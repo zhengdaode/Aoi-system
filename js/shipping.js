@@ -90,3 +90,33 @@ Aoi.ship.refillBatches = function () {
   }).join('');
   if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
 };
+
+// 导出当前批次为 CSV（排发表）
+Aoi.ship.export = function () {
+  var batchId = document.getElementById('shipBatch').value;
+  if (!batchId) { Aoi.toast('请先选择批次', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  var rows = d.orders.filter(function (o) { return o.batchId === batchId; });
+  if (!rows.length) { Aoi.toast('该批次暂无订单', 'warning'); return; }
+  var data = rows.map(function (o) {
+    return {
+      '购买者': o.buyer,
+      '制品': o.type + ' - ' + o.model,
+      '数量': o.count,
+      '囤货地': Aoi.warehouse.name(o.warehouseId) || '',
+      '快递单号': o.tracking || '',
+      '合照': o.photo || '',
+      '状态': o.shipped || '未发'
+    };
+  });
+  var csv = '﻿' + XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(data));
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '排发_' + Aoi.orders.batchDate(batchId) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  Aoi.toast('已导出 ' + rows.length + ' 条', 'success');
+};

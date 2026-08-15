@@ -467,7 +467,10 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">发货管理</h3>
           <p class="text-sm text-gray-500 mb-3">选到货批次，录快递单号、设合照、标记发货（单号请复制到菜鸟裹裹查询）</p>
-          <select id="shipBatch" onchange="Aoi.ship.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="shipBatch" onchange="Aoi.ship.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+            <button onclick="Aoi.ship.export()" class="px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">导出 CSV</button>
+          </div>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex flex-wrap items-center gap-3 mb-3">

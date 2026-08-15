@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.4.0（阶段 0–3 + 4a 团员端完成）
+> 更新日期：2026-08-15 · 版本 v0.5.0（阶段 0–3 + 4a 团员端 + 4b 通知公告）
 
 ## 项目定位
 
@@ -40,6 +40,12 @@
 - **公告**：新增 `d.announcements[]`，管理员在设置页极简发布/删除，团员端首页展示（自动提醒/QQ 机器人留到 4b）。
 - **密钥访问**：`teams.member_key` + 匿名 RPC（`get_team_by_member_key` / `update_team_data_by_member_key`），debug 模式走 localStorage 回退。
 
+### 阶段 4b · 通知公告（自动提醒 + QQ 机器人接口）
+- **自动提醒**（`js/notify.js`，`Aoi.notify`）：按当前数据自动生成「催缴通知」（待交/已驳回 × 国际费）与「发货通知」（已发 × 快递单号），按「类型 × 买家 × 批次」去重幂等。
+- **触发时机**：进入应用时自动同步；标记已交/驳回、标记已发时自动同步。
+- **通知列表**：新→旧展示，单条复制 / 复制全部未发 / 标记已发 / 删除 / 清除已发。
+- **QQ 机器人接口**（`js/bot.js`，`Aoi.bot`）：仅留 `config` + `sendPrivate` / `sendGroup` / `pushAll` 三个占位接口，未接入（`enabled=false`），点「推送」提示未接入。正式接入只需填 config 并实现 HTTP 调用，无需改其它模块。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
@@ -51,6 +57,7 @@
   batches:   [{ id, date, targetAmount?, weights?, manualFees? }],
   payments:  [{ id, batchId, buyer, status, receipt?, receiptDate? }],
   announcements: [{ id, text, date }],
+  notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
   calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup }
 }
 ```
@@ -79,7 +86,6 @@
 
 | 项 | 所属 | 说明 |
 |---|---|---|
-| 通知与公告 | 阶段 4b | 自动提醒 + QQ 机器人（公告极简版已在 4a 带出） |
 | 团员端补全 | 阶段 4b | 申请换囤货地（依赖「囤货地管理」） |
 | 活动管理 | — | 购买时间/出货日期/平台链接/进度状态 |
 | 囤货地管理 | — | 站点与收款码；事务审批里的「转移囤货地申请」依赖此项 |
@@ -89,6 +95,6 @@
 ## 已知限制
 
 - 合照与付款凭证均为 **URL 粘贴**，真实图床上传待阶段 5。
-- 催缴/驳回的**通知**依赖阶段 4b 的 QQ 机器人，当前仅生成可复制的名单。
+- **QQ 机器人接口已就位但未接入**（`Aoi.bot` 占位，`enabled=false`）；当前通知只能手动复制后发群。
 - `Aoi.confirm` 暂用原生 `confirm`，待前端设计统一替换。
 - **团员密钥即访问凭证**：任何持有 `member_key` 者可读写整份团队数据（覆盖式写 blob），存在并发覆盖/误改风险；正式商用前建议加乐观锁或拆分写入权限。

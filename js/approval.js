@@ -100,6 +100,7 @@ Aoi.approval.setStatus = async function (batchId, buyer, status) {
   await Aoi.saveTeamData(d);
   Aoi.approval.render();
   Aoi.toast(buyer + ' → ' + status, 'success');
+  Aoi.notify.sync();
 };
 
 // 生成催缴名单（待交 + 已驳回，含国际费金额）

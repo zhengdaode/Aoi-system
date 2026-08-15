@@ -107,6 +107,8 @@ Aoi.enterApp = async function () {
   Aoi.intl.refillBatches();
   Aoi.approval.refillBatches();
   Aoi.ship.refillBatches();
+  Aoi.notify.refillBatches();
+  Aoi.notify.sync();
   Aoi.calc.fillForm();
   Aoi.showScreen('screen-app');
 };

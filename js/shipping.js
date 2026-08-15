@@ -75,6 +75,7 @@ Aoi.ship.setShipped = async function () {
   await Aoi.saveTeamData(d);
   Aoi.ship.render();
   Aoi.toast('已设 ' + ids.length + ' 条为' + status, 'success');
+  if (status === '已发') Aoi.notify.sync();
 };
 
 Aoi.ship.refillBatches = function () {

@@ -87,3 +87,15 @@ Aoi.hideLoading = function () {
 Aoi.confirm = function (msg) {
   return Promise.resolve(window.confirm(msg));
 };
+
+// 复制文本到剪贴板（含降级）
+Aoi.copyText = function (text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise(function (resolve) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta); resolve();
+  });
+};

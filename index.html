@@ -160,6 +160,7 @@
         <a data-nav="view-intl" onclick="Aoi.nav('view-intl')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际计算</a>
         <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">事务审批</a>
         <a data-nav="view-ship" onclick="Aoi.nav('view-ship')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">发货管理</a>
+        <a data-nav="view-notify" onclick="Aoi.nav('view-notify')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">通知公告</a>
         <a data-nav="view-calc" onclick="Aoi.nav('view-calc')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">计算器</a>
       </nav>
     </aside>
@@ -418,6 +419,38 @@
         </div>
       </div>
 
+      <!-- 通知公告 -->
+      <div id="view-notify" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">通知生成</h3>
+          <p class="text-sm text-gray-500 mb-3">按当前数据自动生成催缴 / 发货通知（进入应用时也会自动同步），也可按批次手动补发</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="notifyBatch" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+            <button onclick="Aoi.notify.generate('remind')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600">生成催缴通知</button>
+            <button onclick="Aoi.notify.generate('shipped')" class="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700">生成发货通知</button>
+            <button onclick="Aoi.notify.sync()" class="px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">同步生成</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">通知列表</h3>
+          <div class="flex flex-wrap items-center gap-3 mb-3">
+            <button onclick="Aoi.notify.copyAll()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">复制全部（未发）</button>
+            <button onclick="Aoi.notify.pushBot()" class="px-4 py-2 bg-indigo-500 text-white text-sm font-bold rounded hover:bg-indigo-600">推送（QQ 机器人）</button>
+            <button onclick="Aoi.notify.clearSent()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">清除已发送</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-3 py-2">类型</th><th class="px-3 py-2">对象</th>
+                <th class="px-3 py-2">内容</th><th class="px-3 py-2">日期</th><th class="px-3 py-2">操作</th>
+              </tr></thead>
+              <tbody id="notifyTbody"></tbody>
+            </table>
+          </div>
+          <p id="notifyStat" class="mt-2 text-sm text-gray-500"></p>
+        </div>
+      </div>
+
       <!-- 计算器 -->
       <div id="view-calc" data-view class="hidden grid gap-4 max-w-4xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -493,5 +526,7 @@
   <script src="js/approval.js"></script>
   <script src="js/shipping.js"></script>
   <script src="js/member.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/bot.js"></script>
 </body>
 </html>

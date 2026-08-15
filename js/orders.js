@@ -484,6 +484,7 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+  Aoi.orders.renderBuyers();
 };
 
 Aoi.orders.addActivity = async function () {
@@ -508,15 +509,22 @@ Aoi.orders.removeActivity = async function (name) {
   if (!(await Aoi.confirm('确定删除活动「' + name + '」？相关订单将变为「无活动」'))) return;
   var d = Aoi.orders.ensure();
   Aoi.undo.arm('删除活动', d);
+  var affected = {};
+  d.orders.forEach(function (o) { if (o.activity === name && o.buyer) affected[o.buyer] = 1; });
   d.activities = d.activities.filter(function (a) { return a !== name; });
   delete d.activityMeta[name];
   d.orders.forEach(function (o) { if (o.activity === name) o.activity = ''; });
+  // 级联清理：受影响买家若无未处理完订单，一并删除其 CN
+  var purged = [];
+  Object.keys(affected).forEach(function (buyer) {
+    if (Aoi.orders.buyerUnfinished(d, buyer) === 0) { Aoi.orders.purgeBuyer(d, buyer); purged.push(buyer); }
+  });
   await Aoi.saveTeamData(d);
   Aoi.orders.renderActivities();
   Aoi.orders.refillDatalists();
   Aoi.orders.refillActivities();
   Aoi.orders.render();
-  Aoi.toast('已删除活动', 'success');
+  Aoi.toast(purged.length ? '已删除活动，并清理 ' + purged.length + ' 位无待处理订单的买家' : '已删除活动', 'success');
 };
 
 // 跳转到订单管理并按活动筛选
@@ -545,6 +553,69 @@ Aoi.orders.removeIp = async function (ip) {
   Aoi.toast('已删除 IP「' + ip + '」', 'success');
 };
 
+// —— 买家（CN）管理 ——
+
+// 订单是否已处理完（已到货且已发货）
+Aoi.orders.isOrderDone = function (o) {
+  return (o.status || '未到货') === '已到货' && (o.shipped || '未发') === '已发';
+};
+
+// 收集去重买家（CN）
+Aoi.orders.collectBuyers = function (d) {
+  var set = {};
+  (d.orders || []).forEach(function (o) { if (o.buyer) set[o.buyer] = 1; });
+  return Object.keys(set).sort();
+};
+
+// 某买家未处理完的订单数
+Aoi.orders.buyerUnfinished = function (d, buyer) {
+  return (d.orders || []).filter(function (o) { return o.buyer === buyer && !Aoi.orders.isOrderDone(o); }).length;
+};
+
+// 清除买家在所有数据里的引用（不保存）
+Aoi.orders.purgeBuyer = function (d, buyer) {
+  d.orders = (d.orders || []).filter(function (o) { return o.buyer !== buyer; });
+  ['payments', 'notifications', 'transfers'].forEach(function (k) {
+    if (Array.isArray(d[k])) d[k] = d[k].filter(function (x) { return x.buyer !== buyer; });
+  });
+  if (d.addresses && d.addresses[buyer]) delete d.addresses[buyer];
+};
+
+// 渲染买家（CN）列表
+Aoi.orders.renderBuyers = function () {
+  var d = Aoi.orders.ensure();
+  var tbody = document.getElementById('buyerTbody');
+  if (!tbody) return;
+  var buyers = Aoi.orders.collectBuyers(d);
+  tbody.innerHTML = buyers.length ? buyers.map(function (buyer) {
+    var total = (d.orders || []).filter(function (o) { return o.buyer === buyer; }).length;
+    var unfinished = Aoi.orders.buyerUnfinished(d, buyer);
+    return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-3 py-2 font-medium">' + Aoi.escapeHtml(buyer) + '</td>'
+      + '<td class="px-3 py-2 text-right text-gray-400">' + total + '</td>'
+      + '<td class="px-3 py-2 text-right ' + (unfinished ? 'text-amber-500' : 'text-green-600') + '">' + unfinished + '</td>'
+      + '<td class="px-3 py-2 text-right"><button data-del-buyer="' + Aoi.escapeHtml(buyer) + '" class="text-red-500 hover:underline">删</button></td>'
+      + '</tr>';
+  }).join('') : '<tr><td colspan="4" class="px-3 py-2 text-gray-400">暂无买家</td></tr>';
+};
+
+// 手动删除买家（CN）
+Aoi.orders.removeBuyer = async function (buyer) {
+  var d = Aoi.approval.ensure();
+  var total = (d.orders || []).filter(function (o) { return o.buyer === buyer; }).length;
+  var unfinished = Aoi.orders.buyerUnfinished(d, buyer);
+  var warn = unfinished > 0 ? '\n⚠️ 该买家仍有 ' + unfinished + ' 条未处理完的订单！' : '';
+  if (!(await Aoi.confirm('确定删除买家「' + buyer + '」？将删除其 ' + total + ' 条订单及交费/地址/通知等记录' + warn, { title: '删除买家', okText: '删除', danger: true }))) return;
+  Aoi.undo.arm('删除买家', d);
+  Aoi.orders.purgeBuyer(d, buyer);
+  await Aoi.saveTeamData(d);
+  Aoi.orders.render();
+  Aoi.orders.renderBuyers();
+  Aoi.orders.refillAllBatchSelects();
+  Aoi.overview.render();
+  Aoi.toast('已删除买家「' + buyer + '」', 'success');
+};
+
 Aoi.orders.setActivityField = async function (name, field, value) {
   var d = Aoi.orders.ensure();
   if (!d.activityMeta[name]) d.activityMeta[name] = {};
@@ -563,6 +634,10 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (btn) { Aoi.orders.removeActivity(btn.getAttribute('data-remove')); return; }
   var jump = e.target.closest('button[data-jump]');
   if (jump) Aoi.orders.jumpToActivity(jump.getAttribute('data-jump'));
+});
+document.getElementById('buyerTbody').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-del-buyer]');
+  if (btn) Aoi.orders.removeBuyer(btn.getAttribute('data-del-buyer'));
 });
 
 // —— 分级选择：IP → 活动（按 IP 过滤）、类型（线路分组 + 搜索） ——

@@ -98,6 +98,7 @@ Aoi.enterApp = async function () {
   Aoi.state.members = info.members;
   Aoi.state.data = await Aoi.getTeamData();
   Aoi.renderSettings();
+  Aoi.announce.render();
   Aoi.orders.render();
   Aoi.orders.renderProducts();
   Aoi.orders.refillDatalists();

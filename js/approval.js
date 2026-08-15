@@ -34,12 +34,13 @@ Aoi.approval.buyerSummary = function (batchId) {
     var rec = Aoi.approval.getRecord(batchId, buyer);
     m.intlFee = intlTotals[buyer] || 0;
     m.status = rec ? rec.status : '待交';
+    m.receipt = rec ? rec.receipt : null;
     return m;
   }).sort(function (a, b) { return a.buyer < b.buyer ? -1 : 1; });
 };
 
 Aoi.approval.statusBadge = function (status) {
-  var map = { '待交': 'text-gray-400', '已交': 'text-green-600', '已驳回': 'text-red-500' };
+  var map = { '待交': 'text-gray-400', '待审核': 'text-amber-500', '已交': 'text-green-600', '已驳回': 'text-red-500' };
   return '<span class="' + (map[status] || 'text-gray-400') + '">' + Aoi.escapeHtml(status) + '</span>';
 };
 
@@ -65,10 +66,14 @@ Aoi.approval.render = function () {
     return;
   }
   var rows = Aoi.approval.buyerSummary(batchId);
-  var paid = 0;
+  var paid = 0, pending = 0;
   tbody.innerHTML = rows.map(function (r) {
     if (r.status === '已交') paid++;
+    if (r.status === '待审核') pending++;
     var b = Aoi.escapeHtml(r.buyer);
+    var receipt = r.receipt
+      ? ' <a href="' + Aoi.escapeHtml(r.receipt) + '" target="_blank" class="text-blue-500 hover:underline text-xs">凭证</a>'
+      : '';
     var actions = '';
     if (r.status !== '已交') actions += '<button data-buyer="' + b + '" data-status="已交" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">标记已交</button>';
     if (r.status !== '已驳回') actions += '<button data-buyer="' + b + '" data-status="已驳回" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>';
@@ -76,12 +81,12 @@ Aoi.approval.render = function () {
       + '<td class="px-3 py-2">' + b + '</td>'
       + '<td class="px-3 py-2 text-right text-gray-400">' + r.goods.toFixed(2) + '</td>'
       + '<td class="px-3 py-2 text-right font-semibold">' + r.intlFee.toFixed(2) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.approval.statusBadge(r.status) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.approval.statusBadge(r.status) + receipt + '</td>'
       + '<td class="px-3 py-2">' + actions + '</td>'
       + '</tr>';
   }).join('');
   document.getElementById('approvalStat').textContent = rows.length
-    ? '共 ' + rows.length + ' 人 · 已交 ' + paid + ' · 待交/驳回 ' + (rows.length - paid)
+    ? '共 ' + rows.length + ' 人 · 已交 ' + paid + ' · 待审核 ' + pending + ' · 待交/驳回 ' + (rows.length - paid - pending)
     : '该批次暂无订单';
 };
 
@@ -101,7 +106,7 @@ Aoi.approval.setStatus = async function (batchId, buyer, status) {
 Aoi.approval.remind = function () {
   var batchId = document.getElementById('approvalBatch').value;
   if (!batchId) return;
-  var unpaid = Aoi.approval.buyerSummary(batchId).filter(function (r) { return r.status !== '已交'; });
+  var unpaid = Aoi.approval.buyerSummary(batchId).filter(function (r) { return r.status === '待交' || r.status === '已驳回'; });
   document.getElementById('approvalRemind').value = unpaid.map(function (r) {
     return r.buyer + '：应付国际费 ¥' + r.intlFee.toFixed(2) + (r.status === '已驳回' ? '（已驳回）' : '');
   }).join('\n');

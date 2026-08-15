@@ -10,8 +10,12 @@ create table if not exists teams (
   owner_id    uuid not null references auth.users(id) on delete cascade,
   name        text not null default '我的团',
   invite_code text,
+  member_key  text,
   created_at  timestamptz not null default now()
 );
+
+-- 迁移：为已存在的团队补充 member_key 字段（新建库已含此列，可安全重复执行）
+alter table teams add column if not exists member_key text;
 
 -- 2. 成员表：团长 + 管理员，user 可属于多个团队（phase 0+1 仅使用首个团队）
 create table if not exists team_members (
@@ -126,6 +130,74 @@ begin
 
   update teams set invite_code = new_code where id = team_id;
   return new_code;
+end;
+$$;
+
+-- 团长重新生成团员密钥（团员端免登录访问口令）
+create or replace function public.regenerate_member_key()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  caller uuid := auth.uid();
+  team_id uuid;
+  new_code text := substr(md5(random()::text), 1, 8);
+begin
+  if caller is null then
+    raise exception '未登录';
+  end if;
+
+  select id into team_id from teams where owner_id = caller limit 1;
+  if team_id is null then
+    raise exception '仅团长可生成团员密钥';
+  end if;
+
+  update teams set member_key = new_code where id = team_id;
+  return new_code;
+end;
+$$;
+
+-- =====================================================================
+-- 团员端匿名访问（security definer 绕过 RLS，内部校验 member_key）
+-- 注意：任何持有 member_key 的人都能读/写团队数据，密钥即访问凭证。
+-- =====================================================================
+
+-- 按团员密钥读取团队名 + 业务数据 blob（匿名，无 auth.uid）
+create or replace function public.get_team_by_member_key(member_key text)
+returns json
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select json_build_object(
+    'name', t.name,
+    'data', coalesce(d.data, '{}'::jsonb)
+  )
+  from teams t
+  left join team_data d on d.team_id = t.id
+  where t.member_key = member_key
+  limit 1;
+$$;
+
+-- 按团员密钥写入业务数据 blob（匿名，覆盖整份数据；密钥即授权）
+create or replace function public.update_team_data_by_member_key(member_key text, new_data jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_team_id uuid;
+begin
+  select id into target_team_id from teams where member_key = member_key;
+  if target_team_id is null then
+    raise exception '密钥无效';
+  end if;
+
+  update team_data set data = new_data, updated_at = now() where team_id = target_team_id;
 end;
 $$;
 

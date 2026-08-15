@@ -12,6 +12,11 @@ Aoi.renderSettings = function () {
   document.getElementById('inviteSection').classList.toggle('hidden', !isOwner);
   document.getElementById('inviteCode').textContent = t.invite_code || '（未生成）';
 
+  var mkSection = document.getElementById('memberKeySection');
+  if (mkSection) mkSection.classList.toggle('hidden', !isOwner);
+  var mkLabel = document.getElementById('memberKeyLabel');
+  if (mkLabel) mkLabel.textContent = t.member_key || '（未生成）';
+
   var list = document.getElementById('memberList');
   list.innerHTML = '';
   Aoi.state.members.forEach(function (m) {
@@ -33,6 +38,52 @@ Aoi.onRegenerateCode = async function () {
     document.getElementById('inviteCode').textContent = code;
     Aoi.toast('邀请码已更新', 'success');
   } catch (e) { Aoi.toast(e.message, 'error'); }
+};
+
+// 团长生成 / 刷新团员密钥
+Aoi.onRegenerateMemberKey = async function () {
+  try {
+    var code = await Aoi.regenerateMemberKey();
+    document.getElementById('memberKeyLabel').textContent = code;
+    Aoi.toast('团员密钥已更新', 'success');
+  } catch (e) { Aoi.toast(e.message, 'error'); }
+};
+
+// 公告（极简版：手动发布/删除，展示给团员端；自动提醒/QQ 机器人留到阶段 4b）
+Aoi.announce = {};
+
+Aoi.announce.publish = async function () {
+  var ta = document.getElementById('announceInput');
+  var text = ta.value.trim();
+  if (!text) { Aoi.toast('请输入公告内容', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  if (!Array.isArray(d.announcements)) d.announcements = [];
+  d.announcements.push({ id: Aoi.genId(), text: text, date: new Date().toISOString().slice(0, 10) });
+  await Aoi.saveTeamData(d);
+  ta.value = '';
+  Aoi.announce.render();
+  Aoi.toast('公告已发布', 'success');
+};
+
+Aoi.announce.render = function () {
+  var ul = document.getElementById('announceList');
+  if (!ul) return;
+  var d = Aoi.orders.ensure();
+  var list = (d.announcements || []).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  ul.innerHTML = list.length ? list.map(function (a) {
+    return '<li class="flex items-start justify-between border-b border-gray-100 py-2">'
+      + '<div class="flex-1"><p class="text-sm whitespace-pre-wrap">' + Aoi.escapeHtml(a.text) + '</p>'
+      + '<p class="text-xs text-gray-400 mt-1">' + Aoi.escapeHtml(a.date || '') + '</p></div>'
+      + '<button data-remove-announce="' + a.id + '" class="text-red-500 text-sm hover:underline ml-2">删</button>'
+      + '</li>';
+  }).join('') : '<li class="text-sm text-gray-400 py-2">暂无公告</li>';
+};
+
+Aoi.announce.remove = async function (id) {
+  var d = Aoi.orders.ensure();
+  d.announcements = (d.announcements || []).filter(function (a) { return a.id !== id; });
+  await Aoi.saveTeamData(d);
+  Aoi.announce.render();
 };
 
 // 团长移除管理员
@@ -73,4 +124,10 @@ Aoi.onJoinTeam = async function () {
 document.getElementById('memberList').addEventListener('click', function (e) {
   var btn = e.target.closest('[data-remove]');
   if (btn) Aoi.onRemoveMember(btn.getAttribute('data-remove'));
+});
+
+// 事件委托：公告列表里的「删」按钮
+document.getElementById('announceList').addEventListener('click', function (e) {
+  var btn = e.target.closest('[data-remove-announce]');
+  if (btn) Aoi.announce.remove(btn.getAttribute('data-remove-announce'));
 });

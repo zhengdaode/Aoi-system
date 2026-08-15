@@ -6,7 +6,12 @@ Aoi.debugTeam = function () {
   var key = 'aoi_debug_team';
   var team = JSON.parse(localStorage.getItem(key) || 'null');
   if (!team) {
-    team = { id: 'debug-team', owner_id: 'debug-local', name: '调试团', invite_code: 'DEBUG', created_at: null };
+    team = { id: 'debug-team', owner_id: 'debug-local', name: '调试团', invite_code: 'DEBUG', member_key: 'DEMO', created_at: null };
+    localStorage.setItem(key, JSON.stringify(team));
+  }
+  // 兼容旧调试数据：补齐 member_key
+  if (!team.member_key) {
+    team.member_key = 'DEMO';
     localStorage.setItem(key, JSON.stringify(team));
   }
   return team;
@@ -86,5 +91,44 @@ Aoi.removeMember = async function (userId) {
   var r = await Aoi.db.from('team_members').delete()
     .eq('user_id', userId)
     .eq('team_id', Aoi.state.team.id);
+  if (r.error) throw new Error(r.error.message);
+};
+
+// 团长重新生成团员密钥（团员端免登录口令）
+Aoi.regenerateMemberKey = async function () {
+  if (Aoi.state.user && Aoi.state.user.isDebug) {
+    var t = Aoi.debugTeam();
+    t.member_key = 'DEMO' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    localStorage.setItem('aoi_debug_team', JSON.stringify(t));
+    Aoi.state.team = t;
+    return t.member_key;
+  }
+  var r = await Aoi.db.rpc('regenerate_member_key');
+  if (r.error) throw new Error(r.error.message);
+  return r.data;
+};
+
+// 团员端：按团员密钥读取团队数据（debug 走 localStorage，否则匿名 RPC）
+Aoi.getTeamDataByMemberKey = async function (key) {
+  var debugTeam = JSON.parse(localStorage.getItem('aoi_debug_team') || 'null');
+  if (debugTeam && (debugTeam.member_key || 'DEMO') === key) {
+    return {
+      name: debugTeam.name || '调试团',
+      data: JSON.parse(localStorage.getItem('aoi_debug_data') || '{}')
+    };
+  }
+  var r = await Aoi.db.rpc('get_team_by_member_key', { member_key: key });
+  if (r.error || !r.data) return null;
+  return r.data;
+};
+
+// 团员端：按团员密钥保存团队数据
+Aoi.saveTeamDataByMemberKey = async function (key, data) {
+  var debugTeam = JSON.parse(localStorage.getItem('aoi_debug_team') || 'null');
+  if (debugTeam && (debugTeam.member_key || 'DEMO') === key) {
+    localStorage.setItem('aoi_debug_data', JSON.stringify(data));
+    return;
+  }
+  var r = await Aoi.db.rpc('update_team_data_by_member_key', { member_key: key, new_data: data });
   if (r.error) throw new Error(r.error.message);
 };

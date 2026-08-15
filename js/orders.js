@@ -174,6 +174,7 @@ Aoi.orders.createBatch = async function () {
 Aoi.orders.deleteBatch = async function (id) {
   if (!(await Aoi.confirm('确定删除该批次？其订单将变为未分批'))) return;
   var d = Aoi.orders.ensure();
+  Aoi.undo.arm('删除批次', d);
   d.batches = d.batches.filter(function (b) { return b.id !== id; });
   d.orders.forEach(function (o) { if (o.batchId === id) o.batchId = null; });
   await Aoi.saveTeamData(d);
@@ -328,6 +329,7 @@ Aoi.orders.batchDelete = async function () {
   var idSet = {};
   ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
+  Aoi.undo.arm('删除 ' + ids.length + ' 条订单', d);
   d.orders = d.orders.filter(function (o) { return !idSet[o.id]; });
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
@@ -353,6 +355,7 @@ Aoi.orders.renderProducts = function () {
 
 Aoi.orders.removeProduct = async function (id) {
   var d = Aoi.orders.ensure();
+  Aoi.undo.arm('删除周边', d);
   d.products = d.products.filter(function (p) { return p.id !== id; });
   await Aoi.saveTeamData(d);
   Aoi.orders.renderProducts();
@@ -415,6 +418,7 @@ Aoi.orders.addActivity = async function () {
 Aoi.orders.removeActivity = async function (name) {
   if (!(await Aoi.confirm('确定删除活动「' + name + '」？已有订单的活动名不受影响'))) return;
   var d = Aoi.orders.ensure();
+  Aoi.undo.arm('删除活动', d);
   d.activities = d.activities.filter(function (a) { return a !== name; });
   delete d.activityMeta[name];
   await Aoi.saveTeamData(d);

@@ -126,3 +126,53 @@ Aoi.copyText = function (text) {
     document.execCommand('copy'); document.body.removeChild(ta); resolve();
   });
 };
+
+// —— 撤销机制：删除前快照，30 秒内可恢复 ——
+
+Aoi.undo = { snapshot: null, label: '', timer: null };
+
+Aoi.undo.arm = function (label, d) {
+  var u = Aoi.undo;
+  if (u.timer) clearTimeout(u.timer);
+  u.snapshot = JSON.parse(JSON.stringify(d));
+  u.label = label;
+  u.timer = setTimeout(Aoi.undo.clear, 30000);
+  var bar = document.getElementById('undoBar');
+  var txt = document.getElementById('undoLabel');
+  if (txt) txt.textContent = label;
+  if (bar) bar.classList.remove('hidden');
+};
+
+Aoi.undo.restore = async function () {
+  var u = Aoi.undo;
+  if (!u.snapshot) return;
+  var snap = u.snapshot, label = u.label;
+  Aoi.undo.clear();
+  await Aoi.saveTeamData(snap);
+  Aoi.state.data = snap;
+  Aoi.refreshViews();
+  Aoi.toast('已撤销「' + label + '」', 'success');
+};
+
+Aoi.undo.clear = function () {
+  var u = Aoi.undo;
+  if (u.timer) clearTimeout(u.timer);
+  u.snapshot = null; u.label = ''; u.timer = null;
+  var bar = document.getElementById('undoBar');
+  if (bar) bar.classList.add('hidden');
+};
+
+// 刷新所有视图（撤销恢复后调用）
+Aoi.refreshViews = function () {
+  Aoi.orders.render();
+  Aoi.orders.renderProducts();
+  Aoi.orders.refillDatalists();
+  Aoi.orders.refillBatches();
+  Aoi.orders.renderBatches();
+  Aoi.orders.renderActivities();
+  Aoi.intl.refillBatches();
+  Aoi.approval.refillBatches();
+  Aoi.ship.refillBatches();
+  Aoi.warehouse.render();
+  Aoi.warehouse.renderTransfers();
+};

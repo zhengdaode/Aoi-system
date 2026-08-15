@@ -111,6 +111,7 @@ Aoi.enterApp = async function () {
   Aoi.notify.sync();
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
+  Aoi.img.renderSettings();
   Aoi.calc.fillForm();
   Aoi.showScreen('screen-app');
 };

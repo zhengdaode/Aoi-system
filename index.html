@@ -215,9 +215,23 @@
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <input id="whQr" type="text" placeholder="收款码 URL（选填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'whQr')"></label>
             <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
           </div>
           <ul id="whList"></ul>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">图床设置</h3>
+          <p class="text-sm text-gray-500 mb-3">图片上传到可配置图床（默认免费图床，支持 Chevereto / Lsky Pro / 通用格式）</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label class="block text-xs text-gray-500 mb-1">API 地址</label><input id="imgApi" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">文件字段名</label><input id="imgField" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">Token（选填）</label><input id="imgToken" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">Token 位置</label><select id="imgTokenIn" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"><option value="url">URL 参数</option><option value="header">请求头</option></select></div>
+            <div class="md:col-span-2"><label class="block text-xs text-gray-500 mb-1">响应 URL 路径（选填，如 data.links.url）</label><input id="imgRespPath" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+          </div>
+          <button onclick="Aoi.img.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -433,6 +447,7 @@
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.ship.toggleAll(this)"> 全选</label>
             <input id="shipPhoto" type="text" placeholder="合照 URL" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'shipPhoto')"></label>
             <button onclick="Aoi.ship.setPhoto()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量设合照</button>
             <select id="shipStatus" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="已发">设为已发</option>
@@ -565,5 +580,6 @@
   <script src="js/notify.js"></script>
   <script src="js/bot.js"></script>
   <script src="js/warehouse.js"></script>
+  <script src="js/image-upload.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.6.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地）
+> 更新日期：2026-08-15 · 版本 v0.7.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床）
 
 ## 项目定位
 
@@ -52,6 +52,11 @@
 - **团长审核**：事务审批页列出待处理申请，同意后把该买家在该批次的订单 `warehouseId` 标记为目标囤货地，驳回则保留原状。
 - **发货视图**：发货管理新增「囤货地」列，按 `orders.warehouseId` 显示（空则 —）。
 
+### 阶段 5 · 图床配置（真实图片上传）
+- **图床上传**（`js/image-upload.js`，`Aoi.img`）：本地压缩（最大边长 800，JPEG 0.85）→ 上传可配置图床 → 返回 URL。
+- **沿用原免费图床方案**：默认 `esaimg.cdn1.vip`，支持 Chevereto / Lsky Pro / 通用格式；`api`/`field`/`token`/`tokenIn`/`respPath` 可在设置页配置。
+- **接入点**：发货管理合照、囤货地收款码、团员端付款凭证，均在 URL 输入旁新增「上传」按钮。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
@@ -66,7 +71,8 @@
   transfers:  [{ id, buyer, batchId, toWarehouseId, reason, status, date }],
   announcements: [{ id, text, date }],
   notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
-  calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup }
+  calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup },
+  imgHost:   { api, field, token, tokenIn, respPath }
 }
 ```
 
@@ -95,12 +101,11 @@
 | 项 | 所属 | 说明 |
 |---|---|---|
 | 活动管理 | — | 购买时间/出货日期/平台链接/进度状态 |
-| 图床配置 | 阶段 5 | 真实图片上传（当前合照与付款凭证均为 URL 粘贴） |
 | 打磨 | 阶段 5 | 黑夜模式、撤销、两步确认、导出、教程站 |
 
 ## 已知限制
 
-- 合照与付款凭证均为 **URL 粘贴**，真实图床上传待阶段 5。
+- 图床默认走免费图床 `esaimg.cdn1.vip`（原方案），失效时需在「图床设置」里更换 API 地址。
 - **QQ 机器人接口已就位但未接入**（`Aoi.bot` 占位，`enabled=false`）；当前通知只能手动复制后发群。
 - `Aoi.confirm` 暂用原生 `confirm`，待前端设计统一替换。
 - **团员密钥即访问凭证**：任何持有 `member_key` 者可读写整份团队数据（覆盖式写 blob），存在并发覆盖/误改风险；正式商用前建议加乐观锁或拆分写入权限。

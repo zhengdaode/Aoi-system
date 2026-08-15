@@ -1,119 +1,126 @@
-// 本地调试账户：无需联网，数据存浏览器 localStorage
-const DEBUG_EMAIL = 'test@test.com';
-const DEBUG_PWD = 'test123';
-const DEBUG_USER_ID = 'debug-local-user';
+// Aoi-system — 认证：注册 / 登录 / 找回 / 改密 / 退出
+window.Aoi = window.Aoi || {};
 
-async function handleLogin() {
-    let email = document.getElementById('authEmail').value.trim();
-    let pwd = document.getElementById('authPassword').value;
-    if(!email || !pwd) { showToast('请输入账号和密码', 'warning'); return; }
-    // 调试账户绕过 Supabase，纯本地模式
-    if (email === DEBUG_EMAIL && pwd === DEBUG_PWD) {
-        currentUser = { id: DEBUG_USER_ID, email: DEBUG_EMAIL, isDebug: true };
-        initCloudData();
-        return;
-    }
-    showLoading('登录中...');
-    try {
-        const { data, error } = await db.auth.signInWithPassword({ email, password: pwd });
-        hideLoading();
-        if(error) { showToast('登录失败: 账号不存在或密码错误', 'error'); return; }
-        currentUser = data.user; initCloudData();
-    } catch (err) { hideLoading(); showToast('连接云端失败！', 'error'); }
-}
+Aoi.auth = {};
 
-async function handleRegisterSubmit() {
-    let email = document.getElementById('regEmail').value.trim();
-    let pwd = document.getElementById('regPassword').value;
-    if(!email) { showToast('请正确填写邮箱！', 'warning'); return; }
-    if(pwd.length < 6 || pwd !== document.getElementById('regConfirmPassword').value) { showToast('密码无效或不一致！', 'warning'); return; }
-    showLoading('提交注册中...');
-    try {
-        const { data, error } = await db.auth.signUp({ email, password: pwd, options: { emailRedirectTo: window.location.origin } });
-        hideLoading();
-        if(error) showToast('注册失败: ' + error.message, 'error');
-        else {
-            showToast('注册成功！请前往邮箱点击确认链接完成注册。（可能在垃圾邮件里）', 'success');
-            showScreen('login-screen');
-        }
-    } catch (err) { hideLoading(); showToast('错误，请检查网络', 'error'); }
-}
+Aoi.auth.register = async function () {
+  var email = document.getElementById('regEmail').value.trim();
+  var pwd = document.getElementById('regPassword').value;
+  var pwd2 = document.getElementById('regConfirm').value;
+  if (!email || !pwd) { Aoi.toast('请填写邮箱和密码', 'warning'); return; }
+  if (pwd.length < 6) { Aoi.toast('密码至少 6 位', 'warning'); return; }
+  if (pwd !== pwd2) { Aoi.toast('两次密码不一致', 'warning'); return; }
 
-async function handleSendResetCode() {
-    let email = document.getElementById('forgotEmail').value.trim();
-    if(!email) { showToast('请输入注册时的邮箱', 'warning'); return; }
-    showLoading('发送请求中...');
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-    hideLoading();
-    if(error) showToast('发送失败: ' + error.message, 'error');
-    else {
-        showToast('密码重置链接已发送！请前往邮箱点击链接设置新密码。', 'success');
-        showScreen('login-screen');
-    }
-}
+  Aoi.showLoading('注册中...');
+  var r = await Aoi.db.auth.signUp({
+    email: email,
+    password: pwd,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  Aoi.hideLoading();
+  if (r.error) { Aoi.toast('注册失败：' + r.error.message, 'error'); return; }
+  Aoi.toast('注册成功，请去邮箱点击确认链接（可能在垃圾邮件）', 'success');
+  Aoi.showScreen('screen-auth');
+};
 
-// 核心：监听用户从邮件里点击链接跳回网页的动作
-db.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'PASSWORD_RECOVERY') {
-        showScreen('reset-screen');
-    }
+Aoi.auth.login = async function () {
+  var email = document.getElementById('loginEmail').value.trim();
+  var pwd = document.getElementById('loginPassword').value;
+  if (!email || !pwd) { Aoi.toast('请输入邮箱和密码', 'warning'); return; }
+
+  // 调试账户：绕过 Supabase，数据走 localStorage
+  if (email === Aoi.DEBUG_EMAIL && pwd === Aoi.DEBUG_PWD) {
+    Aoi.state.user = { id: 'debug-local', email: Aoi.DEBUG_EMAIL, isDebug: true };
+    await Aoi.enterApp();
+    return;
+  }
+
+  Aoi.showLoading('登录中...');
+  var r = await Aoi.db.auth.signInWithPassword({ email: email, password: pwd });
+  Aoi.hideLoading();
+  if (r.error) { Aoi.toast('登录失败：邮箱或密码错误', 'error'); return; }
+  Aoi.state.user = r.data.user;
+  await Aoi.enterApp();
+};
+
+Aoi.auth.sendReset = async function () {
+  var email = document.getElementById('forgotEmail').value.trim();
+  if (!email) { Aoi.toast('请输入注册邮箱', 'warning'); return; }
+
+  Aoi.showLoading('发送中...');
+  var r = await Aoi.db.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  Aoi.hideLoading();
+  if (r.error) { Aoi.toast('发送失败：' + r.error.message, 'error'); return; }
+  Aoi.toast('重置链接已发送，请查收邮箱', 'success');
+  Aoi.showScreen('screen-auth');
+};
+
+Aoi.auth.doReset = async function () {
+  var pwd = document.getElementById('resetPassword').value;
+  if (pwd.length < 6) { Aoi.toast('新密码至少 6 位', 'warning'); return; }
+
+  Aoi.showLoading('重置中...');
+  var r = await Aoi.db.auth.updateUser({ password: pwd });
+  Aoi.hideLoading();
+  if (r.error) { Aoi.toast('重置失败：' + r.error.message, 'error'); return; }
+  Aoi.toast('密码已重置', 'success');
+  var user = (await Aoi.db.auth.getUser()).data.user;
+  Aoi.state.user = user;
+  await Aoi.enterApp();
+};
+
+Aoi.auth.changePassword = async function () {
+  var pwd = document.getElementById('newPassword').value;
+  if (pwd.length < 6) { Aoi.toast('新密码至少 6 位', 'warning'); return; }
+
+  Aoi.showLoading('修改中...');
+  var r = await Aoi.db.auth.updateUser({ password: pwd });
+  Aoi.hideLoading();
+  if (r.error) { Aoi.toast('修改失败：' + r.error.message, 'error'); return; }
+  Aoi.toast('密码已修改', 'success');
+  document.getElementById('newPassword').value = '';
+};
+
+Aoi.auth.logout = async function () {
+  await Aoi.db.auth.signOut();
+  Aoi.state.user = null;
+  Aoi.state.team = null;
+  Aoi.state.members = [];
+  Aoi.showScreen('screen-auth');
+};
+
+// 登录后进入应用：有团队 → 设置页；无团队 → 入驻页
+Aoi.enterApp = async function () {
+  var info = await Aoi.loadTeam();
+  if (!info) { Aoi.showScreen('screen-onboard'); return; }
+  Aoi.state.team = info.team;
+  Aoi.state.role = info.role;
+  Aoi.state.members = info.members;
+  Aoi.state.data = await Aoi.getTeamData();
+  Aoi.renderSettings();
+  Aoi.orders.render();
+  Aoi.orders.renderProducts();
+  Aoi.orders.refillDatalists();
+  Aoi.orders.refillBatches();
+  Aoi.orders.renderBatches();
+  Aoi.intl.refillBatches();
+  Aoi.approval.refillBatches();
+  Aoi.ship.refillBatches();
+  Aoi.calc.fillForm();
+  Aoi.showScreen('screen-app');
+};
+
+// 监听密码找回回调
+Aoi.db.auth.onAuthStateChange(function (event) {
+  if (event === 'PASSWORD_RECOVERY') Aoi.showScreen('screen-reset');
 });
 
-async function handleDoResetPassword() {
-    let newPwd = document.getElementById('resetNewPassword').value;
-    if(newPwd.length < 6) { showToast('新密码至少需要6位', 'warning'); return; }
-    showLoading('正在重置...');
-    const { error } = await db.auth.updateUser({ password: newPwd });
-    hideLoading();
-    if(error) return showToast('更新失败：' + error.message, 'error');
-
-    showToast('密码重置成功！', 'success');
-    currentUser = (await db.auth.getUser()).data.user;
-    initCloudData();
-}
-
-async function saveQueryKey() {
-    let key = document.getElementById('settingQueryKey').value.trim();
-    if(!key) { showToast('请输入密钥！', 'warning'); return; }
-    if (currentUser.isDebug) { showToast('调试模式不支持密钥设置', 'info'); return; }
-    showLoading('保存密钥...');
-    const { error } = await db.from('leader_data').update({ query_key: key }).eq('user_id', currentUser.id);
-    hideLoading();
-    if(error) showToast('密钥保存失败！', 'error');
-    else showToast('全局密钥设置成功！', 'success');
-}
-
-async function handleLogout() {
-    if (!currentUser.isDebug) await db.auth.signOut();
-    localStorage.removeItem('assistant_uid');
-    currentUser = null; groupData = []; imageUrlData = {};
-    showScreen('portal-screen');
-}
-
-async function initCloudData() {
-    try {
-        // 调试账户：从 localStorage 读取数据
-        if (currentUser.isDebug) {
-            const saved = localStorage.getItem('groupData_V4');
-            if (saved) groupData = JSON.parse(saved);
-            const savedImg = localStorage.getItem('imageUrlData_V1');
-            if (savedImg) imageUrlData = JSON.parse(savedImg);
-            showScreen('dashboard-screen'); updateBatchDatalist(); switchTab('input');
-            if (typeof applyBackground === 'function') applyBackground();
-            if (typeof applyFeatureToggles === 'function') applyFeatureToggles();
-            return;
-        }
-        showLoading('正在拉取数据...');
-        const { data, error } = await db.from('leader_data').select('*').eq('user_id', currentUser.id).single();
-        if(data) {
-            groupData = data.group_data || []; imageUrlData = data.image_data || {};
-            document.getElementById('settingQueryKey').value = data.query_key || '';
-        } else { await db.from('leader_data').insert({ user_id: currentUser.id, group_data: [], image_data: {} }); }
-    } catch(e) {} finally { hideLoading(); showScreen('dashboard-screen'); updateBatchDatalist(); switchTab('input'); if (typeof applyBackground === 'function') applyBackground(); if (typeof applyFeatureToggles === 'function') applyFeatureToggles(); }
-}
-
-// 页面启动时检查是否已登录（放在 auth.js 末尾，确保 initCloudData 已定义）
-db.auth.getSession().then(({ data: { session } }) => {
-    if (session) { currentUser = session.user; initCloudData(); }
-    else showScreen('portal-screen');
+// 启动：恢复会话
+Aoi.db.auth.getSession().then(function (res) {
+  if (res.data && res.data.session) {
+    Aoi.state.user = res.data.session.user;
+    Aoi.enterApp();
+  } else {
+    Aoi.showScreen('screen-auth');
+  }
 });

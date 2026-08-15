@@ -179,7 +179,7 @@ Aoi.refreshViews = function () {
   Aoi.overview.render();
 };
 
-// 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）
+// 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）+ 开设 IP 一览
 Aoi.overview = {
   render: function () {
     var d = Aoi.state.data || {};
@@ -193,5 +193,42 @@ Aoi.overview = {
     set('ovUnpaid', payments.filter(function (p) { return p.status === '待交' || p.status === '已驳回'; }).length);
     set('ovToShip', orders.filter(function (o) { return o.status === '已到货' && (o.shipped || '未发') === '未发'; }).length);
     set('ovToArrive', orders.filter(function (o) { return (o.status || '未到货') === '未到货'; }).length);
+
+    // 开设 IP 一览
+    var ipBox = document.getElementById('ovIpList');
+    if (ipBox) {
+      var ips = Aoi.orders.collectIps(d);
+      ipBox.innerHTML = ips.length ? ips.map(function (ip) {
+        var count = Aoi.orders.activitiesByIp(ip).length;
+        return '<button data-ovip="' + Aoi.escapeHtml(ip) + '" class="px-3 py-1.5 bg-gray-100 hover:bg-blue-100 rounded text-sm text-left">'
+          + Aoi.escapeHtml(ip) + ' <span class="text-xs text-gray-400">' + count + '</span></button>';
+      }).join('') : '<span class="text-sm text-gray-400">暂无 IP</span>';
+    }
+  },
+  showIp: function (ip) {
+    var d = Aoi.state.data || {};
+    var acts = Aoi.orders.activitiesByIp(ip);
+    var box = document.getElementById('ovIpActivities');
+    if (!box) return;
+    var head = '<div class="flex items-center justify-between mb-2">'
+      + '<h4 class="text-sm font-semibold">' + Aoi.escapeHtml(ip) + ' 的活动</h4>'
+      + '<button data-ovdel-ip="' + Aoi.escapeHtml(ip) + '" class="text-xs text-red-500 hover:underline">删除该 IP</button></div>';
+    box.innerHTML = head
+      + (acts.length ? acts.map(function (a) {
+          var m = (d.activityMeta && d.activityMeta[a]) || {};
+          return '<div class="flex items-center gap-2 py-1 border-b border-gray-100 text-sm">'
+            + '<button data-ovjump="' + Aoi.escapeHtml(a) + '" class="font-medium text-blue-600 hover:underline text-left">' + Aoi.escapeHtml(a) + '</button>'
+            + '<span class="text-xs text-gray-400">' + Aoi.escapeHtml(m.status || '未开始') + '</span></div>';
+        }).join('') : '<span class="text-sm text-gray-400">该 IP 下暂无活动</span>');
   }
 };
+
+// 总览 IP 一览：点击 IP 查看其活动（事件委托；IP 经 data 属性传递，避免内联 onclick 注入）
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-ovip]');
+  if (btn) { Aoi.overview.showIp(btn.getAttribute('data-ovip')); return; }
+  var jump = e.target.closest('button[data-ovjump]');
+  if (jump) { Aoi.orders.jumpToActivity(jump.getAttribute('data-ovjump')); return; }
+  var del = e.target.closest('button[data-ovdel-ip]');
+  if (del) Aoi.orders.removeIp(del.getAttribute('data-ovdel-ip'));
+});

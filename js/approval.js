@@ -32,7 +32,7 @@ Aoi.approval.buyerSummary = function (batchId) {
   return Object.keys(map).map(function (buyer) {
     var m = map[buyer];
     var rec = Aoi.approval.getRecord(batchId, buyer);
-    m.intlFee = intlTotals[buyer] || 0;
+    m.intlFee = (rec && rec.intlFee != null) ? rec.intlFee : (intlTotals[buyer] || 0);
     m.status = rec ? rec.status : '待交';
     m.receipt = rec ? rec.receipt : null;
     return m;
@@ -140,7 +140,7 @@ Aoi.approval.refillBatches = function () {
   var cur = sel.value;
   var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
   sel.innerHTML = '<option value="">选择批次…</option>' + list.map(function (b) {
-    return '<option value="' + b.id + '">' + Aoi.escapeHtml(b.date + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
+    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
   }).join('');
   if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
 };

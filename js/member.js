@@ -82,10 +82,10 @@ Aoi.member.renderFees = function (cn) {
   var tbody = document.getElementById('memberFeeTbody');
   tbody.innerHTML = ids.length ? ids.map(function (batchId) {
     var batch = myBatches[batchId];
+    var rec = Aoi.approval.getRecord(batchId, cn);
     var items = Aoi.intl.buildItems(batch);
     var totals = Aoi.intl.buyerTotals(batchId, items);
-    var fee = totals[cn] || 0;
-    var rec = Aoi.approval.getRecord(batchId, cn);
+    var fee = (rec && rec.intlFee != null) ? rec.intlFee : (totals[cn] || 0);
     var status = rec ? rec.status : '待交';
     var receipt = rec ? rec.receipt : null;
 

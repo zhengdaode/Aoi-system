@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.9.2（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨 + 8 分级录入与类型线路 + 9 收件地址与批次选货）
+> 更新日期：2026-08-16 · 版本 v0.9.2（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨 + 8 分级录入与类型线路 + 9 收件地址与批次选货 + 10 批次命名/IP一览/分摊落库）
 
 ## 项目定位
 
@@ -77,16 +77,24 @@
 - **IP（作品）与活动批次（团期）区分**：Excel 导入不再用 `团期名.split` 推 IP，改为确认弹窗中从已知 IP 选填（前缀自动匹配，如「术力口」⊆「术力口-初音未来17周年」）；导入同时写 `activityMeta[活动].ip`，使活动在录入时能按 IP 正确过滤。
 - **批次选货**：国际批次列表每行新增「选货」按钮，跳转订单管理并预选该批次、只显示未分批商品，勾选后「标记到货」归入。
 
+### 阶段 10 · 批次命名 + IP 一览 + 分摊落库（修复）
+- **批次命名**：新建批次可选命名，可改名；批次列表可展开查看批次内活动（活动 × 数量）。
+- **总览「开设 IP 一览」**：列出所有 IP，点 IP 查看其活动（可跳转订单管理），并可删除该 IP（清除其在订单/周边/活动/常用类型中的关联）。
+- **类型筛选与大类折叠**：按 IP 常用类型加模糊搜索；手动录入类型面板按发货线路分组可折叠。
+- **国际计算分摊落库**：新增「保存分摊到订单」，把分摊结果写入 `orders.intlFee`（每件商品）与 `payments.intlFee`（每人待交国际运费），审批/团员端/催缴通知优先读已保存值。
+- **活动/订单联动**：活动管理点击活动名跳转订单管理（按活动筛选）。
+- **修复**：批次下拉未同步刷新、国际计算器无法选批次、活动管理无法查看已有活动、删除活动无效（`ensure()` 反推复现）。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
 {
   orders:    [{ id, ip, activity, type, model, price, count, buyer,
-                status, batchId, paid, shipped, tracking, photo, received, warehouseId }],
+                status, batchId, paid, shipped, tracking, photo, received, warehouseId, intlFee }],
   products:  [{ id, ip, type, model, price }],
   activities:[string],  ips:[string],
-  batches:   [{ id, date, targetAmount?, weights?, manualFees? }],
-  payments:  [{ id, batchId, buyer, status, receipt?, receiptDate? }],
+  batches:   [{ id, date, name, targetAmount?, weights?, manualFees? }],
+  payments:  [{ id, batchId, buyer, status, intlFee?, receipt?, receiptDate? }],
   warehouses: [{ id, name, qrCode }],
   transfers:  [{ id, buyer, batchId, toWarehouseId, reason, status, date }],
   announcements: [{ id, text, date }],

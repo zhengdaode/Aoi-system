@@ -111,6 +111,30 @@ Aoi.intl.saveTarget = async function () {
   Aoi.toast('国际运费总额已保存', 'success');
 };
 
+// 保存分摊结果：写入每件商品国际费 + 每人待交国际运费（审批/团员端/通知据此显示）
+Aoi.intl.saveAllocation = async function () {
+  var batchId = document.getElementById('intlBatch').value;
+  var batch = Aoi.intl.getBatch(batchId);
+  if (!batch) { Aoi.toast('请先选择批次', 'warning'); return; }
+  var d = Aoi.approval.ensure();
+  var items = Aoi.intl.buildItems(batch);
+  var feeByKey = {};
+  items.forEach(function (it) { feeByKey[it.key] = it.weightedIntlFee; });
+  d.orders.forEach(function (o) {
+    if (o.batchId !== batchId) return;
+    o.intlFee = (feeByKey[o.type + '|' + o.model] || 0) * o.count;
+  });
+  var totals = Aoi.intl.buyerTotals(batchId, items);
+  Object.keys(totals).forEach(function (buyer) {
+    var rec = Aoi.approval.getRecord(batchId, buyer);
+    if (!rec) d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: buyer, status: '待交', intlFee: totals[buyer] });
+    else rec.intlFee = totals[buyer];
+  });
+  await Aoi.saveTeamData(d);
+  if (Aoi.notify && Aoi.notify.sync) Aoi.notify.sync();
+  Aoi.toast('已保存分摊结果到商品与待交国际运费', 'success');
+};
+
 // 设置单位重量
 Aoi.intl.setWeight = async function (key, value) {
   var batch = Aoi.intl.getBatch(document.getElementById('intlBatch').value);
@@ -139,7 +163,7 @@ Aoi.intl.refillBatches = function () {
   var cur = sel.value;
   var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
   sel.innerHTML = '<option value="">选择批次…</option>' + list.map(function (b) {
-    return '<option value="' + b.id + '">' + Aoi.escapeHtml(b.date + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
+    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
   }).join('');
   if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
 };

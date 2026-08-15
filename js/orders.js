@@ -16,6 +16,7 @@ Aoi.orders.ensure = function () {
   if (!d.activityMeta) d.activityMeta = {};
   if (!d.typeMeta) d.typeMeta = {};
   if (!d.ipTypes) d.ipTypes = {};
+  if (!d.addresses) d.addresses = {};
   // 首次迁移：把内置常用类型并入类型库（线路=未分类）
   Aoi.orders.TYPE_SUGGESTIONS.forEach(function (t) {
     if (!d.typeMeta[t]) d.typeMeta[t] = { route: '未分类' };
@@ -73,6 +74,10 @@ Aoi.orders.confirmImport = async function () {
   d.orders = d.orders.concat(records);
   if (activity && d.activities.indexOf(activity) < 0) d.activities.push(activity);
   if (ip && d.ips.indexOf(ip) < 0) d.ips.push(ip);
+  if (activity && ip) {
+    if (!d.activityMeta[activity]) d.activityMeta[activity] = {};
+    d.activityMeta[activity].ip = ip;
+  }
   await Aoi.saveTeamData(d);
   Aoi.import.pending = [];
   Aoi.orders.render();
@@ -176,6 +181,17 @@ Aoi.orders.createBatch = async function () {
   Aoi.toast('已新建批次 ' + date, 'success');
 };
 
+// 从批次列表跳转订单管理，为该批次勾选具体到货商品
+Aoi.orders.addToBatch = function (batchId) {
+  Aoi.nav('view-orders');
+  var fBatch = document.getElementById('fBatch');
+  if (fBatch) fBatch.value = '__none__';  // 只看未分批商品
+  var sel = document.getElementById('arriveBatchSel');
+  if (sel) sel.value = batchId;
+  Aoi.orders.render();
+  Aoi.toast('勾选已到货的商品，点「标记到货」归入该批次', 'info');
+};
+
 // 删除批次：订单保留，取消分批
 Aoi.orders.deleteBatch = async function (id) {
   if (!(await Aoi.confirm('确定删除该批次？其订单将变为未分批'))) return;
@@ -200,7 +216,7 @@ Aoi.orders.renderBatches = function () {
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(b.date) + '</td>'
       + '<td class="px-3 py-2 text-right">' + Aoi.orders.batchCount(b.id) + '</td>'
-      + '<td class="px-3 py-2"><button class="text-red-500 hover:underline" onclick="Aoi.orders.deleteBatch(\'' + b.id + '\')">删除</button></td>'
+      + '<td class="px-3 py-2 whitespace-nowrap"><button class="text-blue-500 hover:underline mr-3" onclick="Aoi.orders.addToBatch(\'' + b.id + '\')">选货</button><button class="text-red-500 hover:underline" onclick="Aoi.orders.deleteBatch(\'' + b.id + '\')">删除</button></td>'
       + '</tr>';
   }).join('');
 };

@@ -118,8 +118,8 @@ function makeRecord(batch, catRow, header, priceRow, ci, count, buyer) {
   }
   return {
     id: Aoi.genId(),
-    ip: batch.split(/\s/)[0] || '',
-    activity: batch,
+    ip: '',          // IP（作品）由管理员在确认弹窗中选填，不从团期名推
+    activity: batch, // 团期名 = 活动批次
     type: type,
     model: model,
     price: parseFloat(priceRow[ci]) || 0,
@@ -138,10 +138,14 @@ Aoi.import.detectActivity = function (records) {
   return '';
 };
 
-// 识别 IP（首条非空）
+// 识别 IP（作品）：优先匹配已知 IP 中「活动批次」的前缀（如「术力口」⊆「术力口-初音未来17周年」）
 Aoi.import.detectIp = function (records) {
-  for (var i = 0; i < records.length; i++) {
-    if (records[i].ip) return records[i].ip;
+  var act = Aoi.import.detectActivity(records);
+  if (!act) return '';
+  var d = Aoi.orders.ensure();
+  var ips = Aoi.orders.collectIps(d);
+  for (var i = 0; i < ips.length; i++) {
+    if (ips[i] && act.indexOf(ips[i]) === 0) return ips[i];
   }
   return '';
 };

@@ -8,6 +8,7 @@ Aoi.member.ensure = function () {
   var d = Aoi.orders.ensure();
   if (!Array.isArray(d.announcements)) d.announcements = [];
   Aoi.approval.ensure();
+  Aoi.notify.ensure();
   return d;
 };
 
@@ -42,6 +43,7 @@ Aoi.member.render = function () {
   Aoi.member.renderAnnounce();
   Aoi.member.renderFees(cn);
   Aoi.member.renderOrders(cn);
+  Aoi.member.renderAddress(cn);
   Aoi.member.refillTransferBatches();
   Aoi.warehouse.refillOptions();
 };
@@ -138,6 +140,37 @@ Aoi.member.renderOrders = function (cn) {
       + '<td class="px-3 py-2">' + confirm + '</td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="8" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
+};
+
+// —— 收件地址：只写不读（保护隐私），提交后在 QQ 通知团长 ——
+
+Aoi.member.address = function (cn) {
+  var d = Aoi.orders.ensure();
+  return (d.addresses && d.addresses[cn]) || '';
+};
+
+Aoi.member.renderAddress = function (cn) {
+  var has = !!Aoi.member.address(cn);
+  var status = document.getElementById('memberAddrStatus');
+  if (status) status.textContent = has ? '已填写（为保护隐私，不显示原文）' : '未填写';
+};
+
+Aoi.member.saveAddress = async function () {
+  var addr = document.getElementById('memberAddr').value.trim();
+  if (!addr) { Aoi.toast('请输入收件地址', 'warning'); return; }
+  var cn = Aoi.member.state.cn;
+  var d = Aoi.member.ensure();
+  d.addresses[cn] = addr;
+  d.notifications.push({
+    id: Aoi.genId(), type: 'address', buyer: cn, batchId: null,
+    title: '收件地址更新',
+    body: cn + ' 更新了收件地址：' + addr,
+    date: new Date().toISOString().slice(0, 10), sent: false
+  });
+  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+  document.getElementById('memberAddr').value = '';
+  Aoi.member.renderAddress(cn);
+  Aoi.toast('收件地址已保存，团长将收到通知', 'success');
 };
 
 // 提交付款凭证：写 payments，状态置为待审核

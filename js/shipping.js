@@ -40,6 +40,7 @@ Aoi.ship.render = function () {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.orders.typeRoute(o.type)) + '</td>'
       + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.warehouse.name(o.warehouseId) || '—') + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.member.address(o.buyer) || '—') + '</td>'
       + '<td class="px-3 py-2">' + photo + '</td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(o.tracking || '') + '" placeholder="快递单号" onchange="Aoi.ship.setTracking(\'' + o.id + '\', this.value)" class="w-32 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2">' + Aoi.ship.shippedBadge(o.shipped) + '</td>'

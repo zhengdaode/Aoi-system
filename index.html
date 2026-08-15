@@ -167,6 +167,7 @@
         <a data-nav="view-settings" onclick="Aoi.nav('view-settings')" class="block px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold cursor-pointer">账号与设置</a>
         <a data-nav="view-entry" onclick="Aoi.nav('view-entry')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">信息录入</a>
         <a data-nav="view-orders" onclick="Aoi.nav('view-orders')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">订单管理</a>
+        <a data-nav="view-activities" onclick="Aoi.nav('view-activities')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">活动管理</a>
         <a data-nav="view-batches" onclick="Aoi.nav('view-batches')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际批次</a>
         <a data-nav="view-intl" onclick="Aoi.nav('view-intl')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际计算</a>
         <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">事务审批</a>
@@ -334,6 +335,31 @@
             </tr></thead>
             <tbody id="orderTbody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- 活动管理 -->
+      <div id="view-activities" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">活动管理</h3>
+          <p class="text-sm text-gray-500 mb-3">为每个活动记录购买时间、出货日期、平台链接与进度状态</p>
+          <div class="flex flex-wrap items-center gap-3 mb-4">
+            <input id="newActivity" type="text" placeholder="新活动名称" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <button onclick="Aoi.orders.addActivity()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增活动</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-3 py-2">活动</th>
+                <th class="px-3 py-2">购买时间</th>
+                <th class="px-3 py-2">出货日期</th>
+                <th class="px-3 py-2">平台链接</th>
+                <th class="px-3 py-2">进度</th>
+                <th class="px-3 py-2"></th>
+              </tr></thead>
+              <tbody id="activityTbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 

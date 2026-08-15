@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.7.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床）
+> 更新日期：2026-08-15 · 版本 v0.8.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理）
 
 ## 项目定位
 
@@ -57,6 +57,11 @@
 - **沿用原免费图床方案**：默认 `esaimg.cdn1.vip`，支持 Chevereto / Lsky Pro / 通用格式；`api`/`field`/`token`/`tokenIn`/`respPath` 可在设置页配置。
 - **接入点**：发货管理合照、囤货地收款码、团员端付款凭证，均在 URL 输入旁新增「上传」按钮。
 
+### 阶段 6 · 活动管理
+- **活动台账**（`js/orders.js`，`Aoi.orders`）：为每个活动记录购买时间、出货日期、平台链接、进度状态（未开始/进行中/已下单/已出货/已完成）。
+- **数据模型**：新增 `d.activityMeta = { [活动名]: { buyDate, shipDate, link, status } }`，活动名沿用 `d.activities` 字符串数组（订单 `activity` 字段不受影响）。
+- **交互**：字段即时保存（onchange）；删除活动仅从台账移除，不影响历史订单。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
@@ -72,7 +77,8 @@
   announcements: [{ id, text, date }],
   notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
   calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup },
-  imgHost:   { api, field, token, tokenIn, respPath }
+  imgHost:   { api, field, token, tokenIn, respPath },
+  activityMeta: { [活动名]: { buyDate, shipDate, link, status } }
 }
 ```
 
@@ -100,7 +106,6 @@
 
 | 项 | 所属 | 说明 |
 |---|---|---|
-| 活动管理 | — | 购买时间/出货日期/平台链接/进度状态 |
 | 打磨 | 阶段 5 | 黑夜模式、撤销、两步确认、导出、教程站 |
 
 ## 已知限制

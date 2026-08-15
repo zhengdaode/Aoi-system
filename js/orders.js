@@ -13,6 +13,7 @@ Aoi.orders.ensure = function () {
   if (!Array.isArray(d.activities)) d.activities = [];
   if (!Array.isArray(d.ips)) d.ips = [];
   if (!Array.isArray(d.batches)) d.batches = [];
+  if (!d.activityMeta) d.activityMeta = {};
   Aoi.state.data = d;
   return d;
 };
@@ -367,3 +368,76 @@ Aoi.orders.refillActivities = function () {
     + d.activities.map(function (a) { return '<option>' + Aoi.escapeHtml(a) + '</option>'; }).join('');
   sel.value = cur;
 };
+
+// —— 活动管理：购买时间 / 出货日期 / 平台链接 / 进度状态 ——
+
+Aoi.orders.ACTIVITY_STATUSES = ['未开始', '进行中', '已下单', '已出货', '已完成'];
+
+Aoi.orders.activityStatusOptions = function (cur) {
+  return Aoi.orders.ACTIVITY_STATUSES.map(function (s) {
+    return '<option value="' + s + '"' + (s === cur ? ' selected' : '') + '>' + s + '</option>';
+  }).join('');
+};
+
+Aoi.orders.renderActivities = function () {
+  var d = Aoi.orders.ensure();
+  var tbody = document.getElementById('activityTbody');
+  if (!tbody) return;
+  tbody.innerHTML = d.activities.length ? d.activities.map(function (name) {
+    var m = d.activityMeta[name] || {};
+    return '<tr class="border-b border-gray-100">'
+      + '<td class="px-3 py-2 font-semibold whitespace-nowrap">' + Aoi.escapeHtml(name) + '</td>'
+      + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.buyDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="buyDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
+      + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.shipDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
+      + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="border border-gray-300 rounded px-2 py-1 text-sm w-40"></td>'
+      + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
+      + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
+      + '</tr>';
+  }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+};
+
+Aoi.orders.addActivity = async function () {
+  var el = document.getElementById('newActivity');
+  var name = el.value.trim();
+  if (!name) { Aoi.toast('请输入活动名称', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  if (d.activities.indexOf(name) >= 0) { Aoi.toast('该活动已存在', 'warning'); return; }
+  d.activities.push(name);
+  d.activityMeta[name] = { buyDate: '', shipDate: '', link: '', status: '未开始' };
+  await Aoi.saveTeamData(d);
+  el.value = '';
+  Aoi.orders.renderActivities();
+  Aoi.orders.refillDatalists();
+  Aoi.orders.refillActivities();
+  Aoi.toast('已新增活动 ' + name, 'success');
+};
+
+Aoi.orders.removeActivity = async function (name) {
+  if (!(await Aoi.confirm('确定删除活动「' + name + '」？已有订单的活动名不受影响'))) return;
+  var d = Aoi.orders.ensure();
+  d.activities = d.activities.filter(function (a) { return a !== name; });
+  delete d.activityMeta[name];
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderActivities();
+  Aoi.orders.refillDatalists();
+  Aoi.orders.refillActivities();
+  Aoi.toast('已删除活动', 'success');
+};
+
+Aoi.orders.setActivityField = async function (name, field, value) {
+  var d = Aoi.orders.ensure();
+  if (!d.activityMeta[name]) d.activityMeta[name] = {};
+  d.activityMeta[name][field] = value;
+  await Aoi.saveTeamData(d);
+};
+
+// 事件委托：活动字段即时保存 / 删除
+document.getElementById('activityTbody').addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.hasAttribute('data-activity')) return;
+  Aoi.orders.setActivityField(el.getAttribute('data-activity'), el.getAttribute('data-field'), el.value);
+});
+document.getElementById('activityTbody').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-remove]');
+  if (btn) Aoi.orders.removeActivity(btn.getAttribute('data-remove'));
+});

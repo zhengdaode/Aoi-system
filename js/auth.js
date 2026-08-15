@@ -104,6 +104,7 @@ Aoi.enterApp = async function () {
   Aoi.orders.refillDatalists();
   Aoi.orders.refillBatches();
   Aoi.orders.renderBatches();
+  Aoi.orders.renderActivities();
   Aoi.intl.refillBatches();
   Aoi.approval.refillBatches();
   Aoi.ship.refillBatches();

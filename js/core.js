@@ -83,9 +83,36 @@ Aoi.hideLoading = function () {
   if (el) el.classList.add('hidden');
 };
 
-// 确认对话框（占位：先复用原生 confirm，后续由前端设计统一替换）
-Aoi.confirm = function (msg) {
-  return Promise.resolve(window.confirm(msg));
+// 自定义确认弹窗（替换原生 confirm；opts 支持 { title, okText, danger }）
+Aoi.confirm = function (msg, opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    var modal = document.getElementById('confirmModal');
+    var title = document.getElementById('confirmTitle');
+    var body = document.getElementById('confirmBody');
+    var okBtn = document.getElementById('confirmOk');
+    var cancelBtn = document.getElementById('confirmCancel');
+    if (!modal || !okBtn || !cancelBtn) { resolve(window.confirm(msg)); return; }
+    if (title) title.textContent = opts.title || '确认操作';
+    if (body) body.textContent = msg;
+    okBtn.textContent = opts.okText || '确定';
+    okBtn.className = 'px-4 py-2 rounded font-bold text-white '
+      + (opts.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700');
+    modal.classList.remove('hidden');
+    var done = false;
+    function onOk() { close(true); }
+    function onCancel() { close(false); }
+    function close(val) {
+      if (done) return;
+      done = true;
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
 };
 
 // 复制文本到剪贴板（含降级）

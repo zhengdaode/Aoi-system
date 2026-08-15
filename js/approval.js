@@ -95,6 +95,13 @@ Aoi.approval.setStatus = async function (batchId, buyer, status) {
   if (!batchId || !buyer) return;
   var d = Aoi.approval.ensure();
   var p = Aoi.approval.getRecord(batchId, buyer);
+  // 两步确认：标记已交 / 驳回前弹确认，防止误操作
+  var ok = await Aoi.confirm('确认将「' + buyer + '」标记为「' + status + '」？', {
+    title: status === '已交' ? '确认收款' : '确认驳回',
+    okText: status === '已交' ? '确认已交' : '确认驳回',
+    danger: status === '已驳回'
+  });
+  if (!ok) return;
   if (p) p.status = status;
   else d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: buyer, status: status });
   await Aoi.saveTeamData(d);

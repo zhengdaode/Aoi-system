@@ -53,10 +53,10 @@ Aoi.escapeHtml = function (str) {
 Aoi.toast = function (msg, type) {
   type = type || 'info';
   var palette = {
-    success: { bg: '#16a34a', icon: '✅' },
-    error:   { bg: '#dc2626', icon: '❌' },
-    warning: { bg: '#ca8a04', icon: '⚠️' },
-    info:    { bg: '#2563eb', icon: 'ℹ️' }
+    success: { bg: '#5db872', icon: '✅' },
+    error:   { bg: '#c64545', icon: '❌' },
+    warning: { bg: '#d4a017', icon: '⚠️' },
+    info:    { bg: '#3d3d3a', icon: 'ℹ️' }
   };
   var p = palette[type] || palette.info;
   var el = document.createElement('div');
@@ -176,4 +176,22 @@ Aoi.refreshViews = function () {
   Aoi.ship.refillBatches();
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
+  Aoi.overview.render();
+};
+
+// 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）
+Aoi.overview = {
+  render: function () {
+    var d = Aoi.state.data || {};
+    var orders = d.orders || [];
+    var payments = d.payments || [];
+    var set = function (id, n) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = n;
+    };
+    set('ovPending', payments.filter(function (p) { return p.status === '待审核'; }).length);
+    set('ovUnpaid', payments.filter(function (p) { return p.status === '待交' || p.status === '已驳回'; }).length);
+    set('ovToShip', orders.filter(function (o) { return o.status === '已到货' && (o.shipped || '未发') === '未发'; }).length);
+    set('ovToArrive', orders.filter(function (o) { return (o.status || '未到货') === '未到货'; }).length);
+  }
 };

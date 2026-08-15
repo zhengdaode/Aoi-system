@@ -5,6 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aoi System — 谷圈团购管理</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gray: {
+              50: '#f5f0e8', 100: '#faf9f5', 200: '#e6dfd8', 300: '#e6dfd8',
+              400: '#8e8b82', 500: '#6c6a64', 600: '#3d3d3a', 700: '#252523',
+              800: '#181715', 900: '#141413'
+            },
+            blue: { 100: '#efe9de', 500: '#cc785c', 600: '#cc785c', 700: '#a9583e' },
+            green: { 600: '#5db872', 700: '#4aa161' },
+            red: { 500: '#c64545', 600: '#b13a3a', 700: '#9e3232' },
+            amber: { 500: '#d4a017', 600: '#b8860b' },
+            indigo: { 500: '#181715', 600: '#141413' }
+          }
+        }
+      }
+    };
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/styles.css">
@@ -169,33 +189,87 @@
 
   <!-- 应用外壳 -->
   <section id="screen-app" data-screen class="hidden min-h-screen md:flex">
-    <aside class="w-56 bg-gray-900 p-4 hidden md:block shrink-0">
-      <h1 class="font-bold text-lg text-white mb-4">Aoi System</h1>
-      <nav class="space-y-1">
-        <a data-nav="view-settings" onclick="Aoi.nav('view-settings')" class="block px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold cursor-pointer">账号与设置</a>
-        <a data-nav="view-entry" onclick="Aoi.nav('view-entry')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">信息录入</a>
-        <a data-nav="view-orders" onclick="Aoi.nav('view-orders')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">订单管理</a>
-        <a data-nav="view-activities" onclick="Aoi.nav('view-activities')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">活动管理</a>
-        <a data-nav="view-types" onclick="Aoi.nav('view-types')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">类型管理</a>
-        <a data-nav="view-batches" onclick="Aoi.nav('view-batches')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际批次</a>
-        <a data-nav="view-intl" onclick="Aoi.nav('view-intl')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际计算</a>
-        <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">事务审批</a>
-        <a data-nav="view-ship" onclick="Aoi.nav('view-ship')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">发货管理</a>
-        <a data-nav="view-notify" onclick="Aoi.nav('view-notify')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">通知公告</a>
-        <a data-nav="view-calc" onclick="Aoi.nav('view-calc')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">计算器</a>
+    <aside class="w-60 bg-white border-r border-gray-200 p-5 hidden md:flex md:flex-col shrink-0">
+      <div class="mb-6 px-2">
+        <h1 class="font-serif text-xl font-bold leading-tight flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+          Aoi System
+        </h1>
+        <p class="text-xs text-gray-500 mt-1">谷圈团购管理</p>
+      </div>
+      <nav class="flex-1 overflow-y-auto space-y-6">
+        <div>
+          <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">业务</p>
+          <div class="space-y-0.5">
+            <a data-nav="view-overview" onclick="Aoi.nav('view-overview')" class="block px-3 py-2 rounded-md text-sm font-medium cursor-pointer bg-blue-600 text-white">总览</a>
+            <a data-nav="view-entry" onclick="Aoi.nav('view-entry')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">信息录入</a>
+            <a data-nav="view-orders" onclick="Aoi.nav('view-orders')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">订单管理</a>
+            <a data-nav="view-batches" onclick="Aoi.nav('view-batches')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">国际批次</a>
+            <a data-nav="view-intl" onclick="Aoi.nav('view-intl')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">国际计算</a>
+            <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">事务审批</a>
+            <a data-nav="view-ship" onclick="Aoi.nav('view-ship')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">发货管理</a>
+            <a data-nav="view-notify" onclick="Aoi.nav('view-notify')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">通知公告</a>
+          </div>
+        </div>
+        <div>
+          <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">基础数据</p>
+          <div class="space-y-0.5">
+            <a data-nav="view-activities" onclick="Aoi.nav('view-activities')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">活动管理</a>
+            <a data-nav="view-types" onclick="Aoi.nav('view-types')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">类型管理</a>
+            <a data-nav="view-warehouse" onclick="Aoi.nav('view-warehouse')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">囤货地管理</a>
+          </div>
+        </div>
+        <div>
+          <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">工具</p>
+          <div class="space-y-0.5">
+            <a data-nav="view-calc" onclick="Aoi.nav('view-calc')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">计算器</a>
+          </div>
+        </div>
+        <div>
+          <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">账户</p>
+          <div class="space-y-0.5">
+            <a data-nav="view-settings" onclick="Aoi.nav('view-settings')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">账号与设置</a>
+          </div>
+        </div>
       </nav>
     </aside>
     <main class="flex-1 p-6">
-      <header class="flex items-center justify-between mb-6">
+      <header class="flex items-center justify-between mb-8">
         <div>
-          <h2 class="text-xl font-bold">Aoi System</h2>
-          <p id="myRole" class="text-sm text-gray-500"></p>
+          <h2 class="font-serif text-2xl font-bold">Aoi System</h2>
+          <p id="myRole" class="text-sm text-gray-500 mt-0.5"></p>
         </div>
-        <button onclick="Aoi.auth.logout()" class="text-sm text-red-500 hover:underline">退出登录</button>
+        <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline">退出登录</button>
       </header>
 
+      <!-- 总览 -->
+      <div id="view-overview" data-view class="grid gap-4 max-w-5xl">
+        <div class="mb-2">
+          <h2 class="font-serif text-2xl font-bold">总览</h2>
+          <p class="text-sm text-gray-500 mt-1">登录后待办一览，点击卡片直达对应功能</p>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <button onclick="Aoi.nav('view-approval')" class="aoi-card-hover bg-white border border-gray-200 rounded-lg p-6 text-left cursor-pointer">
+            <p class="text-xs text-gray-500 mb-2">待审核交费</p>
+            <p id="ovPending" class="font-serif text-4xl font-bold">0</p>
+          </button>
+          <button onclick="Aoi.nav('view-approval')" class="aoi-card-hover bg-white border border-gray-200 rounded-lg p-6 text-left cursor-pointer">
+            <p class="text-xs text-gray-500 mb-2">待催缴</p>
+            <p id="ovUnpaid" class="font-serif text-4xl font-bold">0</p>
+          </button>
+          <button onclick="Aoi.nav('view-ship')" class="aoi-card-hover bg-white border border-gray-200 rounded-lg p-6 text-left cursor-pointer">
+            <p class="text-xs text-gray-500 mb-2">待发货</p>
+            <p id="ovToShip" class="font-serif text-4xl font-bold">0</p>
+          </button>
+          <button onclick="Aoi.nav('view-orders')" class="aoi-card-hover bg-white border border-gray-200 rounded-lg p-6 text-left cursor-pointer">
+            <p class="text-xs text-gray-500 mb-2">未到货</p>
+            <p id="ovToArrive" class="font-serif text-4xl font-bold">0</p>
+          </button>
+        </div>
+      </div>
+
       <!-- 账号与设置 -->
-      <div id="view-settings" data-view class="grid gap-4 max-w-3xl">
+      <div id="view-settings" data-view class="hidden grid gap-4 max-w-3xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">团队信息</h3>
           <p class="text-sm text-gray-600">团队名：<span id="teamName" class="font-semibold"></span></p>
@@ -220,18 +294,6 @@
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="font-bold mb-2">囤货地管理</h3>
-          <p class="text-sm text-gray-500 mb-3">维护囤货站点（名称 + 收款码），团员可申请换囤货地</p>
-          <div class="flex flex-wrap items-center gap-3 mb-3">
-            <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <input id="whQr" type="text" placeholder="收款码 URL（选填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'whQr')"></label>
-            <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
-          </div>
-          <ul id="whList"></ul>
-        </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">图床设置</h3>
           <p class="text-sm text-gray-500 mb-3">图片上传到可配置图床（默认免费图床，支持 Chevereto / Lsky Pro / 通用格式）</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -242,14 +304,6 @@
             <div class="md:col-span-2"><label class="block text-xs text-gray-500 mb-1">响应 URL 路径（选填，如 data.links.url）</label><input id="imgRespPath" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
           </div>
           <button onclick="Aoi.img.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
-        </div>
-
-        <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 class="font-bold mb-2">发布公告</h3>
-          <p class="text-sm text-gray-500 mb-2">团员端首页可见（自动提醒 / QQ 机器人留到阶段 4b）</p>
-          <textarea id="announceInput" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-2" placeholder="公告内容"></textarea>
-          <button onclick="Aoi.announce.publish()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">发布</button>
-          <ul id="announceList" class="mt-3"></ul>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -428,6 +482,21 @@
         </div>
       </div>
 
+      <!-- 囤货地管理 -->
+      <div id="view-warehouse" data-view class="hidden grid gap-4 max-w-3xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">囤货地管理</h3>
+          <p class="text-sm text-gray-500 mb-3">维护囤货站点（名称 + 收款码），团员可申请换囤货地</p>
+          <div class="flex flex-wrap items-center gap-3 mb-3">
+            <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="whQr" type="text" placeholder="收款码 URL（选填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'whQr')"></label>
+            <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
+          </div>
+          <ul id="whList"></ul>
+        </div>
+      </div>
+
       <!-- 国际批次 -->
       <div id="view-batches" data-view class="hidden grid gap-4 max-w-3xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -567,6 +636,13 @@
 
       <!-- 通知公告 -->
       <div id="view-notify" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">发布公告</h3>
+          <p class="text-sm text-gray-500 mb-2">团员端首页可见（自动提醒 / QQ 机器人留到阶段 4b）</p>
+          <textarea id="announceInput" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-2" placeholder="公告内容"></textarea>
+          <button onclick="Aoi.announce.publish()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">发布</button>
+          <ul id="announceList" class="mt-3"></ul>
+        </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">通知生成</h3>
           <p class="text-sm text-gray-500 mb-3">按当前数据自动生成催缴 / 发货通知（进入应用时也会自动同步），也可按批次手动补发</p>

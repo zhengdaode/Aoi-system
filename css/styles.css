@@ -1,4 +1,24 @@
-/* Aoi-system — 基础样式（前端视觉设计后续由 skill 统一完成） */
+/* Aoi-system — Claude editorial 设计系统（暖奶油 canvas + 珊瑚 primary + 深海军蓝 surface） */
+
+:root {
+  --canvas: #faf9f5;
+  --surface: #ffffff;
+  --surface-card: #efe9de;
+  --surface-dark: #181715;
+  --hairline: #e6dfd8;
+  --text: #141413;      /* ink */
+  --body: #3d3d3a;
+  --muted: #6c6a64;
+  --muted-soft: #8e8b82;
+  --primary: #cc785c;         /* coral */
+  --primary-active: #a9583e;
+  --success: #5db872;
+  --warning: #d4a017;
+  --error: #c64545;
+  --serif: "Cormorant Garamond", "EB Garamond", Georgia, "Songti SC", "SimSun", "Noto Serif SC", serif;
+  --sans: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
 
 html,
 body {
@@ -7,6 +27,56 @@ body {
 }
 
 body {
+  font-family: var(--sans);
+  color: var(--text);
+  background: var(--canvas);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 展示标题：slab-serif 400 常规字重 + 负字距（正文仍是 sans） */
+h1, h2, h3,
+.font-serif {
+  font-family: var(--serif);
+  letter-spacing: -0.02em;
+}
+
+.font-mono {
+  font-family: var(--mono);
+}
+
+/* 输入焦点：边框转珊瑚 + 3px 珊瑚 15% 外环 */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15);
+}
+
+/* 侧边栏导航：当前项珊瑚底白字（on-primary） */
+[data-nav].bg-blue-600 {
+  color: #fff;
+}
+
+/* 卡片 hover 微阴影（文档 0 1px 3px rgba(20,20,19,0.08)，阴影罕见） */
+.aoi-card-hover {
+  transition: box-shadow 0.2s ease;
+}
+.aoi-card-hover:hover {
+  box-shadow: 0 1px 3px rgba(20, 20, 19, 0.08);
+}
+
+/* 细滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #e6dfd8;
+  border-radius: 5px;
+  border: 2px solid #faf9f5;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8e8b82;
 }

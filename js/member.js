@@ -42,6 +42,8 @@ Aoi.member.render = function () {
   Aoi.member.renderAnnounce();
   Aoi.member.renderFees(cn);
   Aoi.member.renderOrders(cn);
+  Aoi.member.refillTransferBatches();
+  Aoi.warehouse.refillOptions();
 };
 
 // 公告（新→旧）
@@ -164,6 +166,34 @@ Aoi.member.confirmShip = async function (orderId) {
   await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
   Aoi.member.renderOrders(Aoi.member.state.cn);
   Aoi.toast('已确认收货', 'success');
+};
+
+// 刷新「申请换囤货地」的批次下拉（只看自己的到货批次）
+Aoi.member.refillTransferBatches = function () {
+  var d = Aoi.orders.ensure();
+  var cn = Aoi.member.state.cn;
+  var myBatches = {};
+  d.orders.forEach(function (o) { if (o.buyer === cn && o.batchId) myBatches[o.batchId] = 1; });
+  var sel = document.getElementById('memberTransferBatch');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">选择到货批次…</option>' + Object.keys(myBatches).sort(function (a, b) {
+    return Aoi.orders.batchDate(a) < Aoi.orders.batchDate(b) ? -1 : 1;
+  }).map(function (id) {
+    return '<option value="' + id + '">' + Aoi.escapeHtml(Aoi.orders.batchDate(id)) + '</option>';
+  }).join('');
+};
+
+// 提交换囤货地申请
+Aoi.member.submitTransfer = async function () {
+  var batchId = document.getElementById('memberTransferBatch').value;
+  var toId = document.getElementById('transferTo').value;
+  var reason = document.getElementById('memberTransferReason').value.trim();
+  if (!batchId || !toId) { Aoi.toast('请选择到货批次和目标囤货地', 'warning'); return; }
+  var d = Aoi.warehouse.ensure();
+  d.transfers.push({ id: Aoi.genId(), buyer: Aoi.member.state.cn, batchId: batchId, toWarehouseId: toId, reason: reason, status: '待处理', date: new Date().toISOString().slice(0, 10) });
+  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+  document.getElementById('memberTransferReason').value = '';
+  Aoi.toast('换囤货地申请已提交，等待团长审核', 'success');
 };
 
 // 事件委托：我的国际费「提交凭证」

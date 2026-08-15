@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.5.0（阶段 0–3 + 4a 团员端 + 4b 通知公告）
+> 更新日期：2026-08-15 · 版本 v0.6.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地）
 
 ## 项目定位
 
@@ -46,16 +46,24 @@
 - **通知列表**：新→旧展示，单条复制 / 复制全部未发 / 标记已发 / 删除 / 清除已发。
 - **QQ 机器人接口**（`js/bot.js`，`Aoi.bot`）：仅留 `config` + `sendPrivate` / `sendGroup` / `pushAll` 三个占位接口，未接入（`enabled=false`），点「推送」提示未接入。正式接入只需填 config 并实现 HTTP 调用，无需改其它模块。
 
+### 阶段 4c · 囤货地管理 + 换囤货地申请
+- **囤货地管理**（`js/warehouse.js`，`Aoi.warehouse`）：团长在设置页增删囤货站点（名称 + 收款码 URL）。
+- **团员申请换囤货地**：团员端选到货批次 + 目标囤货地 + 理由，写入 `d.transfers[]`（待处理）。
+- **团长审核**：事务审批页列出待处理申请，同意后把该买家在该批次的订单 `warehouseId` 标记为目标囤货地，驳回则保留原状。
+- **发货视图**：发货管理新增「囤货地」列，按 `orders.warehouseId` 显示（空则 —）。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
 {
   orders:    [{ id, ip, activity, type, model, price, count, buyer,
-                status, batchId, paid, shipped, tracking, photo, received }],
+                status, batchId, paid, shipped, tracking, photo, received, warehouseId }],
   products:  [{ id, ip, type, model, price }],
   activities:[string],  ips:[string],
   batches:   [{ id, date, targetAmount?, weights?, manualFees? }],
   payments:  [{ id, batchId, buyer, status, receipt?, receiptDate? }],
+  warehouses: [{ id, name, qrCode }],
+  transfers:  [{ id, buyer, batchId, toWarehouseId, reason, status, date }],
   announcements: [{ id, text, date }],
   notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
   calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup }
@@ -86,9 +94,7 @@
 
 | 项 | 所属 | 说明 |
 |---|---|---|
-| 团员端补全 | 阶段 4b | 申请换囤货地（依赖「囤货地管理」） |
 | 活动管理 | — | 购买时间/出货日期/平台链接/进度状态 |
-| 囤货地管理 | — | 站点与收款码；事务审批里的「转移囤货地申请」依赖此项 |
 | 图床配置 | 阶段 5 | 真实图片上传（当前合照与付款凭证均为 URL 粘贴） |
 | 打磨 | 阶段 5 | 黑夜模式、撤销、两步确认、导出、教程站 |
 

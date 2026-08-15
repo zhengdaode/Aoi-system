@@ -109,6 +109,8 @@ Aoi.enterApp = async function () {
   Aoi.ship.refillBatches();
   Aoi.notify.refillBatches();
   Aoi.notify.sync();
+  Aoi.warehouse.render();
+  Aoi.warehouse.renderTransfers();
   Aoi.calc.fillForm();
   Aoi.showScreen('screen-app');
 };

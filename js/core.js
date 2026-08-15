@@ -170,6 +170,7 @@ Aoi.refreshViews = function () {
   Aoi.orders.refillBatches();
   Aoi.orders.renderBatches();
   Aoi.orders.renderActivities();
+  Aoi.orders.renderTypes();
   Aoi.intl.refillBatches();
   Aoi.approval.refillBatches();
   Aoi.ship.refillBatches();

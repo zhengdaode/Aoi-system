@@ -14,6 +14,12 @@ Aoi.orders.ensure = function () {
   if (!Array.isArray(d.ips)) d.ips = [];
   if (!Array.isArray(d.batches)) d.batches = [];
   if (!d.activityMeta) d.activityMeta = {};
+  if (!d.typeMeta) d.typeMeta = {};
+  if (!d.ipTypes) d.ipTypes = {};
+  // 首次迁移：把内置常用类型并入类型库（线路=未分类）
+  Aoi.orders.TYPE_SUGGESTIONS.forEach(function (t) {
+    if (!d.typeMeta[t]) d.typeMeta[t] = { route: '未分类' };
+  });
   Aoi.state.data = d;
   return d;
 };
@@ -390,23 +396,26 @@ Aoi.orders.renderActivities = function () {
     var m = d.activityMeta[name] || {};
     return '<tr class="border-b border-gray-100">'
       + '<td class="px-3 py-2 font-semibold whitespace-nowrap">' + Aoi.escapeHtml(name) + '</td>'
+      + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="ip" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.ipOptions(m.ip) + '</select></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.buyDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="buyDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.shipDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="border border-gray-300 rounded px-2 py-1 text-sm w-40"></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
 };
 
 Aoi.orders.addActivity = async function () {
   var el = document.getElementById('newActivity');
   var name = el.value.trim();
   if (!name) { Aoi.toast('请输入活动名称', 'warning'); return; }
+  var ipEl = document.getElementById('newActivityIp');
+  var ip = ipEl ? ipEl.value.trim() : '';
   var d = Aoi.orders.ensure();
   if (d.activities.indexOf(name) >= 0) { Aoi.toast('该活动已存在', 'warning'); return; }
   d.activities.push(name);
-  d.activityMeta[name] = { buyDate: '', shipDate: '', link: '', status: '未开始' };
+  d.activityMeta[name] = { buyDate: '', shipDate: '', link: '', status: '未开始', ip: ip };
   await Aoi.saveTeamData(d);
   el.value = '';
   Aoi.orders.renderActivities();
@@ -444,4 +453,223 @@ document.getElementById('activityTbody').addEventListener('change', function (e)
 document.getElementById('activityTbody').addEventListener('click', function (e) {
   var btn = e.target.closest('button[data-remove]');
   if (btn) Aoi.orders.removeActivity(btn.getAttribute('data-remove'));
+});
+
+// —— 分级选择：IP → 活动（按 IP 过滤）、类型（线路分组 + 搜索） ——
+
+Aoi.orders.ROUTES = ['常规二次元线路', '一般线路发送', '大件类', '名贵类', '未分类'];
+
+Aoi.orders.ipOptions = function (cur) {
+  var d = Aoi.orders.ensure();
+  var ips = Aoi.orders.collectIps(d);
+  if (cur && ips.indexOf(cur) < 0) ips.push(cur);
+  return '<option value="">（未分类）</option>' + ips.map(function (ip) {
+    return '<option value="' + Aoi.escapeHtml(ip) + '"' + (ip === cur ? ' selected' : '') + '>' + Aoi.escapeHtml(ip) + '</option>';
+  }).join('');
+};
+
+Aoi.orders.activitiesByIp = function (ip) {
+  var d = Aoi.orders.ensure();
+  return d.activities.filter(function (a) {
+    var m = d.activityMeta[a] || {};
+    return (m.ip || '') === ip;
+  });
+};
+
+// IP 常用类型优先，其余兜底
+Aoi.orders.typesByIp = function (ip) {
+  var d = Aoi.orders.ensure();
+  var all = Object.keys(d.typeMeta);
+  var common = (d.ipTypes && d.ipTypes[ip]) || [];
+  var seen = {}, result = [];
+  common.forEach(function (t) { if (d.typeMeta[t] && !seen[t]) { seen[t] = 1; result.push(t); } });
+  all.forEach(function (t) { if (!seen[t]) result.push(t); });
+  return result;
+};
+
+Aoi.orders.typeRoute = function (type) {
+  var d = Aoi.orders.ensure();
+  var m = d.typeMeta[type];
+  return (m && m.route) ? m.route : '未分类';
+};
+
+// IP 输入变化 → 刷新活动 select + 类型面板
+Aoi.orders.onIpChange = function (ipId) {
+  var typeId = ipId === 'oIp' ? 'oType' : 'pType';
+  if (ipId === 'oIp') Aoi.orders.refillActivitySelect();
+  var panel = document.getElementById(typeId + 'Panel');
+  if (panel && !panel.classList.contains('hidden')) Aoi.orders.renderTypePanel(typeId);
+};
+
+Aoi.orders.refillActivitySelect = function () {
+  var ip = (document.getElementById('oIp') || {}).value.trim();
+  var sel = document.getElementById('oActivity');
+  if (!sel) return;
+  var acts = ip ? Aoi.orders.activitiesByIp(ip) : [];
+  sel.disabled = !ip;
+  sel.innerHTML = ip
+    ? '<option value="">选择活动…</option>' + acts.map(function (a) {
+        return '<option value="' + Aoi.escapeHtml(a) + '">' + Aoi.escapeHtml(a) + '</option>';
+      }).join('')
+    : '<option value="">先选 IP</option>';
+};
+
+// —— 类型选择面板：显式 × 关闭，点空白不关闭 ——
+
+Aoi.orders.toggleTypePanel = function (typeId) {
+  var panel = document.getElementById(typeId + 'Panel');
+  if (!panel) return;
+  if (!panel.classList.contains('hidden')) { Aoi.orders.closeTypePanel(typeId); return; }
+  ['oType', 'pType'].forEach(function (id) { if (id !== typeId) Aoi.orders.closeTypePanel(id); });
+  Aoi.orders.renderTypePanel(typeId);
+  panel.classList.remove('hidden');
+};
+
+Aoi.orders.closeTypePanel = function (typeId) {
+  var panel = document.getElementById(typeId + 'Panel');
+  if (panel) panel.classList.add('hidden');
+};
+
+Aoi.orders.filterTypePanel = function (typeId) {
+  Aoi.orders.renderTypePanel(typeId);
+};
+
+Aoi.orders.renderTypePanel = function (typeId) {
+  var list = document.getElementById(typeId + 'List');
+  if (!list) return;
+  var ipId = typeId === 'oType' ? 'oIp' : 'pIp';
+  var ip = (document.getElementById(ipId) || {}).value.trim();
+  var kwEl = document.getElementById(typeId + 'Search');
+  var kw = kwEl ? kwEl.value.trim().toLowerCase() : '';
+  var types = ip ? Aoi.orders.typesByIp(ip) : Object.keys(Aoi.orders.ensure().typeMeta);
+  if (kw) types = types.filter(function (t) { return t.toLowerCase().indexOf(kw) >= 0; });
+  var groups = {};
+  types.forEach(function (t) { var r = Aoi.orders.typeRoute(t); if (!groups[r]) groups[r] = []; groups[r].push(t); });
+  var html = '';
+  Aoi.orders.ROUTES.forEach(function (route) {
+    if (!groups[route] || !groups[route].length) return;
+    html += '<div class="text-xs font-bold text-gray-400 px-2 mt-2 mb-1">' + route + '</div>';
+    html += '<div class="flex flex-wrap gap-1 px-2">';
+    groups[route].forEach(function (t) {
+      html += '<button class="px-2 py-1 bg-gray-100 hover:bg-blue-100 rounded text-sm" data-input="' + typeId + '" data-type="' + Aoi.escapeHtml(t) + '">' + Aoi.escapeHtml(t) + '</button>';
+    });
+    html += '</div>';
+  });
+  list.innerHTML = html || '<div class="px-2 py-2 text-sm text-gray-400">无匹配类型</div>';
+};
+
+// 事件委托：点类型 chip → 填入 input 并关闭
+document.addEventListener('click', function (e) {
+  var chip = e.target.closest('button[data-type]');
+  if (!chip) return;
+  var input = document.getElementById(chip.getAttribute('data-input'));
+  if (input) input.value = chip.getAttribute('data-type');
+  Aoi.orders.closeTypePanel(chip.getAttribute('data-input'));
+});
+
+// —— 类型管理：线路标签 + 按 IP 常用类型 ——
+
+Aoi.orders.routeOptions = function (cur) {
+  return Aoi.orders.ROUTES.map(function (r) {
+    return '<option value="' + r + '"' + (r === cur ? ' selected' : '') + '>' + r + '</option>';
+  }).join('');
+};
+
+Aoi.orders.renderTypes = function () {
+  var d = Aoi.orders.ensure();
+  var tbody = document.getElementById('typeTbody');
+  if (tbody) {
+    tbody.innerHTML = Object.keys(d.typeMeta).map(function (t) {
+      var m = d.typeMeta[t];
+      return '<tr class="border-b border-gray-100">'
+        + '<td class="px-3 py-2 font-semibold">' + Aoi.escapeHtml(t) + '</td>'
+        + '<td class="px-3 py-2"><select data-type="' + Aoi.escapeHtml(t) + '" data-field="route" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.routeOptions(m.route) + '</select></td>'
+        + '<td class="px-3 py-2"><button data-remove-type="' + Aoi.escapeHtml(t) + '" class="text-red-500 hover:underline">删</button></td>'
+        + '</tr>';
+    }).join('');
+  }
+  var ipSel = document.getElementById('typeIpSel');
+  if (ipSel) {
+    var ips = Aoi.orders.collectIps(d);
+    var cur = ipSel.value;
+    ipSel.innerHTML = '<option value="">选择 IP…</option>' + ips.map(function (ip) {
+      return '<option value="' + Aoi.escapeHtml(ip) + '">' + Aoi.escapeHtml(ip) + '</option>';
+    }).join('');
+    if (cur && ips.indexOf(cur) >= 0) ipSel.value = cur;
+  }
+  Aoi.orders.renderTypeIp();
+};
+
+Aoi.orders.renderTypeIp = function () {
+  var ip = document.getElementById('typeIpSel').value;
+  var box = document.getElementById('typeIpBox');
+  if (!box) return;
+  if (!ip) { box.innerHTML = '<div class="text-gray-400 text-sm">先选择 IP</div>'; return; }
+  var d = Aoi.orders.ensure();
+  var common = d.ipTypes[ip] || [];
+  var set = {}; common.forEach(function (t) { set[t] = 1; });
+  box.innerHTML = Object.keys(d.typeMeta).map(function (t) {
+    var on = set[t] ? ' checked' : '';
+    return '<label class="inline-flex items-center gap-1 mr-3 mb-2 text-sm cursor-pointer"><input type="checkbox" data-iptype="' + Aoi.escapeHtml(t) + '"' + on + '>' + Aoi.escapeHtml(t) + '</label>';
+  }).join('') || '<div class="text-gray-400 text-sm">类型库为空</div>';
+};
+
+Aoi.orders.toggleTypeIp = async function (type) {
+  var ip = document.getElementById('typeIpSel').value;
+  if (!ip) return;
+  var d = Aoi.orders.ensure();
+  if (!d.ipTypes[ip]) d.ipTypes[ip] = [];
+  var i = d.ipTypes[ip].indexOf(type);
+  if (i >= 0) d.ipTypes[ip].splice(i, 1); else d.ipTypes[ip].push(type);
+  await Aoi.saveTeamData(d);
+};
+
+Aoi.orders.addType = async function () {
+  var nameEl = document.getElementById('newType');
+  var name = nameEl.value.trim();
+  var route = document.getElementById('newTypeRoute').value;
+  if (!name) { Aoi.toast('请输入类型名称', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  if (d.typeMeta[name]) { Aoi.toast('该类型已存在', 'warning'); return; }
+  d.typeMeta[name] = { route: route };
+  await Aoi.saveTeamData(d);
+  nameEl.value = '';
+  Aoi.orders.renderTypes();
+  Aoi.toast('已新增类型 ' + name, 'success');
+};
+
+Aoi.orders.removeType = async function (name) {
+  if (!(await Aoi.confirm('确定删除类型「' + name + '」？'))) return;
+  var d = Aoi.orders.ensure();
+  Aoi.undo.arm('删除类型', d);
+  delete d.typeMeta[name];
+  Object.keys(d.ipTypes).forEach(function (ip) {
+    d.ipTypes[ip] = d.ipTypes[ip].filter(function (t) { return t !== name; });
+  });
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderTypes();
+  Aoi.toast('已删除类型', 'success');
+};
+
+Aoi.orders.setTypeRoute = async function (name, route) {
+  var d = Aoi.orders.ensure();
+  if (!d.typeMeta[name]) return;
+  d.typeMeta[name].route = route;
+  await Aoi.saveTeamData(d);
+};
+
+// 事件委托：类型字段即时保存 / 删除 / 常用类型勾选
+document.getElementById('typeTbody').addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.hasAttribute('data-type')) return;
+  Aoi.orders.setTypeRoute(el.getAttribute('data-type'), el.value);
+});
+document.getElementById('typeTbody').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-remove-type]');
+  if (btn) Aoi.orders.removeType(btn.getAttribute('data-remove-type'));
+});
+document.getElementById('typeIpBox').addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.hasAttribute('data-iptype')) return;
+  Aoi.orders.toggleTypeIp(el.getAttribute('data-iptype'));
 });

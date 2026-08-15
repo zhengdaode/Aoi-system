@@ -26,6 +26,9 @@ Aoi.ship.render = function () {
   }
   var d = Aoi.orders.ensure();
   var rows = d.orders.filter(function (o) { return o.batchId === batchId; });
+  rows = rows.slice().sort(function (a, b) {
+    return Aoi.orders.typeRoute(a.type) < Aoi.orders.typeRoute(b.type) ? -1 : 1;
+  });
   var shipped = 0;
   tbody.innerHTML = rows.map(function (o) {
     if ((o.shipped || '未发') === '已发') shipped++;
@@ -34,6 +37,7 @@ Aoi.ship.render = function () {
       + '<td class="px-2 py-2"><input type="checkbox" class="ship-check" data-id="' + o.id + '"></td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.buyer) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.orders.typeRoute(o.type)) + '</td>'
       + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.warehouse.name(o.warehouseId) || '—') + '</td>'
       + '<td class="px-3 py-2">' + photo + '</td>'
@@ -102,6 +106,7 @@ Aoi.ship.export = function () {
     return {
       '购买者': o.buyer,
       '制品': o.type + ' - ' + o.model,
+      '发货线路': Aoi.orders.typeRoute(o.type),
       '数量': o.count,
       '囤货地': Aoi.warehouse.name(o.warehouseId) || '',
       '快递单号': o.tracking || '',

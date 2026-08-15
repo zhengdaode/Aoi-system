@@ -168,6 +168,7 @@
         <a data-nav="view-entry" onclick="Aoi.nav('view-entry')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">信息录入</a>
         <a data-nav="view-orders" onclick="Aoi.nav('view-orders')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">订单管理</a>
         <a data-nav="view-activities" onclick="Aoi.nav('view-activities')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">活动管理</a>
+        <a data-nav="view-types" onclick="Aoi.nav('view-types')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">类型管理</a>
         <a data-nav="view-batches" onclick="Aoi.nav('view-batches')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际批次</a>
         <a data-nav="view-intl" onclick="Aoi.nav('view-intl')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">国际计算</a>
         <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded text-gray-300 text-sm font-semibold cursor-pointer hover:bg-gray-800">事务审批</a>
@@ -268,9 +269,20 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-3">手动录入订单</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <input id="oIp" list="ipOptions" placeholder="所属 IP" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <input id="oActivity" list="activityOptions" placeholder="所属活动" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <input id="oType" list="typeOptions" placeholder="制品类型（徽章/立牌…）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="oIp" list="ipOptions" placeholder="所属 IP" onchange="Aoi.orders.onIpChange('oIp')" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <select id="oActivity" disabled class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-500">
+              <option value="">先选 IP</option>
+            </select>
+            <div class="relative">
+              <input id="oType" placeholder="制品类型" readonly onclick="Aoi.orders.toggleTypePanel('oType')" class="w-full border border-gray-300 rounded px-3 py-2 text-sm cursor-pointer bg-white">
+              <div id="oTypePanel" class="hidden absolute left-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded shadow-lg w-72">
+                <div class="flex items-center gap-2 p-2 border-b border-gray-100">
+                  <input id="oTypeSearch" type="text" placeholder="搜索类型…" oninput="Aoi.orders.filterTypePanel('oType')" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
+                  <button onclick="Aoi.orders.closeTypePanel('oType')" class="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">×</button>
+                </div>
+                <div id="oTypeList" class="max-h-64 overflow-y-auto p-2"></div>
+              </div>
+            </div>
             <input id="oModel" placeholder="型号（如 电次）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <select id="oCurrency" onchange="Aoi.orders.previewRmb('oPrice','oCurrency','oPricePreview')" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="cny">人民币</option>
@@ -288,8 +300,17 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-3">手动录入周边（预建商品）</h3>
           <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <input id="pIp" list="ipOptions" placeholder="所属 IP" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <input id="pType" list="typeOptions" placeholder="制品类型" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="pIp" list="ipOptions" placeholder="所属 IP" onchange="Aoi.orders.onIpChange('pIp')" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <div class="relative">
+              <input id="pType" placeholder="制品类型" readonly onclick="Aoi.orders.toggleTypePanel('pType')" class="w-full border border-gray-300 rounded px-3 py-2 text-sm cursor-pointer bg-white">
+              <div id="pTypePanel" class="hidden absolute left-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded shadow-lg w-72">
+                <div class="flex items-center gap-2 p-2 border-b border-gray-100">
+                  <input id="pTypeSearch" type="text" placeholder="搜索类型…" oninput="Aoi.orders.filterTypePanel('pType')" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
+                  <button onclick="Aoi.orders.closeTypePanel('pType')" class="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">×</button>
+                </div>
+                <div id="pTypeList" class="max-h-64 overflow-y-auto p-2"></div>
+              </div>
+            </div>
             <input id="pModel" placeholder="型号" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <select id="pCurrency" onchange="Aoi.orders.previewRmb('pPrice','pCurrency','pPricePreview')" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="cny">人民币</option>
@@ -342,15 +363,17 @@
       <div id="view-activities" data-view class="hidden grid gap-4 max-w-5xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">活动管理</h3>
-          <p class="text-sm text-gray-500 mb-3">为每个活动记录购买时间、出货日期、平台链接与进度状态</p>
+          <p class="text-sm text-gray-500 mb-3">为每个活动记录所属 IP、购买时间、出货日期、平台链接与进度状态</p>
           <div class="flex flex-wrap items-center gap-3 mb-4">
             <input id="newActivity" type="text" placeholder="新活动名称" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="newActivityIp" list="ipOptions" placeholder="所属 IP（可选）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <button onclick="Aoi.orders.addActivity()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增活动</button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="px-3 py-2">活动</th>
+                <th class="px-3 py-2">所属 IP</th>
                 <th class="px-3 py-2">购买时间</th>
                 <th class="px-3 py-2">出货日期</th>
                 <th class="px-3 py-2">平台链接</th>
@@ -360,6 +383,40 @@
               <tbody id="activityTbody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- 类型管理 -->
+      <div id="view-types" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">制品类型库</h3>
+          <p class="text-sm text-gray-500 mb-3">为每个类型标注发货线路标签（常规二次元线路 / 一般线路发送 / 大件类 / 名贵类），录入订单时按线路分组选择</p>
+          <div class="flex flex-wrap items-center gap-3 mb-4">
+            <input id="newType" type="text" placeholder="新类型名称" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <select id="newTypeRoute" class="border border-gray-300 rounded px-3 py-2 text-sm">
+              <option>常规二次元线路</option><option>一般线路发送</option><option>大件类</option><option>名贵类</option><option>未分类</option>
+            </select>
+            <button onclick="Aoi.orders.addType()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增类型</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-3 py-2">类型</th>
+                <th class="px-3 py-2">发货线路</th>
+                <th class="px-3 py-2"></th>
+              </tr></thead>
+              <tbody id="typeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">按 IP 设置常用类型</h3>
+          <p class="text-sm text-gray-500 mb-3">选中 IP 后勾选该 IP 的常用类型，录入订单时这些类型会优先展示</p>
+          <select id="typeIpSel" onchange="Aoi.orders.renderTypeIp()" class="border border-gray-300 rounded px-3 py-2 text-sm mb-3">
+            <option value="">选择 IP…</option>
+          </select>
+          <div id="typeIpBox" class="flex flex-wrap"></div>
         </div>
       </div>
 
@@ -488,7 +545,7 @@
             <table class="w-full text-sm">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="px-2 py-2"></th>
-                <th class="px-3 py-2">购买者</th><th class="px-3 py-2">制品</th><th class="px-3 py-2 text-right">数量</th>
+                <th class="px-3 py-2">购买者</th><th class="px-3 py-2">制品</th><th class="px-3 py-2">发货线路</th><th class="px-3 py-2 text-right">数量</th>
                 <th class="px-3 py-2">囤货地</th>
                 <th class="px-3 py-2">合照</th><th class="px-3 py-2">快递单号</th><th class="px-3 py-2">发货状态</th>
               </tr></thead>

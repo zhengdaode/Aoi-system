@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-15 · 版本 v0.9.0（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨进行中）
+> 更新日期：2026-08-15 · 版本 v0.9.1（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨 + 8 分级录入与类型线路）
 
 ## 项目定位
 
@@ -58,9 +58,19 @@
 - **接入点**：发货管理合照、囤货地收款码、团员端付款凭证，均在 URL 输入旁新增「上传」按钮。
 
 ### 阶段 6 · 活动管理
-- **活动台账**（`js/orders.js`，`Aoi.orders`）：为每个活动记录购买时间、出货日期、平台链接、进度状态（未开始/进行中/已下单/已出货/已完成）。
-- **数据模型**：新增 `d.activityMeta = { [活动名]: { buyDate, shipDate, link, status } }`，活动名沿用 `d.activities` 字符串数组（订单 `activity` 字段不受影响）。
+- **活动台账**（`js/orders.js`，`Aoi.orders`）：为每个活动记录所属 IP、购买时间、出货日期、平台链接、进度状态（未开始/进行中/已下单/已出货/已完成）。
+- **数据模型**：新增 `d.activityMeta = { [活动名]: { ip, buyDate, shipDate, link, status } }`，活动名沿用 `d.activities` 字符串数组（订单 `activity` 字段不受影响）。
 - **交互**：字段即时保存（onchange）；删除活动仅从台账移除，不影响历史订单。
+
+### 阶段 8 · 分级录入 + 类型线路（设计修复）
+- **分级录入**（`view-entry`）：录入订单时按 `IP → 活动 → 类型` 逐级选择，避免无效/过时内容污染索引。
+  - IP：`<input list="ipOptions">` 自由输入（顶层分类，可新增）。
+  - 活动：受控 `<select>`，仅显示所选 IP 下的活动（`activityMeta[活动].ip` 匹配），未选 IP 时禁用。
+  - 类型：受控只读输入 + 自建面板（`Aoi.orders.toggleTypePanel`），按「发货线路」分组 + 模糊搜索 + 显式 × 关闭（不点空白关闭，防误关）。
+- **类型线路标签**（`view-types` 类型管理页）：每个类型标注 `常规二次元线路 / 一般线路发送 / 大件类 / 名贵类 / 未分类`，录入与发货时按线路分组。
+- **按 IP 常用类型**：`view-types` 页选中 IP 后勾选该 IP 的常用类型，录入时优先展示（`typesByIp`）。
+- **发货分离**（`js/shipping.js`）：发货表新增「发货线路」列并按线路排序，排发导出 CSV 含线路字段，便于按线路分开发出。
+- **数据模型**：新增 `d.typeMeta = { [类型名]: { route } }`、`d.ipTypes = { [IP]: [类型名...] }`；内置常用类型首启自动并入 `typeMeta`（route=未分类），向后兼容旧数据。
 
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
@@ -78,7 +88,9 @@
   notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
   calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup },
   imgHost:   { api, field, token, tokenIn, respPath },
-  activityMeta: { [活动名]: { buyDate, shipDate, link, status } }
+  activityMeta: { [活动名]: { ip, buyDate, shipDate, link, status } },
+  typeMeta:  { [类型名]: { route } },
+  ipTypes:   { [IP]: [类型名...] }
 }
 ```
 

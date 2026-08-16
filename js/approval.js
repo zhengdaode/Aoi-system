@@ -107,6 +107,7 @@ Aoi.approval.setStatus = async function (batchId, buyer, status) {
   await Aoi.saveTeamData(d);
   Aoi.approval.render();
   Aoi.toast(buyer + ' → ' + status, 'success');
+  Aoi.overview.render();
   Aoi.notify.sync();
 };
 

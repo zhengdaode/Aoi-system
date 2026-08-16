@@ -112,10 +112,10 @@
     <div id="member-entry" class="min-h-screen flex items-center justify-center p-4">
       <div class="w-full max-w-sm bg-white rounded-lg border border-gray-200 p-6">
         <h1 class="text-xl font-bold mb-1">团员自助</h1>
-        <p class="text-sm text-gray-500 mb-5">输入团长提供的团员密钥与你的圈名（CN）</p>
+        <p class="text-sm text-gray-500 mb-5">输入团长提供的团员密钥与你的圈名（CN）或 QQ 号</p>
         <form onsubmit="Aoi.member.enter(); return false;" class="space-y-3">
           <input id="memberKey" type="password" placeholder="团员密钥" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-          <input id="memberCn" type="text" placeholder="你的圈名 / CN" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+          <input id="memberId" type="text" placeholder="你的圈名 / CN 或 QQ 号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
           <button type="submit" class="w-full bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">进入</button>
         </form>
         <a class="block mt-3 text-sm text-blue-500 hover:underline cursor-pointer" onclick="Aoi.showScreen('screen-auth')">← 团长 / 管理员登录</a>
@@ -131,6 +131,12 @@
         </div>
         <button onclick="Aoi.member.logout()" class="text-sm text-red-500 hover:underline">退出</button>
       </header>
+
+      <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 class="font-bold mb-2">绑定 QQ（可选）</h3>
+        <p class="text-sm text-gray-500 mb-2">绑定后可用 QQ 号自助查询，并接收机器人联系提醒</p>
+        <div id="memberQqBox"></div>
+      </div>
 
       <div class="bg-white rounded-lg border border-gray-200 p-6">
         <h3 class="font-bold mb-2">公告</h3>
@@ -183,6 +189,16 @@
         </div>
         <textarea id="memberTransferReason" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mt-3" placeholder="理由（选填）"></textarea>
         <button onclick="Aoi.member.submitTransfer()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">提交申请</button>
+      </div>
+
+      <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 class="font-bold mb-2">申请改圈名</h3>
+        <p class="text-sm text-gray-500 mb-3">更换圈名（CN），团长审核通过后你的订单/交费记录会自动迁移</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <input id="memberNewCn" type="text" placeholder="新圈名（CN）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+          <button onclick="Aoi.member.submitCnChange()" class="px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">提交申请</button>
+        </div>
+        <p id="memberCnChangeStatus" class="mt-2 text-sm text-gray-500"></p>
       </div>
     </div>
   </section>
@@ -481,16 +497,8 @@
             </select>
             <button onclick="Aoi.orders.addType()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增类型</button>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
-                <th class="px-3 py-2">类型</th>
-                <th class="px-3 py-2">发货线路</th>
-                <th class="px-3 py-2"></th>
-              </tr></thead>
-              <tbody id="typeTbody"></tbody>
-            </table>
-          </div>
+          <input id="typeSearch" type="text" placeholder="筛选类型（名称或线路关键词）…" oninput="Aoi.orders.renderTypes()" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3">
+          <div id="typeGroups"></div>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -615,6 +623,19 @@
                 <th class="px-3 py-2">目标囤货地</th><th class="px-3 py-2">理由</th><th class="px-3 py-2">操作</th>
               </tr></thead>
               <tbody id="transferTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">改圈名申请</h3>
+          <p class="text-sm text-gray-500 mb-3">团员申请更改圈名，同意后其订单/交费/地址/QQ 绑定将迁移到新圈名</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-3 py-2">原圈名</th><th class="px-3 py-2">新圈名</th>
+                <th class="px-3 py-2">QQ</th><th class="px-3 py-2">操作</th>
+              </tr></thead>
+              <tbody id="cnChangeTbody"></tbody>
             </table>
           </div>
         </div>

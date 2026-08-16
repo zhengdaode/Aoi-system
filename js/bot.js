@@ -32,7 +32,14 @@ Aoi.bot.sendGroup = async function (message) {
 // 批量推送通知：按 buyer 找 QQ 号私聊，查不到则并入群发。
 Aoi.bot.pushAll = async function (notifications) {
   if (!Aoi.bot.config.enabled || !Aoi.bot.config.httpApi) throw new Error('QQ 机器人未接入');
-  // TODO:
-  //   1. 建立 buyer → QQ 号映射（可存入 team 数据或 config）
-  //   2. notifications.forEach：有 QQ 号 → sendPrivate(qq, n.body)；无 → 收集后 sendGroup(合并文本)
+  var d = Aoi.orders.ensure();
+  var meta = d.memberMeta || {};
+  var groupMsgs = [];
+  for (var i = 0; i < notifications.length; i++) {
+    var n = notifications[i];
+    var qq = (n.buyer && meta[n.buyer]) ? meta[n.buyer].qq : null;
+    if (qq) await Aoi.bot.sendPrivate(qq, n.body);
+    else groupMsgs.push(n.body);
+  }
+  if (groupMsgs.length) await Aoi.bot.sendGroup(groupMsgs.join('\n'));
 };

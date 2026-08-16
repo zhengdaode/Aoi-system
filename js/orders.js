@@ -17,6 +17,8 @@ Aoi.orders.ensure = function () {
   if (!d.typeMeta) d.typeMeta = {};
   if (!d.ipTypes) d.ipTypes = {};
   if (!d.addresses) d.addresses = {};
+  if (!d.memberMeta) d.memberMeta = {};
+  if (!Array.isArray(d.cnChanges)) d.cnChanges = [];
   // 首次迁移：把内置常用类型并入类型库（线路=未分类）
   Aoi.orders.TYPE_SUGGESTIONS.forEach(function (t) {
     if (!d.typeMeta[t]) d.typeMeta[t] = { route: '未分类' };
@@ -579,6 +581,7 @@ Aoi.orders.purgeBuyer = function (d, buyer) {
     if (Array.isArray(d[k])) d[k] = d[k].filter(function (x) { return x.buyer !== buyer; });
   });
   if (d.addresses && d.addresses[buyer]) delete d.addresses[buyer];
+  if (d.memberMeta && d.memberMeta[buyer]) delete d.memberMeta[buyer];
 };
 
 // 渲染买家（CN）列表
@@ -615,6 +618,70 @@ Aoi.orders.removeBuyer = async function (buyer) {
   Aoi.overview.render();
   Aoi.toast('已删除买家「' + buyer + '」', 'success');
 };
+
+// —— 改圈名申请审核（团员申请 → 团长同意后全局迁移） ——
+
+Aoi.orders.renderCnChanges = function () {
+  var d = Aoi.orders.ensure();
+  var tbody = document.getElementById('cnChangeTbody');
+  if (!tbody) return;
+  var rows = (d.cnChanges || []).filter(function (c) { return c.status === '待处理'; })
+    .slice().sort(function (a, b) { return (b.date || '') < (a.date || '') ? -1 : 1; });
+  tbody.innerHTML = rows.length ? rows.map(function (c) {
+    return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.oldCn) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.newCn) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.qq || '—') + '</td>'
+      + '<td class="px-3 py-2 whitespace-nowrap">'
+      + '<button data-cnapprove="' + c.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">同意</button>'
+      + '<button data-cnreject="' + c.id + '" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>'
+      + '</td></tr>';
+  }).join('') : '<tr><td colspan="4" class="px-3 py-2 text-gray-400">暂无改圈名申请</td></tr>';
+};
+
+// 把某买家在所有数据里的引用从 oldCn 迁移到 newCn（不保存）
+Aoi.orders.migrateBuyer = function (d, oldCn, newCn) {
+  d.orders.forEach(function (o) { if (o.buyer === oldCn) o.buyer = newCn; });
+  ['payments', 'notifications', 'transfers'].forEach(function (k) {
+    if (Array.isArray(d[k])) d[k].forEach(function (x) { if (x.buyer === oldCn) x.buyer = newCn; });
+  });
+  if (d.addresses && d.addresses[oldCn] != null) { d.addresses[newCn] = d.addresses[oldCn]; delete d.addresses[oldCn]; }
+  if (d.memberMeta && d.memberMeta[oldCn]) { d.memberMeta[newCn] = d.memberMeta[oldCn]; delete d.memberMeta[oldCn]; }
+};
+
+Aoi.orders.approveCnChange = async function (id) {
+  var d = Aoi.orders.ensure();
+  var c = null;
+  for (var i = 0; i < (d.cnChanges || []).length; i++) if (d.cnChanges[i].id === id) { c = d.cnChanges[i]; break; }
+  if (!c) return;
+  if (c.newCn !== c.oldCn && Aoi.orders.collectBuyers(d).indexOf(c.newCn) >= 0) {
+    Aoi.toast('新圈名「' + c.newCn + '」已存在，无法合并', 'error'); return;
+  }
+  if (!(await Aoi.confirm('确认将「' + c.oldCn + '」改名为「' + c.newCn + '」？其订单/交费/地址/QQ 绑定将一并迁移', { title: '同意改圈名', okText: '同意', danger: true }))) return;
+  c.status = '已同意';
+  Aoi.orders.migrateBuyer(d, c.oldCn, c.newCn);
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderCnChanges();
+  Aoi.orders.renderBuyers();
+  Aoi.orders.render();
+  Aoi.overview.render();
+  Aoi.toast('已改名：' + c.oldCn + ' → ' + c.newCn, 'success');
+};
+
+Aoi.orders.rejectCnChange = async function (id) {
+  var d = Aoi.orders.ensure();
+  for (var i = 0; i < (d.cnChanges || []).length; i++) if (d.cnChanges[i].id === id) { d.cnChanges[i].status = '已驳回'; break; }
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderCnChanges();
+  Aoi.toast('已驳回', 'success');
+};
+
+document.getElementById('cnChangeTbody').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.hasAttribute('data-cnapprove')) Aoi.orders.approveCnChange(btn.getAttribute('data-cnapprove'));
+  else if (btn.hasAttribute('data-cnreject')) Aoi.orders.rejectCnChange(btn.getAttribute('data-cnreject'));
+});
 
 Aoi.orders.setActivityField = async function (name, field, value) {
   var d = Aoi.orders.ensure();
@@ -768,16 +835,38 @@ Aoi.orders.routeOptions = function (cur) {
 
 Aoi.orders.renderTypes = function () {
   var d = Aoi.orders.ensure();
-  var tbody = document.getElementById('typeTbody');
-  if (tbody) {
-    tbody.innerHTML = Object.keys(d.typeMeta).map(function (t) {
-      var m = d.typeMeta[t];
-      return '<tr class="border-b border-gray-100">'
-        + '<td class="px-3 py-2 font-semibold">' + Aoi.escapeHtml(t) + '</td>'
-        + '<td class="px-3 py-2"><select data-type="' + Aoi.escapeHtml(t) + '" data-field="route" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.routeOptions(m.route) + '</select></td>'
-        + '<td class="px-3 py-2"><button data-remove-type="' + Aoi.escapeHtml(t) + '" class="text-red-500 hover:underline">删</button></td>'
-        + '</tr>';
-    }).join('');
+  var kwEl = document.getElementById('typeSearch');
+  var kw = kwEl ? kwEl.value.trim().toLowerCase() : '';
+  var types = Object.keys(d.typeMeta);
+  if (kw) types = types.filter(function (t) {
+    return t.toLowerCase().indexOf(kw) >= 0 || Aoi.orders.typeRoute(t).toLowerCase().indexOf(kw) >= 0;
+  });
+
+  var groups = {};
+  types.forEach(function (t) { var r = Aoi.orders.typeRoute(t); if (!groups[r]) groups[r] = []; groups[r].push(t); });
+
+  var box = document.getElementById('typeGroups');
+  if (box) {
+    var html = '';
+    var idx = 0;
+    Aoi.orders.ROUTES.forEach(function (route) {
+      var list = groups[route];
+      if (!list || !list.length) return;
+      html += '<div class="mt-3"><div class="flex items-center gap-1 text-xs font-bold text-gray-500 cursor-pointer select-none" data-tgroup="' + idx + '">▾ ' + Aoi.escapeHtml(route) + ' <span class="text-gray-300">(' + list.length + ')</span></div>';
+      html += '<div id="typeGroup_' + idx + '" class="mt-1 border border-gray-100 rounded divide-y divide-gray-100">';
+      list.forEach(function (t) {
+        var m = d.typeMeta[t];
+        html += '<div class="flex items-center justify-between px-3 py-2">'
+          + '<span class="text-sm font-semibold">' + Aoi.escapeHtml(t) + '</span>'
+          + '<div class="flex items-center gap-2">'
+          + '<select data-type="' + Aoi.escapeHtml(t) + '" data-field="route" class="border border-gray-300 rounded px-2 py-1 text-xs">' + Aoi.orders.routeOptions(m.route) + '</select>'
+          + '<button data-remove-type="' + Aoi.escapeHtml(t) + '" class="text-red-500 hover:underline text-xs">删</button>'
+          + '</div></div>';
+      });
+      html += '</div></div>';
+      idx++;
+    });
+    box.innerHTML = html || '<div class="text-sm text-gray-400 py-2">无匹配类型</div>';
   }
   var ipSel = document.getElementById('typeIpSel');
   if (ipSel) {
@@ -858,15 +947,20 @@ Aoi.orders.setTypeRoute = async function (name, route) {
   await Aoi.saveTeamData(d);
 };
 
-// 事件委托：类型字段即时保存 / 删除 / 常用类型勾选
-document.getElementById('typeTbody').addEventListener('change', function (e) {
+// 事件委托：类型字段即时保存 / 删除 / 分组折叠 / 常用类型勾选
+document.getElementById('typeGroups').addEventListener('change', function (e) {
   var el = e.target;
   if (!el.hasAttribute('data-type')) return;
   Aoi.orders.setTypeRoute(el.getAttribute('data-type'), el.value);
 });
-document.getElementById('typeTbody').addEventListener('click', function (e) {
+document.getElementById('typeGroups').addEventListener('click', function (e) {
   var btn = e.target.closest('button[data-remove-type]');
-  if (btn) Aoi.orders.removeType(btn.getAttribute('data-remove-type'));
+  if (btn) { Aoi.orders.removeType(btn.getAttribute('data-remove-type')); return; }
+  var grp = e.target.closest('[data-tgroup]');
+  if (grp) {
+    var g = document.getElementById('typeGroup_' + grp.getAttribute('data-tgroup'));
+    if (g) g.classList.toggle('hidden');
+  }
 });
 document.getElementById('typeIpBox').addEventListener('change', function (e) {
   var el = e.target;

@@ -39,7 +39,7 @@ Aoi.ship.render = function () {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.orders.typeRoute(o.type)) + '</td>'
       + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.warehouse.name(o.warehouseId) || '—') + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.ship.warehouseSelect(o.id, o.warehouseId) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.member.address(o.buyer) || '—') + '</td>'
       + '<td class="px-3 py-2">' + photo + '</td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(o.tracking || '') + '" placeholder="快递单号" onchange="Aoi.ship.setTracking(\'' + o.id + '\', this.value)" class="w-32 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
@@ -56,6 +56,24 @@ Aoi.ship.setTracking = async function (orderId, value) {
   }
   await Aoi.saveTeamData(d);
   Aoi.toast('快递单号已保存', 'success');
+};
+
+// 每行囤货地下拉（到货后按商品/订单分配囤货地）
+Aoi.ship.warehouseSelect = function (orderId, selectedId) {
+  var d = Aoi.warehouse.ensure();
+  var opts = '<option value="">—</option>' + d.warehouses.map(function (w) {
+    return '<option value="' + w.id + '"' + (w.id === selectedId ? ' selected' : '') + '>' + Aoi.escapeHtml(w.name) + '</option>';
+  }).join('');
+  return '<select onchange="Aoi.ship.setWarehouse(\'' + orderId + '\', this.value)" class="border border-gray-300 rounded px-1 py-1 text-xs">' + opts + '</select>';
+};
+
+Aoi.ship.setWarehouse = async function (orderId, warehouseId) {
+  var d = Aoi.orders.ensure();
+  for (var i = 0; i < d.orders.length; i++) {
+    if (d.orders[i].id === orderId) { d.orders[i].warehouseId = warehouseId || null; break; }
+  }
+  await Aoi.saveTeamData(d);
+  Aoi.toast('囤货地已更新', 'success');
 };
 
 Aoi.ship.setPhoto = async function () {
@@ -82,6 +100,7 @@ Aoi.ship.setShipped = async function () {
   Aoi.ship.render();
   Aoi.toast('已设 ' + ids.length + ' 条为' + status, 'success');
   if (status === '已发') Aoi.notify.sync();
+  Aoi.overview.render();
 };
 
 Aoi.ship.refillBatches = function () {

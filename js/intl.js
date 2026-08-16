@@ -132,6 +132,7 @@ Aoi.intl.saveAllocation = async function () {
   });
   await Aoi.saveTeamData(d);
   if (Aoi.notify && Aoi.notify.sync) Aoi.notify.sync();
+  if (Aoi.overview) Aoi.overview.render();
   Aoi.toast('已保存分摊结果到商品与待交国际运费', 'success');
 };
 

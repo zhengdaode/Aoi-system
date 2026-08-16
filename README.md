@@ -192,10 +192,10 @@ CREATE POLICY "允许公开提交申请" ON leader_data
   FOR UPDATE USING (true) WITH CHECK (true);
 ```
 4. 提取您的 Supabase URL 和 ANON KEY。
-5. 在 index.html 的配置区替换常量：
+5. 复制 `js/config.example.js` 为 `js/config.js`，填入（只用 anon key，禁止 service_role）：
 ```js
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_KEY = 'your-anon-key';
+SUPABASE_URL = 'https://your-project.supabase.co'
+SUPABASE_ANON_KEY = 'your-anon-key'
 ```
 6. （可选）在 Supabase 开启 Custom SMTP 以解锁无限制的邮箱注册功能。
 7. 部署整个项目文件夹到任意静态托管平台 (Netlify, Vercel, GitHub Pages) 即可运行。推荐点击上方 Deploy to Netlify 按钮一键部署！

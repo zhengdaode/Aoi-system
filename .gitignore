@@ -4,3 +4,4 @@ node_modules/
 assessment-b-*.png
 *.output
 .impeccable/
+js/config.js

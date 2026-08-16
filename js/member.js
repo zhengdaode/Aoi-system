@@ -15,20 +15,24 @@ Aoi.member.ensure = function () {
 // 进入团员端：校验密钥 + CN，拉取团队数据，渲染
 Aoi.member.enter = async function () {
   var key = document.getElementById('memberKey').value.trim();
-  var cn = document.getElementById('memberCn').value.trim();
-  if (!key || !cn) { Aoi.toast('请输入团员密钥和圈名（CN）', 'warning'); return; }
+  var id = document.getElementById('memberId').value.trim();
+  if (!key || !id) { Aoi.toast('请输入团员密钥和圈名（CN）或 QQ 号', 'warning'); return; }
 
   Aoi.showLoading('加载中...');
   var res = await Aoi.getTeamDataByMemberKey(key);
   Aoi.hideLoading();
   if (!res) { Aoi.toast('密钥无效', 'error'); return; }
 
-  Aoi.member.state.key = key;
-  Aoi.member.state.cn = cn;
-  Aoi.member.state.teamName = res.name || '团队';
   // 复用现有模块（orders / intl / approval）统一读 Aoi.state.data
   Aoi.state.data = res.data;
   Aoi.member.ensure();
+
+  var cn = Aoi.member.resolveCn(id);
+  if (!cn) { Aoi.toast('未找到该圈名（CN）或 QQ 号，请确认后重试', 'error'); return; }
+
+  Aoi.member.state.key = key;
+  Aoi.member.state.cn = cn;
+  Aoi.member.state.teamName = res.name || '团队';
 
   Aoi.member.render();
   document.getElementById('member-entry').classList.add('hidden');
@@ -44,6 +48,7 @@ Aoi.member.render = function () {
   Aoi.member.renderFees(cn);
   Aoi.member.renderOrders(cn);
   Aoi.member.renderAddress(cn);
+  Aoi.member.renderBind(cn);
   Aoi.member.refillTransferBatches();
   Aoi.warehouse.refillOptions();
 };
@@ -171,6 +176,78 @@ Aoi.member.saveAddress = async function () {
   document.getElementById('memberAddr').value = '';
   Aoi.member.renderAddress(cn);
   Aoi.toast('收件地址已保存，团长将收到通知', 'success');
+};
+
+// —— QQ 绑定 + QQ 查询 + 申请改圈名 ——
+
+// 用输入（圈名或 QQ 号）解析到圈名；查不到返回 null
+Aoi.member.resolveCn = function (id) {
+  var d = Aoi.orders.ensure();
+  if (!id) return null;
+  var buyers = Aoi.orders.collectBuyers(d);
+  if (buyers.indexOf(id) >= 0) return id;
+  var meta = d.memberMeta || {};
+  var found = null;
+  Object.keys(meta).forEach(function (cn) {
+    if (meta[cn] && String(meta[cn].qq) === id) found = cn;
+  });
+  return found;
+};
+
+Aoi.member.qq = function (cn) {
+  var d = Aoi.orders.ensure();
+  return (d.memberMeta && d.memberMeta[cn] && d.memberMeta[cn].qq) || '';
+};
+
+Aoi.member.renderBind = function (cn) {
+  var box = document.getElementById('memberQqBox');
+  if (!box) return;
+  var qq = Aoi.member.qq(cn);
+  box.innerHTML = qq
+    ? '<p class="text-sm text-gray-600">已绑定 QQ：<span class="font-semibold">' + Aoi.escapeHtml(qq) + '</span></p>'
+    : '<div class="flex items-center gap-2">'
+      + '<input id="memberQq" type="text" placeholder="QQ 号（可选，便于机器人联系提醒）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">'
+      + '<button onclick="Aoi.member.bindQq()" class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">绑定</button>'
+      + '</div>'
+      + '<p class="text-xs text-gray-400 mt-1">绑定后可用 QQ 号登录查询；团长也能通过机器人私聊提醒</p>';
+};
+
+Aoi.member.bindQq = async function () {
+  var qq = document.getElementById('memberQq').value.trim();
+  var cn = Aoi.member.state.cn;
+  if (!qq) { Aoi.toast('请输入 QQ 号', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  d.memberMeta = d.memberMeta || {};
+  d.memberMeta[cn] = d.memberMeta[cn] || {};
+  d.memberMeta[cn].qq = qq;
+  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+  Aoi.member.renderBind(cn);
+  Aoi.toast('QQ 已绑定', 'success');
+};
+
+// 团员申请改圈名：写 cnChanges + 生成改圈名通知
+Aoi.member.submitCnChange = async function () {
+  var newCn = document.getElementById('memberNewCn').value.trim();
+  var cn = Aoi.member.state.cn;
+  if (!newCn) { Aoi.toast('请输入新圈名', 'warning'); return; }
+  if (newCn === cn) { Aoi.toast('新圈名与当前圈名相同', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  if (Aoi.orders.collectBuyers(d).indexOf(newCn) >= 0) { Aoi.toast('该圈名已被占用', 'error'); return; }
+  var qq = Aoi.member.qq(cn);
+  d.cnChanges = d.cnChanges || [];
+  d.cnChanges.push({ id: Aoi.genId(), oldCn: cn, newCn: newCn, qq: qq, status: '待处理', date: new Date().toISOString().slice(0, 10) });
+  d.notifications = d.notifications || [];
+  d.notifications.push({
+    id: Aoi.genId(), type: 'cnchange', buyer: cn, batchId: null,
+    title: '改圈名申请',
+    body: cn + ' 申请改圈名为「' + newCn + '」' + (qq ? '（QQ：' + qq + '）' : ''),
+    date: new Date().toISOString().slice(0, 10), sent: false
+  });
+  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+  document.getElementById('memberNewCn').value = '';
+  var st = document.getElementById('memberCnChangeStatus');
+  if (st) st.textContent = '已提交，等待团长审核';
+  Aoi.toast('改圈名申请已提交', 'success');
 };
 
 // 提交付款凭证：写 payments，状态置为待审核

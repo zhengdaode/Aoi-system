@@ -5,7 +5,8 @@ Aoi.notify = {};
 Aoi.notify.TYPES = {
   remind: { label: '催缴通知', color: 'text-amber-500' },
   shipped: { label: '发货通知', color: 'text-green-600' },
-  address: { label: '收件地址更新', color: 'text-blue-500' }
+  address: { label: '收件地址更新', color: 'text-blue-500' },
+  cnchange: { label: '改圈名申请', color: 'text-purple-500' }
 };
 
 // 补齐 notifications 结构

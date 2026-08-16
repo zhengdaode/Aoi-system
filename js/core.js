@@ -176,6 +176,7 @@ Aoi.refreshViews = function () {
   Aoi.ship.refillBatches();
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
+  Aoi.orders.renderCnChanges();
   Aoi.overview.render();
 };
 
@@ -190,7 +191,14 @@ Aoi.overview = {
       if (el) el.textContent = n;
     };
     set('ovPending', payments.filter(function (p) { return p.status === '待审核'; }).length);
-    set('ovUnpaid', payments.filter(function (p) { return p.status === '待交' || p.status === '已驳回'; }).length);
+    // 待催缴：按「批次 × 买家」从 buyerSummary 汇总，避免遗漏无 payments 记录的买家
+    var unpaid = 0;
+    (d.batches || []).forEach(function (b) {
+      Aoi.approval.buyerSummary(b.id).forEach(function (r) {
+        if (r.status === '待交' || r.status === '已驳回') unpaid++;
+      });
+    });
+    set('ovUnpaid', unpaid);
     set('ovToShip', orders.filter(function (o) { return o.status === '已到货' && (o.shipped || '未发') === '未发'; }).length);
     set('ovToArrive', orders.filter(function (o) { return (o.status || '未到货') === '未到货'; }).length);
 

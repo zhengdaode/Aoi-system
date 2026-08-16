@@ -105,7 +105,9 @@
   activityMeta: { [活动名]: { ip, buyDate, shipDate, link, status } },
   typeMeta:  { [类型名]: { route } },
   ipTypes:   { [IP]: [类型名...] },
-  addresses: { [buyer]: string }
+  addresses: { [buyer]: string },
+  memberMeta: { [cn]: { qq } },
+  cnChanges: [{ id, oldCn, newCn, qq, status, date }]
 }
 ```
 
@@ -121,7 +123,7 @@
 ## 部署（正式云同步）
 
 1. 在 Supabase 建项目，跑 `supabase-schema.sql`。
-2. 填 `js/config.js` 的 `SUPABASE_URL` / `SUPABASE_KEY`（本项目不内置真实密钥）。
+2. 复制 `js/config.example.js` 为 `js/config.js`，填 `SUPABASE_URL` / `SUPABASE_ANON_KEY`（仅 anon key，禁止填 service_role）。
 3. 打开 `index.html` 即可（可托管到任意静态站，如 Netlify）。
 
 ## 复用说明
@@ -141,3 +143,4 @@
 - **QQ 机器人接口已就位但未接入**（`Aoi.bot` 占位，`enabled=false`）；当前通知只能手动复制后发群。
 - **团员密钥即访问凭证**：任何持有 `member_key` 者可读写整份团队数据（覆盖式写 blob），存在并发覆盖/误改风险；正式商用前建议加乐观锁或拆分写入权限。
 - **收件地址「不可回看」仅为 UI 层隐私措施**：`d.addresses` 仍随整份团队 blob 一起返回，持有 `member_key` 者可通过接口读到原文；当前只在团员端界面不回显，未做服务端隔离。要真正防泄露需把地址拆到服务端单独存取，或对成员写接口做字段级过滤。
+- **QQ 号同样属于 PII**：`d.memberMeta[cn].qq` 与收件地址一样随整份团队 blob 返回，任何持有 `member_key` 者可读到所有已绑定买家的 QQ 号。绑定为可选、查询时不强制；正式商用前需与地址一起做服务端字段隔离。

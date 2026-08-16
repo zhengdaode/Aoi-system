@@ -123,6 +123,7 @@ Aoi.enterApp = async function () {
   Aoi.warehouse.renderTransfers();
   Aoi.orders.renderCnChanges();
   Aoi.img.renderSettings();
+  Aoi.bot.renderSettings();
   Aoi.calc.fillForm();
   Aoi.overview.render();
   Aoi.showScreen('screen-app');

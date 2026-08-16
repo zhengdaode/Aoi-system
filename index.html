@@ -342,6 +342,20 @@
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">QQ 机器人</h3>
+          <p class="text-sm text-gray-500 mb-3">经服务端 relay 推送催缴/发货通知到 QQ（relay 地址 + 群号；token 只在服务端，不下发前端）</p>
+          <label class="flex items-center gap-2 mb-3">
+            <input id="botEnabled" type="checkbox" class="rounded">
+            <span class="text-sm">启用机器人推送</span>
+          </label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div><label class="block text-xs text-gray-500 mb-1">relay 地址</label><input id="botRelay" type="text" placeholder="http://1.2.3.4:8080" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">群号（群发兜底）</label><input id="botGroupId" type="text" placeholder="群号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+          </div>
+          <button onclick="Aoi.bot.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">团队成员</h3>
           <ul id="memberList"></ul>
         </div>

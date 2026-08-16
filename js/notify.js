@@ -190,6 +190,9 @@ Aoi.notify.pushBot = async function () {
   if (!unsent.length) { Aoi.toast('没有未发送的通知', 'info'); return; }
   try {
     await Aoi.bot.pushAll(unsent);
+    unsent.forEach(function (n) { n.sent = true; });
+    await Aoi.saveTeamData(d);
+    Aoi.notify.render();
     Aoi.toast('已推送 ' + unsent.length + ' 条', 'success');
   } catch (e) {
     Aoi.toast(e.message || 'QQ 机器人未接入', 'warning');

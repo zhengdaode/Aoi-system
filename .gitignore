@@ -5,3 +5,4 @@ assessment-b-*.png
 *.output
 .impeccable/
 js/config.js
+.env

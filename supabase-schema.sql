@@ -221,11 +221,23 @@ create policy "teams_update_owner" on teams for update
 
 -- team_members：成员可读本团队全部成员；owner 可删除成员。
 -- 插入只经 join_team_by_code / create_my_team RPC，故无需 insert 策略。
+-- 成员身份判断（security definer 绕过 RLS，避免 members_select 自引用递归）
+create or replace function public.is_team_member(t uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return exists (
+    select 1 from team_members m
+    where m.team_id = t and m.user_id = auth.uid()
+  );
+end;
+$$;
+
 create policy "members_select" on team_members for select
-  using (exists (
-    select 1 from team_members m2
-    where m2.team_id = team_members.team_id and m2.user_id = auth.uid()
-  ));
+  using (public.is_team_member(team_members.team_id));
 
 create policy "members_delete_owner" on team_members for delete
   using (exists (

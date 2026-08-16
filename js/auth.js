@@ -91,7 +91,15 @@ Aoi.auth.logout = async function () {
 
 // 登录后进入应用：有团队 → 设置页；无团队 → 入驻页
 Aoi.enterApp = async function () {
-  var info = await Aoi.loadTeam();
+  var info;
+  try {
+    info = await Aoi.loadTeam();
+  } catch (e) {
+    Aoi.hideLoading();
+    Aoi.toast('加载团队失败：' + e.message, 'error');
+    Aoi.showScreen('screen-onboard');
+    return;
+  }
   if (!info) { Aoi.showScreen('screen-onboard'); return; }
   Aoi.state.team = info.team;
   Aoi.state.role = info.role;

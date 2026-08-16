@@ -26,13 +26,14 @@ Aoi.loadTeam = async function () {
 
   var uid = Aoi.state.user.id;
   var r1 = await Aoi.db.from('team_members').select('team_id, role').eq('user_id', uid);
-  if (r1.error || !r1.data || r1.data.length === 0) return null;
+  if (r1.error) throw new Error(r1.error.message);
+  if (!r1.data || r1.data.length === 0) return null;
 
   var teamId = r1.data[0].team_id;
   var role = r1.data[0].role;
 
   var r2 = await Aoi.db.from('teams').select('*').eq('id', teamId).single();
-  if (r2.error) return null;
+  if (r2.error) throw new Error(r2.error.message);
 
   var r3 = await Aoi.db.from('team_members').select('user_id, role, email').eq('team_id', teamId);
 
@@ -67,6 +68,19 @@ Aoi.createMyTeam = async function (name) {
   var r = await Aoi.db.rpc('create_my_team', { team_name: name || '我的团' });
   if (r.error) throw new Error(r.error.message);
   return r.data;
+};
+
+// 团长修改团名（RLS teams_update_owner 已放行 owner 更新，无需新增 RPC）
+Aoi.renameTeam = async function (name) {
+  if (Aoi.state.user && Aoi.state.user.isDebug) {
+    var t = Aoi.debugTeam();
+    t.name = name;
+    localStorage.setItem('aoi_debug_team', JSON.stringify(t));
+    Aoi.state.team = t;
+    return;
+  }
+  var r = await Aoi.db.from('teams').update({ name: name }).eq('id', Aoi.state.team.id);
+  if (r.error) throw new Error(r.error.message);
 };
 
 // 通过邀请码加入团队（管理员）

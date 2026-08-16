@@ -204,7 +204,7 @@
   </section>
 
   <!-- 应用外壳 -->
-  <section id="screen-app" data-screen class="hidden min-h-screen md:flex">
+  <section id="screen-app" data-screen class="hidden min-h-screen flex">
     <aside class="w-60 bg-white border-r border-gray-200 p-5 hidden md:flex md:flex-col shrink-0">
       <div class="mb-6 px-2">
         <h1 class="font-serif text-xl font-bold leading-tight flex items-center gap-2">
@@ -294,7 +294,11 @@
       <div id="view-settings" data-view class="hidden grid gap-4 max-w-3xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">团队信息</h3>
-          <p class="text-sm text-gray-600">团队名：<span id="teamName" class="font-semibold"></span></p>
+          <p class="text-sm text-gray-600 mb-3">团队名：<span id="teamName" class="font-semibold"></span></p>
+          <div id="teamRenameBox" class="flex gap-2">
+            <input id="teamRenameInput" type="text" placeholder="新团名" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
+            <button onclick="Aoi.onRenameTeam()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">改名</button>
+          </div>
         </div>
 
         <div id="inviteSection" class="bg-white rounded-lg border border-gray-200 p-6 hidden">

@@ -17,6 +17,9 @@ Aoi.renderSettings = function () {
   var mkLabel = document.getElementById('memberKeyLabel');
   if (mkLabel) mkLabel.textContent = t.member_key || '（未生成）';
 
+  var renameBox = document.getElementById('teamRenameBox');
+  if (renameBox) renameBox.classList.toggle('hidden', !isOwner);
+
   var list = document.getElementById('memberList');
   list.innerHTML = '';
   Aoi.state.members.forEach(function (m) {
@@ -46,6 +49,20 @@ Aoi.onRegenerateMemberKey = async function () {
     var code = await Aoi.regenerateMemberKey();
     document.getElementById('memberKeyLabel').textContent = code;
     Aoi.toast('团员密钥已更新', 'success');
+  } catch (e) { Aoi.toast(e.message, 'error'); }
+};
+
+// 团长修改团名
+Aoi.onRenameTeam = async function () {
+  var input = document.getElementById('teamRenameInput');
+  var name = input.value.trim();
+  if (!name) { Aoi.toast('请输入新团名', 'warning'); return; }
+  try {
+    await Aoi.renameTeam(name);
+    Aoi.state.team.name = name;
+    Aoi.renderSettings();
+    input.value = '';
+    Aoi.toast('团名已更新', 'success');
   } catch (e) { Aoi.toast(e.message, 'error'); }
 };
 

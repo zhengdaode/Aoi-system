@@ -205,13 +205,16 @@
 
   <!-- 应用外壳 -->
   <section id="screen-app" data-screen class="hidden min-h-screen flex">
-    <aside class="w-60 bg-white border-r border-gray-200 p-5 hidden md:flex md:flex-col shrink-0">
-      <div class="mb-6 px-2">
-        <h1 class="font-serif text-xl font-bold leading-tight flex items-center gap-2">
-          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-          Aoi System
-        </h1>
-        <p class="text-xs text-gray-500 mt-1">谷圈团购管理</p>
+    <aside id="sidebar" class="w-60 bg-white border-r border-gray-200 p-5 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 -translate-x-full transition-transform duration-200 md:static md:translate-x-0">
+      <div class="mb-6 px-2 flex items-start justify-between">
+        <div>
+          <h1 class="font-serif text-xl font-bold leading-tight flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            Aoi System
+          </h1>
+          <p class="text-xs text-gray-500 mt-1">谷圈团购管理</p>
+        </div>
+        <button onclick="Aoi.toggleSidebar(false)" class="md:hidden text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="关闭菜单">×</button>
       </div>
       <nav class="flex-1 overflow-y-auto space-y-6">
         <div>
@@ -249,13 +252,19 @@
         </div>
       </nav>
     </aside>
+    <div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-black bg-opacity-40 hidden md:hidden" onclick="Aoi.toggleSidebar(false)"></div>
     <main class="flex-1 p-6">
       <header class="flex items-center justify-between mb-8">
-        <div>
-          <h2 class="font-serif text-2xl font-bold">Aoi System</h2>
-          <p id="myRole" class="text-sm text-gray-500 mt-0.5"></p>
+        <div class="flex items-center gap-3">
+          <button onclick="Aoi.toggleSidebar()" class="md:hidden text-gray-600 hover:text-gray-900" aria-label="菜单">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </button>
+          <div>
+            <h2 class="font-serif text-2xl font-bold">Aoi System</h2>
+            <p id="myRole" class="text-sm text-gray-500 mt-0.5"></p>
+          </div>
         </div>
-        <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline">退出登录</button>
+        <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline shrink-0">退出登录</button>
       </header>
 
       <!-- 总览 -->

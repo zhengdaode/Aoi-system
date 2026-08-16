@@ -80,3 +80,13 @@ textarea:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: #8e8b82;
 }
+
+/* 数据表：窄屏横向滚动，避免挤成竖排 */
+.overflow-x-auto table {
+  width: max-content;
+  min-width: 100%;
+}
+.overflow-x-auto th,
+.overflow-x-auto td {
+  white-space: nowrap;
+}

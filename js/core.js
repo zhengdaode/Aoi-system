@@ -39,6 +39,17 @@ Aoi.nav = function (viewId) {
     el.classList.toggle('bg-blue-600', el.getAttribute('data-nav') === viewId);
     el.classList.toggle('text-white', el.getAttribute('data-nav') === viewId);
   });
+  Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
+};
+
+// 移动端侧边栏抽屉：无参切换，true 展开 / false 收起
+Aoi.toggleSidebar = function (open) {
+  var sb = document.getElementById('sidebar');
+  var bd = document.getElementById('sidebarBackdrop');
+  if (!sb) return;
+  if (open === undefined) open = sb.classList.contains('-translate-x-full');
+  sb.classList.toggle('-translate-x-full', !open);
+  if (bd) bd.classList.toggle('hidden', !open);
 };
 
 // XSS 防护：转义后再插入 DOM

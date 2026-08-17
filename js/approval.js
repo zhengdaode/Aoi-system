@@ -67,7 +67,7 @@ Aoi.approval.render = function () {
   }
   var rows = Aoi.approval.buyerSummary(batchId);
   var paid = 0, pending = 0;
-  tbody.innerHTML = rows.map(function (r) {
+  tbody.innerHTML = rows.map(function (r, i) {
     if (r.status === '已交') paid++;
     if (r.status === '待审核') pending++;
     var b = Aoi.escapeHtml(r.buyer);
@@ -78,6 +78,7 @@ Aoi.approval.render = function () {
     if (r.status !== '已交') actions += '<button data-buyer="' + b + '" data-status="已交" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">标记已交</button>';
     if (r.status !== '已驳回') actions += '<button data-buyer="' + b + '" data-status="已驳回" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>';
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + b + '</td>'
       + '<td class="px-3 py-2 text-right text-gray-400">' + r.goods.toFixed(2) + '</td>'
       + '<td class="px-3 py-2 text-right font-semibold">' + r.intlFee.toFixed(2) + '</td>'

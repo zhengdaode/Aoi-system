@@ -57,23 +57,17 @@ Aoi.bot.pushAll = async function (notifications) {
   if (!Aoi.bot.config.enabled || !Aoi.bot.config.relay) throw new Error('QQ 机器人未接入');
   var d = Aoi.orders.ensure();
   var meta = d.memberMeta || {};
-  var groupMsgs = [];
-  var failed = 0;
-  for (var i = 0; i < notifications.length; i++) {
-    var n = notifications[i];
+  // 群发 @ 每个人（有绑定 QQ 用 [CQ:at]，无绑定退化为纯文本）
+  var lines = notifications.map(function (n) {
     var qq = (n.buyer && meta[n.buyer]) ? meta[n.buyer].qq : null;
-    if (qq) {
-      try { await Aoi.bot.sendPrivate(qq, n.body); }
-      catch (e) { failed++; }
-    } else {
-      groupMsgs.push(n.body);
-    }
-  }
-  if (groupMsgs.length) {
-    try { await Aoi.bot.sendGroup(groupMsgs.join('\n')); }
-    catch (e) { failed++; }
-  }
-  if (failed) throw new Error('有 ' + failed + ' 条推送失败，请重试');
+    var rest = n.body;
+    var buyer = n.buyer || '';
+    if (buyer && rest.indexOf(buyer + '：') === 0) rest = rest.slice(buyer.length + 1);
+    else if (buyer && rest.indexOf(buyer + ' ') === 0) rest = rest.slice(buyer.length + 1);
+    if (qq) return '[CQ:at,qq=' + qq + '] ' + rest;
+    return n.body;
+  });
+  await Aoi.bot.sendGroup(lines.join('\n'));
 };
 
 // 渲染设置页机器人配置

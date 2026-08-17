@@ -138,6 +138,31 @@ Aoi.copyText = function (text) {
   });
 };
 
+// 导出表格为 PNG 图片（html2canvas）。按钮需带 data-table（表 id）+ data-name（文件名）
+Aoi.exportImage = function (btn) {
+  var id = btn.getAttribute('data-table');
+  var name = btn.getAttribute('data-name') || '表格';
+  var table = document.getElementById(id);
+  if (!table) return;
+  if (typeof html2canvas !== 'function') { Aoi.toast('图片导出组件未加载', 'error'); return; }
+  // 克隆到离屏白色容器再截图，避免受滚动/隐藏容器影响，并留出边距
+  var holder = document.createElement('div');
+  holder.style.cssText = 'position:absolute;left:-9999px;top:0;background:#fff;padding:16px;';
+  holder.appendChild(table.cloneNode(true));
+  document.body.appendChild(holder);
+  html2canvas(holder, { backgroundColor: '#ffffff', scale: 2 }).then(function (canvas) {
+    document.body.removeChild(holder);
+    var a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = name + '.png';
+    a.click();
+    Aoi.toast('已导出「' + name + '」图片', 'success');
+  }).catch(function () {
+    document.body.removeChild(holder);
+    Aoi.toast('导出图片失败', 'error');
+  });
+};
+
 // —— 撤销机制：删除前快照，30 秒内可恢复 ——
 
 Aoi.undo = { snapshot: null, label: '', timer: null };

@@ -127,6 +127,10 @@ Aoi.orders.addManual = async function () {
   });
   if (activity && d.activities.indexOf(activity) < 0) d.activities.push(activity);
   if (ip && d.ips.indexOf(ip) < 0) d.ips.push(ip);
+  if (activity && ip) {
+    if (!d.activityMeta[activity]) d.activityMeta[activity] = {};
+    d.activityMeta[activity].ip = ip;
+  }
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
   Aoi.orders.refillDatalists();
@@ -333,10 +337,11 @@ Aoi.orders.render = function () {
 
   var tbody = document.getElementById('orderTbody');
   var total = 0;
-  tbody.innerHTML = rows.map(function (o) {
+  tbody.innerHTML = rows.map(function (o, i) {
     var sum = o.price * o.count;
     total += sum;
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-2 py-2"><input type="checkbox" class="row-check" data-id="' + o.id + '"></td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.activity) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type) + '</td>'
@@ -431,8 +436,9 @@ Aoi.orders.renderProducts = function () {
   var d = Aoi.orders.ensure();
   var tbody = document.getElementById('productTbody');
   if (!tbody) return;
-  tbody.innerHTML = d.products.map(function (p) {
+  tbody.innerHTML = d.products.map(function (p, i) {
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(p.type + '-' + p.model) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(p.ip) + '</td>'
       + '<td class="px-3 py-2 text-right">' + p.price.toFixed(2) + '</td>'
@@ -474,9 +480,10 @@ Aoi.orders.renderActivities = function () {
   var d = Aoi.orders.ensure();
   var tbody = document.getElementById('activityTbody');
   if (!tbody) return;
-  tbody.innerHTML = d.activities.length ? d.activities.map(function (name) {
+  tbody.innerHTML = d.activities.length ? d.activities.map(function (name, i) {
     var m = d.activityMeta[name] || {};
     return '<tr class="border-b border-gray-100">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2 font-semibold whitespace-nowrap"><button data-jump="' + Aoi.escapeHtml(name) + '" class="text-blue-600 hover:underline text-left">' + Aoi.escapeHtml(name) + '</button></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="ip" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.ipOptions(m.ip) + '</select></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.buyDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="buyDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
@@ -485,7 +492,7 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
   Aoi.orders.renderBuyers();
 };
 
@@ -590,16 +597,17 @@ Aoi.orders.renderBuyers = function () {
   var tbody = document.getElementById('buyerTbody');
   if (!tbody) return;
   var buyers = Aoi.orders.collectBuyers(d);
-  tbody.innerHTML = buyers.length ? buyers.map(function (buyer) {
+  tbody.innerHTML = buyers.length ? buyers.map(function (buyer, i) {
     var total = (d.orders || []).filter(function (o) { return o.buyer === buyer; }).length;
     var unfinished = Aoi.orders.buyerUnfinished(d, buyer);
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2 font-medium">' + Aoi.escapeHtml(buyer) + '</td>'
       + '<td class="px-3 py-2 text-right text-gray-400">' + total + '</td>'
       + '<td class="px-3 py-2 text-right ' + (unfinished ? 'text-amber-500' : 'text-green-600') + '">' + unfinished + '</td>'
       + '<td class="px-3 py-2 text-right"><button data-del-buyer="' + Aoi.escapeHtml(buyer) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="4" class="px-3 py-2 text-gray-400">暂无买家</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无买家</td></tr>';
 };
 
 // 手动删除买家（CN）
@@ -627,8 +635,9 @@ Aoi.orders.renderCnChanges = function () {
   if (!tbody) return;
   var rows = (d.cnChanges || []).filter(function (c) { return c.status === '待处理'; })
     .slice().sort(function (a, b) { return (b.date || '') < (a.date || '') ? -1 : 1; });
-  tbody.innerHTML = rows.length ? rows.map(function (c) {
+  tbody.innerHTML = rows.length ? rows.map(function (c, i) {
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.oldCn) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.newCn) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.qq || '—') + '</td>'
@@ -636,7 +645,7 @@ Aoi.orders.renderCnChanges = function () {
       + '<button data-cnapprove="' + c.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">同意</button>'
       + '<button data-cnreject="' + c.id + '" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>'
       + '</td></tr>';
-  }).join('') : '<tr><td colspan="4" class="px-3 py-2 text-gray-400">暂无改圈名申请</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无改圈名申请</td></tr>';
 };
 
 // 把某买家在所有数据里的引用从 oldCn 迁移到 newCn（不保存）
@@ -755,15 +764,12 @@ Aoi.orders.onIpChange = function (ipId) {
 
 Aoi.orders.refillActivitySelect = function () {
   var ip = (document.getElementById('oIp') || {}).value.trim();
-  var sel = document.getElementById('oActivity');
-  if (!sel) return;
+  var dl = document.getElementById('oActivityOptions');
+  if (!dl) return;
   var acts = ip ? Aoi.orders.activitiesByIp(ip) : [];
-  sel.disabled = !ip;
-  sel.innerHTML = ip
-    ? '<option value="">选择活动…</option>' + acts.map(function (a) {
-        return '<option value="' + Aoi.escapeHtml(a) + '">' + Aoi.escapeHtml(a) + '</option>';
-      }).join('')
-    : '<option value="">先选 IP</option>';
+  dl.innerHTML = acts.map(function (a) {
+    return '<option value="' + Aoi.escapeHtml(a) + '">';
+  }).join('');
 };
 
 // —— 类型选择面板：显式 × 关闭，点空白不关闭 ——

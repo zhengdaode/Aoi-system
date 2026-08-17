@@ -48,14 +48,25 @@ Aoi.notify.sync = async function () {
     var seen = {};
     d.notifications.forEach(function (n) { seen[Aoi.notify.keyOf(n)] = 1; });
     var added = 0;
+    var remindKeys = {};
 
     d.batches.forEach(function (b) {
       Aoi.approval.buyerSummary(b.id).forEach(function (r) {
         if (r.status !== '待交' && r.status !== '已驳回') return;
+        remindKeys[r.buyer + '|' + b.id] = 1;
         var n = Aoi.notify.buildRemind(b.id, r.buyer, r.intlFee, r.status);
         if (seen[Aoi.notify.keyOf(n)]) return;
         d.notifications.push(n); seen[Aoi.notify.keyOf(n)] = 1; added++;
       });
+    });
+
+    // 已缴费/待审核的成员不再催缴：清除过期的未发催缴通知
+    var pruned = 0;
+    d.notifications = d.notifications.filter(function (n) {
+      if (n.type !== 'remind' || n.sent) return true;
+      if (remindKeys[(n.buyer || '') + '|' + (n.batchId || '')]) return true;
+      pruned++;
+      return false;
     });
 
     var byBuyer = {};
@@ -72,7 +83,7 @@ Aoi.notify.sync = async function () {
       d.notifications.push(n); seen[Aoi.notify.keyOf(n)] = 1; added++;
     });
 
-    if (added) await Aoi.saveTeamData(d);
+    if (added || pruned) await Aoi.saveTeamData(d);
     Aoi.notify.render();
   } catch (e) { /* 自动同步失败不打断主流程 */ }
 };

@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-08-16 · 版本 v0.9.2（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨 + 8 分级录入与类型线路 + 9 收件地址与批次选货 + 10 批次命名/IP一览/分摊落库）
+> 更新日期：2026-08-17 · 版本 v0.9.2（阶段 0–3 + 4a 团员端 + 4b 通知公告 + 4c 囤货地 + 5 图床 + 6 活动管理 + 7 打磨 + 8 分级录入与类型线路 + 9 收件地址与批次选货 + 10 批次命名/IP一览/分摊落库 + 11 每人应付国际费改版与全表导出）
 
 ## 项目定位
 
@@ -86,6 +86,15 @@
 - **买家（CN）管理**：活动管理页新增买家列表（圈名/订单数/未处理完数），可手动删除；删除活动时自动级联清理无待处理订单的买家（清除订单/交费/地址/通知等引用）。
 - **修复**：批次下拉未同步刷新、国际计算器无法选批次、活动管理无法查看已有活动、删除活动无效（`ensure()` 反推复现）。
 
+### 阶段 11 · 每人应付国际费改版 + 全表导出图片 / 行号
+- **每人应付国际费 4 列**（`js/intl.js`）：表头改为 购买者 / 购买内容 / 国际金额 / 国内额外金额；购买内容按买家聚合为「类型-型号 ×数量」；国内额外金额为每人手动可编辑字段，写入 `payments[].domesticFee`（不参与国际费重算，`setDomesticFee`）。
+- **全表行号**：所有数据表首列新增行号 `<td>`（订单/审核/发货/活动/买家/周边/换囤货地/改圈名/团员端/分摊明细/每人应付），`map(function (x, i)` 注入序号。
+- **表格可读性**（`css/styles.css` 新增 `.data-table`）：表头底色 + 斑马纹（`tbody tr:nth-child(even)`）+ 点线行分隔，替代原 `border-b` 实线。
+- **全表导出图片**（`js/core.js` `Aoi.exportImage` + html2canvas CDN）：所有数据表加「导出图片」按钮，克隆表格到离屏容器渲染为白底 PNG 下载。
+- **团员端容错**：团员端提交动作（地址 / QQ 绑定 / 改圈名 / 凭证 / 收货 / 换囤货地）统一 try/catch 并 toast，避免静默失败。
+- **催缴过期清理**（`js/notify.js`）：已交费 / 待审核成员自动清除过期的未发催缴通知。
+- **QQ 群发 @ 提及**（`js/bot.js`）：群发改为 `[CQ:at]` 提及有绑定 QQ 的成员，替代逐条私聊。
+
 ## 数据模型（团队数据 blob，`Aoi.state.data`）
 
 ```
@@ -95,7 +104,7 @@
   products:  [{ id, ip, type, model, price }],
   activities:[string],  ips:[string],
   batches:   [{ id, date, name, targetAmount?, weights?, manualFees? }],
-  payments:  [{ id, batchId, buyer, status, intlFee?, receipt?, receiptDate? }],
+  payments:  [{ id, batchId, buyer, status, intlFee?, domesticFee?, receipt?, receiptDate? }],
   warehouses: [{ id, name, qrCode }],
   transfers:  [{ id, buyer, batchId, toWarehouseId, reason, status, date }],
   announcements: [{ id, text, date }],

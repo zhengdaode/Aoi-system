@@ -61,6 +61,31 @@ Aoi.intl.buyerTotals = function (batchId, items) {
   return totals;
 };
 
+// 每人应付国际费明细：购买内容聚合 + 国际金额 + 国内额外金额（读交费记录）
+Aoi.intl.buyerRows = function (batchId, items) {
+  var feeByKey = {};
+  items.forEach(function (it) { feeByKey[it.key] = it.weightedIntlFee; });
+  var d = Aoi.orders.ensure();
+  var map = {};
+  d.orders.forEach(function (o) {
+    if (o.batchId !== batchId) return;
+    var key = o.type + '|' + o.model;
+    if (!map[o.buyer]) map[o.buyer] = { buyer: o.buyer, content: [], intl: 0 };
+    map[o.buyer].intl += (feeByKey[key] || 0) * o.count;
+    map[o.buyer].content.push(o.type + '-' + o.model + ' ×' + o.count);
+  });
+  return Object.keys(map).map(function (buyer) {
+    var m = map[buyer];
+    var rec = Aoi.approval.getRecord(batchId, buyer);
+    return {
+      buyer: buyer,
+      content: m.content.join('，'),
+      intl: m.intl,
+      domestic: (rec && rec.domesticFee != null) ? rec.domesticFee : ''
+    };
+  }).sort(function (a, b) { return b.intl - a.intl; });
+};
+
 // 渲染国际计算页
 Aoi.intl.render = function () {
   var batch = Aoi.intl.getBatch(document.getElementById('intlBatch').value);
@@ -70,9 +95,10 @@ Aoi.intl.render = function () {
   var items = Aoi.intl.buildItems(batch);
   var tbody = document.getElementById('intlTbody');
   var tareTotal = 0, feeTotal = 0;
-  tbody.innerHTML = items.map(function (it) {
+  tbody.innerHTML = items.map(function (it, i) {
     tareTotal += it.totalWeight; feeTotal += it.weightedTotalFee;
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(it.type + ' - ' + it.model) + '</td>'
       + '<td class="px-3 py-2 text-right">' + it.quantity + '</td>'
       + '<td class="px-3 py-2"><input type="number" step="0.01" value="' + (it.unitWeight || '') + '" onchange="Aoi.intl.setWeight(\'' + it.key + '\', this.value)" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
@@ -85,12 +111,17 @@ Aoi.intl.render = function () {
     ? '共 ' + items.length + ' 种制品 · 总重量 ' + tareTotal.toFixed(2) + ' · 已分摊国际费 ' + feeTotal.toFixed(2)
     : '该批次暂无订单';
 
-  var totals = Aoi.intl.buyerTotals(batch.id, items);
+  var rows = Aoi.intl.buyerRows(batch.id, items);
   var btbody = document.getElementById('intlBuyerTbody');
-  btbody.innerHTML = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; }).map(function (buyer) {
+  btbody.innerHTML = rows.map(function (r, i) {
+    var b = r.buyer.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(buyer) + '</td>'
-      + '<td class="px-3 py-2 text-right">' + totals[buyer].toFixed(2) + '</td></tr>';
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.buyer) + '</td>'
+      + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.content) + '</td>'
+      + '<td class="px-3 py-2 text-right">' + r.intl.toFixed(2) + '</td>'
+      + '<td class="px-3 py-2"><input type="number" step="0.01" value="' + (r.domestic || '') + '" onchange="Aoi.intl.setDomesticFee(\'' + batch.id + '\', \'' + b + '\', this.value)" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
+      + '</tr>';
   }).join('');
 };
 
@@ -154,6 +185,17 @@ Aoi.intl.setFee = async function (key, value) {
   batch.manualFees[key] = parseFloat(value) || 0;
   await Aoi.saveTeamData(Aoi.state.data);
   Aoi.intl.render();
+};
+
+// 保存某买家国内额外金额（写入交费记录，不重算分摊）
+Aoi.intl.setDomesticFee = async function (batchId, buyer, value) {
+  var d = Aoi.approval.ensure();
+  var rec = Aoi.approval.getRecord(batchId, buyer);
+  var val = parseFloat(value) || 0;
+  if (rec) rec.domesticFee = val;
+  else d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: buyer, status: '待交', domesticFee: val });
+  await Aoi.saveTeamData(d);
+  Aoi.toast(buyer + ' 国内额外金额已保存', 'success');
 };
 
 // 刷新批次下拉

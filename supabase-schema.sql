@@ -192,7 +192,7 @@ as $$
 declare
   target_team_id uuid;
 begin
-  select id into target_team_id from teams where member_key = member_key;
+  select t.id into target_team_id from teams t where t.member_key = member_key limit 1;
   if target_team_id is null then
     raise exception '密钥无效';
   end if;

@@ -69,8 +69,9 @@ Aoi.warehouse.renderTransfers = function () {
   if (!tbody) return;
   var rows = d.transfers.filter(function (t) { return t.status === '待处理'; })
     .slice().sort(function (a, b) { return (b.date || '') < (a.date || '') ? -1 : 1; });
-  tbody.innerHTML = rows.length ? rows.map(function (t) {
+  tbody.innerHTML = rows.length ? rows.map(function (t, i) {
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(t.buyer) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.orders.batchDate(t.batchId)) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.warehouse.name(t.toWarehouseId)) + '</td>'
@@ -79,7 +80,7 @@ Aoi.warehouse.renderTransfers = function () {
       + '<button data-tapprove="' + t.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">同意</button>'
       + '<button data-treject="' + t.id + '" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>'
       + '</td></tr>';
-  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无换囤货地申请</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">暂无换囤货地申请</td></tr>';
 };
 
 // 同意：把该买家在该批次的订单标记到目标囤货地

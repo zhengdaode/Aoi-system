@@ -85,7 +85,7 @@ Aoi.member.renderFees = function (cn) {
   });
 
   var tbody = document.getElementById('memberFeeTbody');
-  tbody.innerHTML = ids.length ? ids.map(function (batchId) {
+  tbody.innerHTML = ids.length ? ids.map(function (batchId, i) {
     var batch = myBatches[batchId];
     var rec = Aoi.approval.getRecord(batchId, cn);
     var items = Aoi.intl.buildItems(batch);
@@ -106,12 +106,13 @@ Aoi.member.renderFees = function (cn) {
     }
 
     return '<tr class="border-b border-gray-100">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(batch.date || '') + '</td>'
       + '<td class="px-3 py-2 text-right font-semibold">¥' + fee.toFixed(2) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.approval.statusBadge(status) + '</td>'
       + '<td class="px-3 py-2">' + action + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="4" class="px-3 py-2 text-gray-400">暂无到货批次（该圈名还没有已到货的订单）</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无到货批次（该圈名还没有已到货的订单）</td></tr>';
 
   var stat = document.getElementById('memberFeeStat');
   if (stat) stat.textContent = ids.length ? '共 ' + ids.length + ' 个到货批次' : '';
@@ -122,7 +123,7 @@ Aoi.member.renderOrders = function (cn) {
   var d = Aoi.orders.ensure();
   var rows = d.orders.filter(function (o) { return o.buyer === cn; });
   var tbody = document.getElementById('memberOrderTbody');
-  tbody.innerHTML = rows.length ? rows.map(function (o) {
+  tbody.innerHTML = rows.length ? rows.map(function (o, i) {
     var sum = o.price * o.count;
     var shipped = (o.shipped || '未发') === '已发';
     var confirm;
@@ -135,6 +136,7 @@ Aoi.member.renderOrders = function (cn) {
     }
     var tracking = o.tracking || '—';
     return '<tr class="border-b border-gray-100">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.activity) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
       + '<td class="px-3 py-2 text-right">' + o.price.toFixed(2) + '</td>'
@@ -144,7 +146,7 @@ Aoi.member.renderOrders = function (cn) {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(tracking) + '</td>'
       + '<td class="px-3 py-2">' + confirm + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="8" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
 };
 
 // —— 收件地址：只写不读（保护隐私），提交后在 QQ 通知团长 ——
@@ -164,18 +166,22 @@ Aoi.member.saveAddress = async function () {
   var addr = document.getElementById('memberAddr').value.trim();
   if (!addr) { Aoi.toast('请输入收件地址', 'warning'); return; }
   var cn = Aoi.member.state.cn;
-  var d = Aoi.member.ensure();
-  d.addresses[cn] = addr;
-  d.notifications.push({
-    id: Aoi.genId(), type: 'address', buyer: cn, batchId: null,
-    title: '收件地址更新',
-    body: cn + ' 更新了收件地址：' + addr,
-    date: new Date().toISOString().slice(0, 10), sent: false
-  });
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  document.getElementById('memberAddr').value = '';
-  Aoi.member.renderAddress(cn);
-  Aoi.toast('收件地址已保存，团长将收到通知', 'success');
+  try {
+    var d = Aoi.member.ensure();
+    d.addresses[cn] = addr;
+    d.notifications.push({
+      id: Aoi.genId(), type: 'address', buyer: cn, batchId: null,
+      title: '收件地址更新',
+      body: cn + ' 更新了收件地址：' + addr,
+      date: new Date().toISOString().slice(0, 10), sent: false
+    });
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    document.getElementById('memberAddr').value = '';
+    Aoi.member.renderAddress(cn);
+    Aoi.toast('收件地址已保存，团长将收到通知', 'success');
+  } catch (e) {
+    Aoi.toast('地址保存失败：' + (e && e.message ? e.message : e), 'error');
+  }
 };
 
 // —— QQ 绑定 + QQ 查询 + 申请改圈名 ——
@@ -216,13 +222,17 @@ Aoi.member.bindQq = async function () {
   var qq = document.getElementById('memberQq').value.trim();
   var cn = Aoi.member.state.cn;
   if (!qq) { Aoi.toast('请输入 QQ 号', 'warning'); return; }
-  var d = Aoi.orders.ensure();
-  d.memberMeta = d.memberMeta || {};
-  d.memberMeta[cn] = d.memberMeta[cn] || {};
-  d.memberMeta[cn].qq = qq;
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  Aoi.member.renderBind(cn);
-  Aoi.toast('QQ 已绑定', 'success');
+  try {
+    var d = Aoi.orders.ensure();
+    d.memberMeta = d.memberMeta || {};
+    d.memberMeta[cn] = d.memberMeta[cn] || {};
+    d.memberMeta[cn].qq = qq;
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    Aoi.member.renderBind(cn);
+    Aoi.toast('QQ 已绑定', 'success');
+  } catch (e) {
+    Aoi.toast('QQ 绑定失败：' + (e && e.message ? e.message : e), 'error');
+  }
 };
 
 // 团员申请改圈名：写 cnChanges + 生成改圈名通知
@@ -234,49 +244,61 @@ Aoi.member.submitCnChange = async function () {
   var d = Aoi.orders.ensure();
   if (Aoi.orders.collectBuyers(d).indexOf(newCn) >= 0) { Aoi.toast('该圈名已被占用', 'error'); return; }
   var qq = Aoi.member.qq(cn);
-  d.cnChanges = d.cnChanges || [];
-  d.cnChanges.push({ id: Aoi.genId(), oldCn: cn, newCn: newCn, qq: qq, status: '待处理', date: new Date().toISOString().slice(0, 10) });
-  d.notifications = d.notifications || [];
-  d.notifications.push({
-    id: Aoi.genId(), type: 'cnchange', buyer: cn, batchId: null,
-    title: '改圈名申请',
-    body: cn + ' 申请改圈名为「' + newCn + '」' + (qq ? '（QQ：' + qq + '）' : ''),
-    date: new Date().toISOString().slice(0, 10), sent: false
-  });
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  document.getElementById('memberNewCn').value = '';
-  var st = document.getElementById('memberCnChangeStatus');
-  if (st) st.textContent = '已提交，等待团长审核';
-  Aoi.toast('改圈名申请已提交', 'success');
+  try {
+    d.cnChanges = d.cnChanges || [];
+    d.cnChanges.push({ id: Aoi.genId(), oldCn: cn, newCn: newCn, qq: qq, status: '待处理', date: new Date().toISOString().slice(0, 10) });
+    d.notifications = d.notifications || [];
+    d.notifications.push({
+      id: Aoi.genId(), type: 'cnchange', buyer: cn, batchId: null,
+      title: '改圈名申请',
+      body: cn + ' 申请改圈名为「' + newCn + '」' + (qq ? '（QQ：' + qq + '）' : ''),
+      date: new Date().toISOString().slice(0, 10), sent: false
+    });
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    document.getElementById('memberNewCn').value = '';
+    var st = document.getElementById('memberCnChangeStatus');
+    if (st) st.textContent = '已提交，等待团长审核';
+    Aoi.toast('改圈名申请已提交', 'success');
+  } catch (e) {
+    Aoi.toast('改圈名提交失败：' + (e && e.message ? e.message : e), 'error');
+  }
 };
 
 // 提交付款凭证：写 payments，状态置为待审核
 Aoi.member.submitReceipt = async function (batchId, receiptUrl) {
   if (!receiptUrl) { Aoi.toast('请填写付款凭证 URL', 'warning'); return; }
   var cn = Aoi.member.state.cn;
-  var d = Aoi.approval.ensure();
-  var p = Aoi.approval.getRecord(batchId, cn);
-  if (p) {
-    p.receipt = receiptUrl;
-    p.receiptDate = new Date().toISOString();
-    p.status = '待审核';
-  } else {
-    d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: cn, status: '待审核', receipt: receiptUrl, receiptDate: new Date().toISOString() });
+  try {
+    var d = Aoi.approval.ensure();
+    var p = Aoi.approval.getRecord(batchId, cn);
+    if (p) {
+      p.receipt = receiptUrl;
+      p.receiptDate = new Date().toISOString();
+      p.status = '待审核';
+    } else {
+      d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: cn, status: '待审核', receipt: receiptUrl, receiptDate: new Date().toISOString() });
+    }
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    Aoi.member.renderFees(cn);
+    Aoi.toast('凭证已提交，等待团长审核', 'success');
+  } catch (e) {
+    Aoi.toast('凭证提交失败：' + (e && e.message ? e.message : e), 'error');
   }
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  Aoi.member.renderFees(cn);
-  Aoi.toast('凭证已提交，等待团长审核', 'success');
 };
 
 // 确认收货
 Aoi.member.confirmShip = async function (orderId) {
-  var d = Aoi.orders.ensure();
-  for (var i = 0; i < d.orders.length; i++) {
-    if (d.orders[i].id === orderId) { d.orders[i].received = true; break; }
+  try {
+    var d = Aoi.orders.ensure();
+    for (var i = 0; i < d.orders.length; i++) {
+      if (d.orders[i].id === orderId) { d.orders[i].received = true; break; }
+    }
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    Aoi.member.renderOrders(Aoi.member.state.cn);
+    Aoi.toast('已确认收货', 'success');
+  } catch (e) {
+    Aoi.toast('确认收货失败：' + (e && e.message ? e.message : e), 'error');
   }
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  Aoi.member.renderOrders(Aoi.member.state.cn);
-  Aoi.toast('已确认收货', 'success');
 };
 
 // 刷新「申请换囤货地」的批次下拉（只看自己的到货批次）
@@ -300,11 +322,15 @@ Aoi.member.submitTransfer = async function () {
   var toId = document.getElementById('transferTo').value;
   var reason = document.getElementById('memberTransferReason').value.trim();
   if (!batchId || !toId) { Aoi.toast('请选择到货批次和目标囤货地', 'warning'); return; }
-  var d = Aoi.warehouse.ensure();
-  d.transfers.push({ id: Aoi.genId(), buyer: Aoi.member.state.cn, batchId: batchId, toWarehouseId: toId, reason: reason, status: '待处理', date: new Date().toISOString().slice(0, 10) });
-  await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
-  document.getElementById('memberTransferReason').value = '';
-  Aoi.toast('换囤货地申请已提交，等待团长审核', 'success');
+  try {
+    var d = Aoi.warehouse.ensure();
+    d.transfers.push({ id: Aoi.genId(), buyer: Aoi.member.state.cn, batchId: batchId, toWarehouseId: toId, reason: reason, status: '待处理', date: new Date().toISOString().slice(0, 10) });
+    await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d);
+    document.getElementById('memberTransferReason').value = '';
+    Aoi.toast('换囤货地申请已提交，等待团长审核', 'success');
+  } catch (e) {
+    Aoi.toast('申请提交失败：' + (e && e.message ? e.message : e), 'error');
+  }
 };
 
 // 事件委托：我的国际费「提交凭证」

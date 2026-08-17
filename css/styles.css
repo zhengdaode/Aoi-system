@@ -90,3 +90,15 @@ textarea:focus {
 .overflow-x-auto td {
   white-space: nowrap;
 }
+
+/* 数据表：表头底色 + 虚线行分隔 + 斑马纹（便于数行） */
+.data-table thead th {
+  background: var(--surface-card);
+  color: var(--body);
+}
+.data-table tbody tr {
+  border-bottom: 1px dashed var(--hairline);
+}
+.data-table tbody tr:nth-child(even) {
+  background: var(--canvas);
+}

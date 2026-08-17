@@ -30,10 +30,11 @@ Aoi.ship.render = function () {
     return Aoi.orders.typeRoute(a.type) < Aoi.orders.typeRoute(b.type) ? -1 : 1;
   });
   var shipped = 0;
-  tbody.innerHTML = rows.map(function (o) {
+  tbody.innerHTML = rows.map(function (o, i) {
     if ((o.shipped || '未发') === '已发') shipped++;
     var photo = o.photo ? '<a href="' + Aoi.escapeHtml(o.photo) + '" target="_blank" class="text-blue-500 hover:underline">查看</a>' : '<span class="text-gray-400">—</span>';
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
+      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-2 py-2"><input type="checkbox" class="ship-check" data-id="' + o.id + '"></td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.buyer) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'

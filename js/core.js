@@ -140,25 +140,51 @@ Aoi.copyText = function (text) {
   });
 };
 
+// 表内被勾选行的 data-id 集合（.row-check / .ship-check 等，供行选择导出）
+Aoi.exportSelectedIds = function (table) {
+  var ids = [];
+  table.querySelectorAll('input[type="checkbox"][data-id]').forEach(function (cb) {
+    if (cb.checked) ids.push(cb.getAttribute('data-id'));
+  });
+  return ids;
+};
+
+// 克隆表仅保留选中行（表头完整保留）；ids 为空时原样返回
+Aoi.exportFilterRows = function (clone, ids) {
+  if (!ids || !ids.length) return clone;
+  var set = {};
+  ids.forEach(function (id) { set[id] = 1; });
+  clone.querySelectorAll('tbody tr').forEach(function (tr) {
+    var cb = tr.querySelector('input[type="checkbox"][data-id]');
+    if (cb && !set[cb.getAttribute('data-id')]) tr.remove();
+  });
+  return clone;
+};
+
 // 导出表格为 PNG 图片（html2canvas）。按钮需带 data-table（表 id）+ data-name（文件名）
+// 表内有勾选行时询问：仅导出选中行（确定）/ 导出整表（取消）
 Aoi.exportImage = function (btn) {
   var id = btn.getAttribute('data-table');
   var name = btn.getAttribute('data-name') || '表格';
   var table = document.getElementById(id);
   if (!table) return;
   if (typeof html2canvas !== 'function') { Aoi.toast('图片导出组件未加载', 'error'); return; }
+  var selected = Aoi.exportSelectedIds(table);
+  var onlySelected = selected.length > 0 &&
+    window.confirm('已勾选 ' + selected.length + ' 行。\n确定 = 仅导出选中的行；取消 = 导出整表。');
   // 克隆到离屏白色容器再截图，避免受滚动/隐藏容器影响，并留出边距
   var holder = document.createElement('div');
   holder.style.cssText = 'position:absolute;left:-9999px;top:0;background:#fff;padding:16px;';
-  holder.appendChild(table.cloneNode(true));
+  holder.appendChild(Aoi.exportFilterRows(table.cloneNode(true), onlySelected ? selected : []));
   document.body.appendChild(holder);
+  var label = onlySelected ? name + '（选中 ' + selected.length + ' 行）' : name;
   html2canvas(holder, { backgroundColor: '#ffffff', scale: 2 }).then(function (canvas) {
     document.body.removeChild(holder);
     var a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
-    a.download = name + '.png';
+    a.download = label + '.png';
     a.click();
-    Aoi.toast('已导出「' + name + '」图片', 'success');
+    Aoi.toast('已导出「' + label + '」图片', 'success');
   }).catch(function () {
     document.body.removeChild(holder);
     Aoi.toast('导出图片失败', 'error');

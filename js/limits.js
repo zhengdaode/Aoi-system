@@ -59,31 +59,48 @@ Aoi.limits.planCore = function (products, opts) {
   return result;
 };
 
-// 汇总某活动的商品（种类×型号 排单数量 + 均价）
+// 汇总某活动的商品（种类×型号 排单数量 + 均价 + 外币原价均价）
 Aoi.limits.productsForActivity = function (activity) {
   var d = Aoi.orders.ensure();
   var map = {};
   d.orders.forEach(function (o) {
     if (o.activity !== activity) return;
     var key = o.type + '|' + o.model;
-    if (!map[key]) map[key] = { type: o.type, model: o.model, qty: 0, prices: [] };
+    if (!map[key]) map[key] = { type: o.type, model: o.model, qty: 0, prices: [], origs: [] };
     map[key].qty += o.count;
     if (o.price != null) map[key].prices.push(o.price);
+    if (o.priceOrig != null && o.currency && o.currency !== 'cny') map[key].origs.push({ currency: o.currency, value: o.priceOrig });
   });
   return Object.keys(map).map(function (k) {
     var m = map[k];
     m.price = m.prices.length ? m.prices.reduce(function (a, b) { return a + b; }, 0) / m.prices.length : 0;
+    // 外币原价：同键可能混多种币种，取出现最多的币种求均价
+    if (m.origs.length) {
+      var groups = {};
+      m.origs.forEach(function (g) { (groups[g.currency] = groups[g.currency] || []).push(g.value); });
+      var main = Object.keys(groups).sort(function (a, b) { return groups[b].length - groups[a].length; })[0];
+      m.origCurrency = main;
+      m.origAvg = groups[main].reduce(function (a, b) { return a + b; }, 0) / groups[main].length;
+    }
     delete m.prices;
+    delete m.origs;
     return m;
   });
 };
 
-// 渲染商品表（种类/排单数量/参考单价/限购输入）
+// 外币原价展示（与订单表 formatOrig 同符号规则）
+Aoi.limits.origText = function (p) {
+  if (p.origAvg == null) return '—';
+  var sym = p.origCurrency === 'jpy' ? 'JP¥' : (p.origCurrency === 'krw' ? '₩' : p.origCurrency);
+  return sym + p.origAvg.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+};
+
+// 渲染商品表（种类/排单数量/参考单价/外币原价/限购输入）
 Aoi.limits.load = function () {
   var activity = document.getElementById('limActivity').value;
   var tbody = document.getElementById('limProductTbody');
   if (!tbody) return;
-  if (!activity) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-2 text-gray-400">请先选择活动</td></tr>'; return; }
+  if (!activity) { tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-2 text-gray-400">请先选择活动</td></tr>'; return; }
   var products = Aoi.limits.productsForActivity(activity);
   tbody.innerHTML = products.length ? products.map(function (p, i) {
     var key = Aoi.escapeHtml(p.type + '|' + p.model);
@@ -93,9 +110,10 @@ Aoi.limits.load = function () {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(p.model) + '</td>'
       + '<td class="px-3 py-2 text-right">' + p.qty + '</td>'
       + '<td class="px-3 py-2 text-right">' + (p.price ? p.price.toFixed(2) : '—') + '</td>'
+      + '<td class="px-3 py-2 text-right">' + Aoi.limits.origText(p) + '</td>'
       + '<td class="px-3 py-2"><input type="number" step="1" min="0" placeholder="不限" data-lim="' + key + '" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">该活动暂无订单</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">该活动暂无订单</td></tr>';
   document.getElementById('limResultBox').classList.add('hidden');
 };
 
@@ -132,16 +150,25 @@ Aoi.limits.plan = function () {
   products.forEach(function (p) { p.limit = limits[p.type + '|' + p.model]; });
 
   var freeShip = parseFloat(document.getElementById('limFreeShip').value) || 0;
+  var curEl = document.getElementById('limFreeShipCurrency');
+  var freeCur = curEl ? curEl.value : 'cny';
+  var freeShipRmb = freeCur === 'cny' ? freeShip : Aoi.calc.toRmb(freeShip, freeCur);
   var accounts = parseInt(document.getElementById('limAccounts').value, 10);
   var maxTypes = parseInt(document.getElementById('limMaxTypes').value, 10) || 0;
   if (isNaN(accounts) || accounts <= 0) { Aoi.toast('请填写可使用的账号数量', 'warning'); return; }
 
-  var result = Aoi.limits.planCore(products, { freeShip: freeShip, accounts: accounts, maxTypes: maxTypes });
-  Aoi.limits.renderResult(activity, result, freeShip);
+  var result = Aoi.limits.planCore(products, { freeShip: freeShipRmb, accounts: accounts, maxTypes: maxTypes });
+  Aoi.limits.renderResult(activity, result, freeShip, freeShipRmb, freeCur);
 };
 
-// 渲染结果表
-Aoi.limits.renderResult = function (activity, result, freeShip) {
+// 币种符号（与订单表 formatOrig 同规则）
+Aoi.limits.currencySymbol = function (currency) {
+  return currency === 'jpy' ? 'JP¥' : (currency === 'krw' ? '₩' : '¥');
+};
+
+// 渲染结果表（freeShip = 所选币种金额；freeShipRmb = 换算后人民币包邮线）
+Aoi.limits.renderResult = function (activity, result, freeShip, freeShipRmb, freeCur) {
+  if (freeShipRmb == null) { freeShipRmb = freeShip; freeCur = 'cny'; }
   var tbody = document.getElementById('limResultTbody');
   var stat = document.getElementById('limResultStat');
   var box = document.getElementById('limResultBox');
@@ -159,7 +186,11 @@ Aoi.limits.renderResult = function (activity, result, freeShip) {
   var remainText = result.remaining.length
     ? '⚠️ 剩余未分配：' + result.remaining.map(function (r) { return r.type + '-' + r.model + ' ×' + r.qty; }).join('，')
     : '全部排单数量已分配完毕';
-  stat.textContent = '活动「' + activity + '」· 包邮线 ¥' + freeShip.toFixed(2) + ' · 用 ' + result.accounts.length + ' 个账号 · ' + remainText;
+  var curSym = Aoi.limits.currencySymbol(freeCur);
+  var freeShipText = freeCur === 'cny'
+    ? '包邮线 ¥' + freeShipRmb.toFixed(2)
+    : '包邮线 ' + curSym + freeShip + '（≈ ¥' + freeShipRmb.toFixed(2) + '）';
+  stat.textContent = '活动「' + activity + '」· ' + freeShipText + ' · 用 ' + result.accounts.length + ' 个账号 · ' + remainText;
   box.classList.remove('hidden');
 };
 

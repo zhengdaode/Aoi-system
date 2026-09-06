@@ -872,7 +872,10 @@
           <p class="text-sm text-gray-500 mb-3">选活动 → 设限购 → 填包邮金额与账号数，计算每个账号在最大限度包邮前提下的购买内容</p>
           <div class="flex flex-wrap items-center gap-3 mb-4">
             <select id="limActivity" onchange="Aoi.limits.load()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
-            <input id="limFreeShip" type="number" step="0.01" placeholder="每单包邮金额 (¥)" class="border border-gray-300 rounded px-3 py-2 text-sm w-40">
+            <input id="limFreeShip" type="number" step="0.01" placeholder="每单包邮金额" class="border border-gray-300 rounded px-3 py-2 text-sm w-36">
+            <select id="limFreeShipCurrency" class="border border-gray-300 rounded px-2 py-2 text-sm">
+              <option value="cny">人民币</option><option value="jpy">日元</option><option value="krw">韩元</option>
+            </select>
             <input id="limAccounts" type="number" step="1" min="1" placeholder="可使用的账号数量" class="border border-gray-300 rounded px-3 py-2 text-sm w-40">
             <input id="limMaxTypes" type="number" step="1" min="0" placeholder="每账号最大购买种类（空=不限）" class="border border-gray-300 rounded px-3 py-2 text-sm w-56">
           </div>
@@ -887,6 +890,7 @@
                 <th class="px-2 py-2 text-right w-8">行号</th>
                 <th class="px-3 py-2">制品类型</th><th class="px-3 py-2">型号</th>
                 <th class="px-3 py-2 text-right">排单数量</th><th class="px-3 py-2 text-right">参考单价(¥)</th>
+                <th class="px-3 py-2 text-right">外币原价</th>
                 <th class="px-3 py-2">单账号限购（空=不限）</th>
               </tr></thead>
               <tbody id="limProductTbody"></tbody>
@@ -897,8 +901,7 @@
         <div id="limResultBox" class="bg-white rounded-lg border border-gray-200 p-6 hidden">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">购买计划结果</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
-            <button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button>
+            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button>
           </div>
           <p id="limResultStat" class="text-sm text-gray-500 mb-2"></p>
           <div class="overflow-x-auto">

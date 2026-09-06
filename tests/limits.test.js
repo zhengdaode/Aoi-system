@@ -111,3 +111,59 @@ describe('Aoi.tableExport（v2.0.0 问题 9）', () => {
     delete win.XLSX;
   });
 });
+
+describe('Aoi.limits 限购计算器（v3.2.0 T2：活动刷新 + 包邮金额币种 + 外币原价）', () => {
+  beforeEach(() => {
+    aoi.state.data = {
+      activities: ['2026春团'],
+      orders: [
+        { id: 'o1', activity: '2026春团', type: '吧唧', model: 'M1', price: 60, priceOrig: 1200, currency: 'jpy', count: 2, buyer: '小明' },
+        { id: 'o2', activity: '2026春团', type: '吧唧', model: 'M1', price: 63, priceOrig: 1300, currency: 'jpy', count: 1, buyer: '小红' },
+        { id: 'o3', activity: '2026春团', type: '立牌', model: 'M2', price: 50, priceOrig: null, currency: 'cny', count: 1, buyer: '小刚' }
+      ]
+    };
+  });
+
+  it('productsForActivity 汇总外币原价：同币种求均价', () => {
+    const ps = aoi.limits.productsForActivity('2026春团');
+    const m1 = ps.find((p) => p.model === 'M1');
+    expect(m1.origCurrency).toBe('jpy');
+    expect(m1.origAvg).toBe(1250);
+    // 人民币订单不产生外币原价
+    const m2 = ps.find((p) => p.model === 'M2');
+    expect(m2.origAvg).toBeUndefined();
+  });
+
+  it('origText / currencySymbol 与订单表符号规则一致', () => {
+    const ps = aoi.limits.productsForActivity('2026春团');
+    const m1 = ps.find((p) => p.model === 'M1');
+    expect(aoi.limits.origText(m1)).toBe('JP¥1,250');
+    expect(aoi.limits.origText({})).toBe('—');
+    expect(aoi.limits.currencySymbol('jpy')).toBe('JP¥');
+    expect(aoi.limits.currencySymbol('krw')).toBe('₩');
+    expect(aoi.limits.currencySymbol('cny')).toBe('¥');
+  });
+
+  it('包邮金额选日元：按汇率换算为人民币包邮线参与计算', () => {
+    doc.getElementById('limActivity').innerHTML = '<option value="2026春团" selected>2026春团</option>';
+    doc.getElementById('limActivity').value = '2026春团';
+    aoi.limits.load();
+    doc.getElementById('limFreeShip').value = '1000';
+    doc.getElementById('limFreeShipCurrency').value = 'jpy';
+    doc.getElementById('limAccounts').value = '2';
+    aoi.limits.plan();
+    // 默认汇率 0.048+0.005=0.053 → 1000 日元 ≈ ¥53；账号1 买 M1×1=60 已超包邮线
+    expect(doc.getElementById('limResultStat').textContent).toContain('包邮线 JP¥1000（≈ ¥53.00）');
+    expect(doc.getElementById('limResultBox').classList.contains('hidden')).toBe(false);
+  });
+
+  it('包邮金额人民币：结果展示不变', () => {
+    doc.getElementById('limActivity').value = '2026春团';
+    aoi.limits.load();
+    doc.getElementById('limFreeShip').value = '60';
+    doc.getElementById('limFreeShipCurrency').value = 'cny';
+    doc.getElementById('limAccounts').value = '1';
+    aoi.limits.plan();
+    expect(doc.getElementById('limResultStat').textContent).toContain('包邮线 ¥60.00');
+  });
+});

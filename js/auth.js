@@ -149,6 +149,7 @@ Aoi.enterApp = async function () {
   Aoi.bot.renderSettings();
   Aoi.calc.fillForm();
   Aoi.overview.render();
+  Aoi.limits.render();
   Aoi.showScreen('screen-app');
 };
 

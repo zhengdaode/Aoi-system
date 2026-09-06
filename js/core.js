@@ -40,6 +40,8 @@ Aoi.nav = function (viewId) {
     el.classList.toggle('text-white', el.getAttribute('data-nav') === viewId);
   });
   Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
+  // 数据可能在其他视图被修改，回到限购页时刷新活动下拉与商品表
+  if (viewId === 'view-limits' && Aoi.limits) Aoi.limits.render();
 };
 
 // 移动端侧边栏抽屉：无参切换，true 展开 / false 收起

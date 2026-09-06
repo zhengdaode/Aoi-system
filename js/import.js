@@ -24,8 +24,87 @@ Aoi.import.parse = function (arrayBuffer, fileName) {
   sheets.forEach(function (sn) {
     var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' })
       .map(function (r) { return r.map(function (c) { return c == null ? '' : String(c).trim(); }); });
-    records = records.concat(Aoi.import.parseMatrix(rows, batchFallback));
+    var recs = Aoi.import.parseMatrix(rows, batchFallback);
+    if (!recs.length) recs = Aoi.import.parseRecords(rows, batchFallback);
+    records = records.concat(recs);
   });
+  return records;
+}
+
+// —— 记录式表格解析（一行一订单）：识别本站「下载表格」导出的 xlsx/CSV ——
+// 本站导出表头：行号 | (勾选空列) | 活动 | 制品类型 | 型号 | 单价(¥) | 外币原价 | 数量 | 购买者 | 备注 | 到货状态 | 到货批次 | 小计 | 操作
+// 只映射业务列，UI 噪声列（行号/勾选/到货状态/到货批次/小计/操作）自动忽略。
+var RECORD_ALIASES = {
+  activity: ['活动', '团期', '活动批次'],
+  type: ['制品类型', '分类'],
+  model: ['型号', '款式', '谷子'],
+  price: ['单价', '人民币价'],
+  priceOrig: ['外币原价', '原价'],
+  count: ['数量'],
+  buyer: ['购买者', '购买人', '买家', '昵称'],
+  remark: ['备注']
+};
+var RECORD_BUYER_SKIP = /总数|总金额|合计|购买者|购买人|买家|昵称|编辑|删除/;
+
+function matchAlias(cell, aliases) {
+  for (var i = 0; i < aliases.length; i++) {
+    if (cell === aliases[i] || cell.indexOf(aliases[i]) === 0) return true; // 「单价(¥)」命中「单价」
+  }
+  return false;
+}
+
+// 「JP¥1200」/「₩9,000」/「—」→ { value, currency } | null
+function parseOrigCell(v) {
+  var s = String(v || '').trim();
+  if (!s || s === '—' || s === '-') return null;
+  var currency = 'cny';
+  if (s.indexOf('JP¥') >= 0) currency = 'jpy';
+  else if (s.indexOf('₩') >= 0) currency = 'krw';
+  var num = parseFloat(s.replace(/[^0-9.]/g, ''));
+  return isNaN(num) ? null : { value: num, currency: currency };
+}
+
+// 解析记录式表格，失败返回空数组（由 parse() 回退矩阵式）
+Aoi.import.parseRecords = function (rows, batchFallback) {
+  var header = null, headerIdx = -1, col = {};
+  for (var i = 0; i < Math.min(5, rows.length); i++) {
+    var r = rows[i] || [], c = {};
+    for (var k in RECORD_ALIASES) {
+      for (var j = 0; j < r.length; j++) {
+        if (r[j] && matchAlias(r[j], RECORD_ALIASES[k]) && c[k] == null) { c[k] = j; break; }
+      }
+    }
+    if (c.buyer != null && c.model != null && c.price != null) { header = r; headerIdx = i; col = c; break; }
+  }
+  if (!header) return [];
+
+  var records = [];
+  for (var d = headerIdx + 1; d < rows.length; d++) {
+    var dr = rows[d] || [];
+    var buyer = col.buyer != null ? dr[col.buyer] : '';
+    if (!buyer || RECORD_BUYER_SKIP.test(buyer)) continue;
+    var model = col.model != null ? dr[col.model] : '';
+    if (!model) continue;
+    var count = col.count != null ? parseInt(dr[col.count], 10) : 1;
+    if (isNaN(count) || count <= 0) count = 1;
+    var price = col.price != null ? parseFloat(dr[col.price]) || 0 : 0;
+    var orig = col.priceOrig != null ? parseOrigCell(dr[col.priceOrig]) : null;
+    records.push({
+      id: Aoi.genId(),
+      ip: '',
+      activity: (col.activity != null ? dr[col.activity] : '') || batchFallback,
+      type: (col.type != null ? dr[col.type] : '') || '默认类型',
+      model: model,
+      price: price,
+      priceOrig: orig ? orig.value : null,
+      currency: orig ? orig.currency : 'cny',
+      count: count,
+      buyer: buyer,
+      remark: col.remark != null ? dr[col.remark] : '',
+      status: '未到货',
+      paid: '未交'
+    });
+  }
   return records;
 };
 

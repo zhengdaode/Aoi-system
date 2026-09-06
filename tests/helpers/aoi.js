@@ -26,6 +26,7 @@ const MODULES = [
   'js/auth.js',
   'js/team.js',
   'js/orders.js',
+  'js/import.js',
   'js/calc.js',
   'js/intl.js',
   'js/approval.js',

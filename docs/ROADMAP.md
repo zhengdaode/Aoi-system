@@ -1,8 +1,8 @@
 # Aoi-system · 新项目计划（2026-09）
 
 > 来源：2026-09-06 用户实测反馈的 10 项问题，经代码探查后整理为可执行任务。
-> 本文档是当前唯一有效的路线图；`docs/IMPROVEMENT_PLAN.md` 为 v1.4.0 时期历史归档。
-> 当前基线版本：v1.6.0（CHANGELOG）。
+> 本文档是当前唯一有效的路线图；v1.4.0 时期历史归档见 `docs/archive/IMPROVEMENT_PLAN.md`。
+> 当前基线版本：v3.3.0（CHANGELOG）。v1.7.0–v2.0.0、v3.0.0、v3.2.0 均已实施完成；下方 P0 修复任务 checkbox 已按实际完成情况勾选（溯源见 ITERATION_LOG）。
 
 ---
 
@@ -98,11 +98,11 @@ drop table team_data_bak_20260906;
 
 ### 修复任务（编入 v1.7.0）
 
-- [ ] `supabase-schema.sql` 升级：写入 RPC 改 upsert；`update_team_data_by_member_key` 增加可选乐观锁参数；脚本保证在旧库上可安全重跑；文件头写"线上库重跑验证清单"。
-- [ ] `js/data.js`：RPC 错误分类透出（缺失/网络/密钥无效），`getTeamDataByMemberKey` 不再吞错误。
-- [ ] 保存后回读校验：写成功后再 select 一次确认关键内容落盘，否则报错提示重试。
-- [ ] 团员端保存成功显示掩码回执（地址 `***` 尾 4 字 / QQ 尾 4 位），消除"没保存"错觉。
-- [ ] 部署说明（README + AGENTS.md）补充线上 schema 升级步骤。
+- [x] `supabase-schema.sql` 升级：写入 RPC 改 upsert；`update_team_data_by_member_key` 增加可选乐观锁参数；脚本保证在旧库上可安全重跑；文件头写"线上库重跑验证清单"。（v1.7.0；线上已重跑并验证，见 ITERATION_LOG 第 5 轮）
+- [x] `js/data.js`：RPC 错误分类透出（缺失/网络/密钥无效），`getTeamDataByMemberKey` 不再吞错误。
+- [x] 保存后回读校验：写成功后再 select 一次确认关键内容落盘，否则报错提示重试。
+- [x] 团员端保存成功显示掩码回执（地址 `***` 尾 4 字 / QQ 尾 4 位），消除"没保存"错觉。
+- [x] 部署说明（README + AGENTS.md）补充线上 schema 升级步骤。
 
 ---
 
@@ -114,7 +114,7 @@ drop table team_data_bak_20260906;
    - `js/bot.js`：`sendPrivate` 目前**从未被调用**（私聊链路实际不存在）；新增 `pushPrivate(rows)` 按 `memberMeta[cn].qq` 逐人私聊；通知推送提供"群发(@) / 私聊 / 全部"三选；修正 CQ:at 生成（不再依赖 body 前缀，按 buyer→qq 映射生成）。
    - `relay/relay.js`：批量私聊加节流（每条间隔约 1s，防 NapCat 风控）。
    - 设置页：relay 地址 https 校验 + 混合内容拦截提示（CSP `connect-src` 不允许 http）。
-   - 已知问题记录：`CLAUDE.md` 所述 `enabled=false` 占位与实际链路状态需在修复时同步文档。
+   - 已知问题记录：~~`CLAUDE.md` 所述 `enabled=false` 占位与实际链路状态需在修复时同步文档~~（已于 v3.3.0 同步）。
 
 **验收**：`npm test` 全绿；debug 模式冒烟（团员进入/保存/QQ 推送逻辑分支）；commit。
 
@@ -161,13 +161,14 @@ drop table team_data_bak_20260906;
 ## 文档修订（随版本推进 + 最终汇总）
 
 - [x] 新建 `AGENTS.md`：工作规范 + 注意事项 + 计划索引（本次 commit）。
-- [x] `docs/IMPROVEMENT_PLAN.md` 标记为历史归档，指向本文件。
-- [ ] 每个版本完成时：更新 `CHANGELOG.md`。
-- [ ] 最终汇总：`docs/STATUS.md` 更新至 v2.0.0；`README.md` / `CONTRIBUTING.md` 的项目结构同步为 15 模块现状；`DESIGN-claude.md` 并入 `DESIGN.md` 后删除。
+- [x] `docs/IMPROVEMENT_PLAN.md` 标记为历史归档（v3.3.0 起移至 `docs/archive/`），指向本文件。
+- [x] 每个版本完成时：更新 `CHANGELOG.md`。
+- [x] 最终汇总：`docs/STATUS.md` 更新至 v2.0.0（实际已远超，现跟踪至 v3.3.0）；`README.md` / `CONTRIBUTING.md` 的项目结构同步为 16 模块现状（v3.3.0 完成）；`DESIGN-claude.md` 并入 `DESIGN.md` 后删除（未做——DESIGN-claude.md 保留，暂不合并）。
 
 ---
 
 ## 后续迭代
 
-- **v3.0.0 账号体系重设计**（已完成）：见 `docs/PLAN-AUTH-REDESIGN.md`。
-- **v3.2.0 第二批实测反馈**（2026-09-06 已实施完成）：Excel 导入识别本站导出表格、限购计算器（活动下拉修复 + 包邮金额币种 + 外币原价列）、活动购买人/账号/地址搜索下拉、订单表桌面端 UI 重设计（视口内滚动/吸顶表头/首列吸附/列宽治理）、导出图片行选择——根因、任务与验收见 `docs/PLAN-v3.2.0.md`。
+- **v3.0.0 账号体系重设计**（已完成）：见 `docs/archive/PLAN-AUTH-REDESIGN.md`。
+- **v3.2.0 第二批实测反馈**（2026-09-06 已实施完成）：Excel 导入识别本站导出表格、限购计算器（活动下拉修复 + 包邮金额币种 + 外币原价列）、活动购买人/账号/地址搜索下拉、订单表桌面端 UI 重设计（视口内滚动/吸顶表头/首列吸附/列宽治理）、导出图片行选择——根因、任务与验收见 `docs/archive/PLAN-v3.2.0.md`。
+- **v3.3.0 冗余清理与重构**（2026-09-07 已实施完成）：死代码/死 DOM 删除、重复实现合并（批次下拉×4 / 剪贴板 / CSV / 币种符号）、隐私快照清理（backups/）、测试 106→134、文档一致性修正。

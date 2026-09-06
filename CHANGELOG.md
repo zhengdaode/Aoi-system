@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.3.0 (2026-09-07)
+
+> 冗余清理与重构：全仓审计（死代码 / 重复实现 / 文档漂移 / 隐私风险）后的集中清理版本。
+
+### Removed
+- **死代码删除** — `Aoi.getTeamData`（data.js 兼容入口，全仓 0 调用）、`Aoi.DEBUG_USERNAME/DEBUG_PWD`（core.js，auth.js 用字面量绕过）、`Aoi.state.members`（全仓无读写）
+- **死 DOM 删除** — `index.html` 的 `activityOptions`/`typeOptions` 两个 datalist 及 `refillDatalists` 对应填充分支（无任何 `list=` 引用；活动下拉按 IP 过滤由 `refillActivitySelect` 负责）
+- **死数据字段** — 订单对象 `paid: '未交'`（orders.js / import.js 共 3 处写入、0 处读取；交费状态实际存于 `d.payments`）
+- **隐私快照清理** — 删除本地 `backups/` 下 4 份线上真实用户数据快照（未跟踪文件；同数据仍在线上库可再导出）
+- **杂项** — `--surface-dark` 死 CSS 变量、登录页调试账户明文提示、"阶段 4b"过时 UI 文案；`.gitignore` 过期的 `index-original.html` 条目
+
+### Changed
+- **重复实现合并** — 新增 `Aoi.orders.refillBatchSelect` 通用批次下拉填充，intl/approval/shipping/notify 四份逐字重复的 `refillBatches` 改为薄壳（公共 API 不变）；`approval.copyRemind` 复用 `Aoi.copyText`；新增 `Aoi.downloadCsv`，core.tableExport 回退与 ship.export 两套 CSV 下载逻辑收敛；新增 `Aoi.currencySymbol`，orders/limits 三处币种符号映射收敛
+- **文档一致性修正** — README（版本号 v3.0.0→v3.3.0、测试数 62→134、黑夜模式/自定义背景标注不在 v3 主线、调试账户用户名误写 `debug@aoi.local`→`debug`）；CLAUDE.md（bot.js 从"占位未接入"更正为 v1.7.0 接入 / v3.1.0 双通道）；STATUS.md（"必须重跑 schema"回写为已完成，见 ITERATION_LOG 第 5 轮；机器人占位历史段加注）；ROADMAP.md（基线 v1.6.0→v3.3.0、5 个已完成的 P0 checkbox 勾选）；AGENTS.md（模块数 15→16、归档路径、遗留项指向 STATUS.md）
+- **计划文档归档** — `PLAN-AUTH-REDESIGN.md` / `PLAN-v3.2.0.md` / `IMPROVEMENT_PLAN.md` / `PR-v1.4.0-final.md` 移入 `docs/archive/`
+
+### Added
+- **测试补齐（106 → 134 用例）** — `tests/helpers/aoi.js` MODULES 修正为与 index.html script 顺序严格一致并补入 shipping/warehouse/image-upload 三个此前不加载的模块；新增 approval-flow（审批流转/两步确认/催缴/复制）、shipping（排发表/勾选/发货/单号/囤货地）、warehouse（囤货地/换地审批）三组测试；新增 enter-app 回归守护（enterApp 必须刷新限购计算器活动下拉，防 v3.2.0 修复回退）
+
 ## v3.2.0 (2026-09-06)
 
 > 2026-09 用户实测第二批反馈，计划与根因见 `docs/PLAN-v3.2.0.md`。

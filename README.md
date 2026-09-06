@@ -2,7 +2,7 @@
 
 > **原作者：秋洛 (QiuLuo)** · 原项目：[mossasari/Group-Buy-Management-System](https://github.com/mossasari/Group-Buy-Management-System)
 > **当前维护者：郑 (zhengdaode)** · [GitHub](https://github.com/zhengdaode)
-> **当前版本：v3.0.0**（2026-09-06）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
+> **当前版本：v3.3.0**（2026-09-07）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/zhengdaode/Aoi-system)
 
@@ -13,7 +13,7 @@
 
 ---
 
-## 功能全景（v2.0.0）
+## 功能全景（v3.3.0）
 
 | 模块 | 能力 |
 |------|------|
@@ -31,7 +31,7 @@
 | 工具·限购计划 | **限购购买计划计算器**：选活动→设限购→填包邮金额/账号数/每账号种类上限，贪心装箱输出每账号购买清单与包邮状态，结果可导出 |
 | 团员端 | 凭**团员密钥 + 圈名**免登录：查订单/国际费/公告、提交凭证、确认收货、地址与 QQ 绑定（**掩码回执**） |
 | 导出 | 12 张数据表统一「**导出图片 / 下载表格**」双按钮（PNG / XLSX，CSV 回退） |
-| 界面 | 黑夜模式、自定义背景、移动端抽屉导航 + 订单表卡片视图、表格自适应（首列 sticky / 换行折叠） |
+| 界面 | 移动端抽屉导航 + 订单表卡片视图、表格自适应（首列 sticky / 换行折叠）；黑夜模式 / 自定义背景不在 v3 主线（保留在 `backup-before-cleanup` 分支，需要时可移植） |
 
 ---
 
@@ -85,7 +85,7 @@
 
 ```
 ├── index.html              # 页面骨架 + 全部视图（无框架 SPA）
-├── css/styles.css          # 自定义样式 + 黑夜模式 + 响应式表格/卡片
+├── css/styles.css          # 自定义样式（editorial 设计系统）+ 响应式表格/卡片
 ├── js/                     # 16 个功能模块（window.Aoi 命名空间）
 │   ├── core.js             # 路由/通用工具/撤销/总览
 │   ├── config.js           # 部署时生成（gitignore），模板 config.example.js
@@ -125,11 +125,11 @@
 
 ```bash
 npm install        # 安装 vitest + jsdom（仅测试用，前端本体零依赖）
-npm test           # 62 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
+npm test           # 134 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
 npm run test:watch # 监听模式
 ```
 
-- 本地调试账户：`debug@aoi.local` / `debug123`（绕过 Supabase，数据存 localStorage，前缀 `aoi_debug_*`）。
+- 本地调试账户：`debug` / `debug123`（绕过 Supabase，数据存 localStorage，前缀 `aoi_debug_*`）。
 - 新增 js 模块时，记得加入 `tests/helpers/aoi.js` 的 MODULES 列表。
 - 工作纪律（详见 [AGENTS.md](AGENTS.md)）：**每次改动一个 commit；测试全绿才交付**。CI 已强制（deploy 依赖 test job）。
 

@@ -13,16 +13,16 @@
 | `README.md` | 功能、部署、安全、项目结构 |
 | `docs/design/DESIGN.md` / `docs/design/DESIGN-claude.md` | 视觉设计规范（后者为 Claude 分析版） |
 | `docs/design/PRODUCT.md` | 产品定位 |
-| `docs/IMPROVEMENT_PLAN.md` | v1.4.0 时期改进计划（历史归档） |
+| `docs/IMPROVEMENT_PLAN.md`（已移至 `docs/archive/`） | v1.4.0 时期改进计划（历史归档） |
 
 ## 本次交接重点：QQ 机器人接入
 
-### 现状
+### 现状（2026-09-07 更新：已完整接入并上线）
 
-- 集成点 `js/bot.js` → `Aoi.bot`，已留 `config` + `sendPrivate` / `sendGroup` / `pushAll` 三个占位，`enabled=false`。
-- 通知源 `js/notify.js`（`Aoi.notify`）已按「类型 × 买家 × 批次」去重生成催缴 / 发货通知，可直接推。
+- **已接入**：v1.7.0 完成 `js/bot.js` → relay → NapCat 全链路；v3.1.0 升级双通道推送（自动私聊已绑定者 + 群@全员兜底，未绑定用圈名文字 @）+ 公告一键推群。`enabled=false` 占位时代已结束。
+- 集成点 `js/bot.js` → `Aoi.bot`：`config`（设置页保存 relay 地址 + 群号）+ `sendPrivate` / `sendGroup` / `pushAll`（OneBot v11 HTTP API，经 relay 转发）。
+- 通知源 `js/notify.js`（`Aoi.notify`）按「类型 × 买家 × 批次」去重生成催缴 / 发货通知，可直接推。
 - 私聊推送依赖 `d.memberMeta[cn].qq`（`js/member.js` 团员端可选绑定）；未绑定的由 `pushAll` 并入群发兜底。
-- 目标协议：OneBot v11 HTTP API（`/send_private_msg`、`/send_group_msg`）。
 
 ### 协议端：用 NapCat，别用代码注释里的 Go-Cqhttp
 
@@ -39,7 +39,7 @@
   2. **NapCat 同机小 relay**——NapCat 不公网开放时，在它所在的 VPS 上放个几行的转发服务，前端打这个服务。
 - 浏览器 `fetch` → relay → NapCat，顺带解决 CORS。
 
-### 接入落地清单
+### 接入落地清单（✅ 全部已实施：v1.7.0 接入，v3.1.0 双通道）
 
 1. 服务器部署 NapCat（Docker，`--network host`），登录机器人 QQ，开 HTTP API + access token。
 2. 写 relay（Supabase Edge Function 或 VPS 小服务），token 存 env，做鉴权。

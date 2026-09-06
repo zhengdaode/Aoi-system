@@ -101,8 +101,7 @@ Aoi.import.parseRecords = function (rows, batchFallback) {
       count: count,
       buyer: buyer,
       remark: col.remark != null ? dr[col.remark] : '',
-      status: '未到货',
-      paid: '未交'
+      status: '未到货'
     });
   }
   return records;
@@ -204,8 +203,7 @@ function makeRecord(batch, catRow, header, priceRow, ci, count, buyer) {
     price: parseFloat(priceRow[ci]) || 0,
     count: count,
     buyer: buyer,
-    status: '未到货',
-    paid: '未交'
+    status: '未到货'
   };
 }
 

@@ -1,16 +1,11 @@
 // Aoi-system — 核心工具：状态、屏幕路由、通知、转义
 window.Aoi = window.Aoi || {};
 
-// 调试账户（免 Supabase，纯 localStorage 本地测试）
-Aoi.DEBUG_USERNAME = 'debug';
-Aoi.DEBUG_PWD = 'debug123'; // 调试账户（数据仅存 localStorage）
-
 // 全局状态
 Aoi.state = {
   user: null,    // Supabase 登录用户
   team: null,    // 当前团队 { id, name, invite_code, ... }
   role: null,    // 当前用户角色 owner / admin
-  members: [],   // 团队成员列表
   data: {}       // 团队业务数据（订单/周边/活动等，登录后填充）
 };
 

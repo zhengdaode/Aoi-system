@@ -34,15 +34,6 @@ Aoi.explainRpcError = function (msg, context) {
   return null;
 };
 
-// 读取团队业务数据 blob（管理端：v3 由 enterApp 经 admin_get_team_data 一次拉取，
-// 此函数保留为兼容入口——直接返回内存态，不再单独请求）
-Aoi.getTeamData = async function () {
-  if (Aoi.state.user && Aoi.state.user.isDebug) {
-    return JSON.parse(localStorage.getItem('aoi_debug_data') || '{}');
-  }
-  return Aoi.state.data || {};
-};
-
 // 保存团队业务数据 blob（管理端唯一写入口）
 // 携带 admin token + 上次读到的数据版本（乐观锁）；成功返回并记录新版本
 Aoi.saveTeamData = async function (data) {

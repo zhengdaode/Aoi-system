@@ -43,7 +43,6 @@
         <button type="submit" class="w-full bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">登录</button>
       </form>
       <a class="block mt-3 text-center text-sm text-blue-500 hover:underline cursor-pointer" onclick="Aoi.showScreen('screen-member')">我是团员 → 免登录查询</a>
-      <p class="mt-4 text-xs text-gray-400">调试账户：debug / debug123（数据仅存本机）</p>
     </div>
   </section>
 
@@ -796,7 +795,7 @@
       <div id="view-notify" data-view class="hidden grid gap-4 max-w-5xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">发布公告</h3>
-          <p class="text-sm text-gray-500 mb-2">团员端首页可见（自动提醒 / QQ 机器人留到阶段 4b）</p>
+          <p class="text-sm text-gray-500 mb-2">团员端首页可见，可一键推送 QQ 群</p>
           <textarea id="announceInput" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-2" placeholder="公告内容"></textarea>
           <button onclick="Aoi.announce.publish()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">发布</button>
           <button onclick="Aoi.announce.publish(true)" class="px-4 py-2 bg-indigo-500 text-white text-sm font-bold rounded hover:bg-indigo-600">发布并推送 QQ 群</button>
@@ -964,8 +963,6 @@
   </div>
 
   <datalist id="ipOptions"></datalist>
-  <datalist id="activityOptions"></datalist>
-  <datalist id="typeOptions"></datalist>
   <datalist id="oActivityOptions"></datalist>
 
   <script src="js/config.js"></script>

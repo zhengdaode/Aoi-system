@@ -45,18 +45,12 @@ Aoi.orders.collectIps = function (d) {
   return Object.keys(set);
 };
 
-// 刷新 datalist（IP / 活动 / 制品类型）
+// 刷新 datalist（IP；活动下拉按 IP 过滤，由 refillActivitySelect 负责）
 Aoi.orders.refillDatalists = function () {
   var d = Aoi.orders.ensure();
   var ipList = document.getElementById('ipOptions');
   if (ipList) ipList.innerHTML = Aoi.orders.collectIps(d)
     .map(function (ip) { return '<option value="' + Aoi.escapeHtml(ip) + '">'; }).join('');
-  var actList = document.getElementById('activityOptions');
-  if (actList) actList.innerHTML = d.activities
-    .map(function (a) { return '<option value="' + Aoi.escapeHtml(a) + '">'; }).join('');
-  var typeList = document.getElementById('typeOptions');
-  if (typeList) typeList.innerHTML = Aoi.orders.TYPE_SUGGESTIONS
-    .map(function (t) { return '<option value="' + t + '">'; }).join('');
 };
 
 // —— 导入 ——
@@ -198,7 +192,7 @@ Aoi.orders.addManual = async function () {
       id: Aoi.genId(), ip: ip, activity: activity, type: type, model: model,
       price: prices.price, priceOrig: prices.priceOrig, currency: currency,
       count: count, buyer: buyer, remark: '',
-      status: '未到货', batchId: null, paid: '未交'
+      status: '未到货', batchId: null
     });
   });
   if (activity && d.activities.indexOf(activity) < 0) d.activities.push(activity);

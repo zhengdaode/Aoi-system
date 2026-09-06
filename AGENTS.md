@@ -14,7 +14,9 @@
 
 **见 [docs/ROADMAP.md](docs/ROADMAP.md)** —— 2026-09 用户实测 10 项问题的迭代计划
 （v1.7.0 团员侧修复/QQ 机器人/测试基建 → v1.8.0 订单改版 → v1.9.0 国际计算/活动管理 → v2.0.0 限购计算器/导出/响应式），
-**四个版本已全部实施完成**（2026-09-06，详见 CHANGELOG）；v3.0.0 账号体系重设计亦已实施（见 `docs/PLAN-AUTH-REDESIGN.md`）；线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；遗留项与线上操作见 ROADMAP 尾部。
+**四个版本已全部实施完成**（2026-09-06，详见 CHANGELOG）；v3.0.0 账号体系重设计亦已实施（见 `docs/PLAN-AUTH-REDESIGN.md`）；
+**进行中：v3.2.0 第二批实测反馈迭代（Excel 导入往返 / 限购计算器活动与币种 / 购买人搜索下拉 / 订单表桌面 UI / 导出图片行选择），见 [docs/PLAN-v3.2.0.md](docs/PLAN-v3.2.0.md)**；
+线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；遗留项与线上操作见 ROADMAP 尾部。
 
 ## 技术栈与架构速览
 

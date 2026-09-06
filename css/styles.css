@@ -110,6 +110,39 @@ textarea:focus {
   min-width: 5rem;
 }
 
+/* v3.2.0（T4）：长表视口内滚动 —— 容器限高，横向滚动条始终在可视区内，
+   表头吸顶、首列吸附（原先仅 ≤767px 有首列 sticky），长表不必滚到页面底部才能左右滑 */
+@media (min-width: 768px) {
+  .table-scroll {
+    max-height: calc(100vh - 16rem);
+    overflow: auto;
+  }
+  .table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .table-scroll td:first-child {
+    background: var(--surface);
+  }
+  .table-scroll tr:nth-child(even) td:first-child {
+    background: var(--canvas);
+  }
+  .table-scroll th:first-child,
+  .table-scroll td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
+  .table-scroll thead th:first-child {
+    z-index: 3; /* 表头 × 首列交叉格 */
+  }
+  /* 列宽治理：换行单元格限制最大宽度，避免长内容把单列撑到无限宽 */
+  .data-table td.wrap {
+    max-width: 12rem;
+  }
+}
+
 /* 备注列：默认 2 行折叠，点击展开 */
 .remark-cell {
   white-space: normal;

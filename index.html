@@ -413,7 +413,7 @@
       </div>
 
       <!-- 订单管理 -->
-      <div id="view-orders" data-view class="hidden bg-white rounded-lg border border-gray-200 p-6 max-w-5xl">
+      <div id="view-orders" data-view class="hidden bg-white rounded-lg border border-gray-200 p-6 max-w-7xl">
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="fBuyer" placeholder="按购买者筛选" oninput="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm">
           <select id="fActivity" onchange="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
@@ -430,7 +430,7 @@
           <button onclick="Aoi.orders.showGenRmb()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量生成人民币价</button>
           <button onclick="Aoi.orders.batchDelete()" class="px-4 py-2 bg-red-500 text-white text-sm font-bold rounded hover:bg-red-600">批量删除</button>
         </div>
-        <div id="genRmbBox" class="hidden flex flex-wrap items-center gap-3 mb-4 border border-blue-200 bg-blue-50 dark:bg-gray-800 rounded-lg p-3">
+        <div id="genRmbBox" class="hidden flex flex-wrap items-center gap-3 mb-4 border border-blue-200 bg-blue-50 rounded-lg p-3">
           <span class="text-sm font-semibold">公式：人民币 = 外币原价 × (</span>
           <select id="genCurrency" onchange="Aoi.orders.onGenCurrencyChange()" class="border border-gray-300 rounded px-2 py-1 text-sm">
             <option value="jpy">日元</option>
@@ -444,7 +444,7 @@
           <button onclick="Aoi.orders.applyGenRmb()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700">生成</button>
           <button onclick="Aoi.orders.hideGenRmb()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto table-scroll">
           <table id="orderTable" class="w-full text-sm data-table responsive-cards">
             <thead><tr class="text-left text-gray-500 border-b border-gray-200">
               <th class="px-2 py-2 text-right w-8">行号</th>
@@ -461,7 +461,7 @@
 
       <!-- 活动购买人信息弹窗 -->
       <div id="actBuyersModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-xl p-6" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-lg w-full max-w-xl p-6" onclick="event.stopPropagation()">
           <h3 class="font-bold mb-1">购买人信息</h3>
           <p id="actBuyersTitle" class="text-xs text-gray-400 mb-3"></p>
           <div class="grid grid-cols-3 gap-2 text-xs text-gray-400 mb-1 px-1">
@@ -480,7 +480,7 @@
 
       <!-- 活动快递单号弹窗 -->
       <div id="actTrackModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-lg w-full max-w-md p-6" onclick="event.stopPropagation()">
           <h3 class="font-bold mb-1">快递单号</h3>
           <p id="actTrackTitle" class="text-xs text-gray-400 mb-3">每行一个单号，可随时添加行数</p>
           <textarea id="actTrackInput" rows="6" placeholder="每行一个快递单号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></textarea>
@@ -493,7 +493,7 @@
 
       <!-- 订单编辑弹窗 -->
       <div id="orderEditModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-lg w-full max-w-md p-6" onclick="event.stopPropagation()">
           <h3 class="font-bold mb-3">编辑订单</h3>
           <div class="grid grid-cols-2 gap-3">
             <input id="eActivity" type="text" placeholder="活动" class="col-span-2 border border-gray-300 rounded px-3 py-2 text-sm">
@@ -676,7 +676,7 @@
         </div>
 
         <!-- 悬浮仪表盘：目标金额插值（可收起，滚动时常驻） -->
-        <div id="intlGauge" class="hidden fixed bottom-4 right-4 z-40 w-72 bg-white dark:bg-gray-800 border border-gray-200 rounded-lg shadow-lg p-3">
+        <div id="intlGauge" class="hidden fixed bottom-4 right-4 z-40 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
           <div class="flex items-center justify-between mb-1">
             <span class="text-xs font-bold text-gray-500">目标金额插值</span>
             <button id="intlGaugeToggle" onclick="Aoi.intl.toggleGauge()" class="text-xs text-gray-400 hover:text-gray-600">收起</button>

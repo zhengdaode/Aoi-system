@@ -19,21 +19,24 @@ const w = dom.window;
 // 首列点击事件委托等模块加载即执行的代码依赖的元素在 index.html 中已存在。
 // Supabase JS 库走 CDN 不会加载，测试中需要时由用例自行 stub Aoi.db。
 
-// 模块加载顺序：core → data → orders → calc → intl → approval → 其余
+// 模块加载顺序：与 index.html 底部 <script> 顺序严格一致（config.js 除外，由用例 stub）
 const MODULES = [
   'js/core.js',
   'js/data.js',
   'js/auth.js',
   'js/team.js',
-  'js/orders.js',
   'js/import.js',
+  'js/orders.js',
   'js/calc.js',
   'js/intl.js',
   'js/approval.js',
+  'js/shipping.js',
   'js/member.js',
   'js/notify.js',
   'js/bot.js',
-  'js/limits.js'
+  'js/limits.js',
+  'js/warehouse.js',
+  'js/image-upload.js'
 ];
 
 const loadErrors = [];

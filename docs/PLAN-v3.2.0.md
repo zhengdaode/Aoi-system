@@ -1,7 +1,7 @@
 # Aoi-system · v3.2.0 计划（2026-09-06 用户实测第二批反馈）
 
 > 来源：2026-09-06 用户反馈的 4 个界面问题 + 1 项全局功能需求，经代码探查后整理为可执行任务。
-> 基线版本：v3.1.0（CHANGELOG）。本文档为 v3.2.0 迭代的执行计划；总路线图见 `docs/ROADMAP.md`。
+> 基线版本：v3.1.0（CHANGELOG）。本文档为 v3.2.0 迭代的执行计划（2026-09-06 已全部实施完成，详见 CHANGELOG v3.2.0）；总路线图见 `docs/ROADMAP.md`。
 
 ---
 
@@ -17,13 +17,13 @@
 
 | # | 用户反馈 | 根因要点 | 状态 |
 |---|----------|----------|------|
-| T1 | 信息录入：Excel 导入不识别本站导出的表格 | 导入只支持外部矩阵模板，本站导出是一行一订单扁平表；文件选择器不收 .csv | 待做 |
-| T2 | 限购计算器：无法选择活动 | `Aoi.limits.render()` 从未被调用，活动下拉永远为空 | 待做 |
-| T2b | 限购计算器：包邮金额可选货币 + 对照外币原价 | 计算只用人民币 `o.price`，未接 `currency`/`priceOrig` | 待做 |
-| T3 | 活动管理：购买人/购买账号/送达地址需搜索下拉 | 三项全是纯手敲 input；数据源（圈名/地址）已现成 | 待做 |
-| T4 | 订单管理：桌面端右侧空白、长列撑爆、横向滚动条在页面最底部；批量生成人民币价黑字黑背景 | 全局 `width:max-content`+`nowrap`；容器限宽 `max-w-5xl`；5 处 `dark:bg-gray-800` 无配套文字色 | 待做 |
-| T5 | 全局：导出图片可选整表或选中几行 | `exportImage` 只会克隆整表；行勾选基建已存在 | 待做 |
-| T6 | 收尾：测试全绿 + CHANGELOG/STATUS/ROADMAP 更新 + 推 origin | — | 待做 |
+| T1 | 信息录入：Excel 导入不识别本站导出的表格 | 导入只支持外部矩阵模板，本站导出是一行一订单扁平表；文件选择器不收 .csv | ✅ 完成 |
+| T2 | 限购计算器：无法选择活动 | `Aoi.limits.render()` 从未被调用，活动下拉永远为空 | ✅ 完成 |
+| T2b | 限购计算器：包邮金额可选货币 + 对照外币原价 | 计算只用人民币 `o.price`，未接 `currency`/`priceOrig` | ✅ 完成 |
+| T3 | 活动管理：购买人/购买账号/送达地址需搜索下拉 | 三项全是纯手敲 input；数据源（圈名/地址）已现成 | ✅ 完成 |
+| T4 | 订单管理：桌面端右侧空白、长列撑爆、横向滚动条在页面最底部；批量生成人民币价黑字黑背景 | 全局 `width:max-content`+`nowrap`；容器限宽 `max-w-5xl`；5 处 `dark:bg-gray-800` 无配套文字色 | ✅ 完成 |
+| T5 | 全局：导出图片可选整表或选中几行 | `exportImage` 只会克隆整表；行勾选基建已存在 | ✅ 完成 |
+| T6 | 收尾：测试全绿 + CHANGELOG/STATUS/ROADMAP 更新 + 推 origin | — | ✅ 完成 |
 
 ---
 
@@ -37,10 +37,10 @@
 
 ### 任务
 
-- [ ] `js/import.js` 新增 `parseRecords(rows)` 记录式解析分支：表头含「购买者/购买人」且含「型号|单价」时按行解析；列映射 活动/制品类型/型号/单价/外币原价/数量/购买者/备注；剥离 行号/checkbox 空列/到货状态/到货批次/小计/操作 等 UI 噪声列。
-- [ ] `parse()` 中先试记录式、命中即用，否则回退矩阵式（外部模板功能保持兼容）。
-- [ ] `index.html` accept 增加 `.csv`。
-- [ ] `js/import.js` 加入 `tests/helpers/aoi.js` MODULES；新建 `tests/import.test.js`：本站导出表头同构往返用例 + 矩阵式旧用例回归。
+- [x] `js/import.js` 新增 `parseRecords(rows)` 记录式解析分支：表头含「购买者/购买人」且含「型号|单价」时按行解析；列映射 活动/制品类型/型号/单价/外币原价/数量/购买者/备注；剥离 行号/checkbox 空列/到货状态/到货批次/小计/操作 等 UI 噪声列。
+- [x] `parse()` 中先试记录式、命中即用，否则回退矩阵式（外部模板功能保持兼容）。
+- [x] `index.html` accept 增加 `.csv`。
+- [x] `js/import.js` 加入 `tests/helpers/aoi.js` MODULES；新建 `tests/import.test.js`：本站导出表头同构往返用例 + 矩阵式旧用例回归。
 
 ---
 
@@ -50,7 +50,7 @@
 
 `Aoi.limits.refillActivities()`（limits.js:109-119）是 `#limActivity` 唯一填充入口，由 `Aoi.limits.render()`（limits.js:167-169）调用；而 `Aoi.limits.render()` 全仓库唯一调用点是 `Aoi.refreshViews()`（core.js:248），后者仅在撤销操作时触发。`auth.js` `enterApp`（107-153）逐视图刷新了所有其它模块、**唯独漏了 limits**；`core.js nav()`（32-43）只做显隐切换。结果：进入限购页时 select 恒为空，表现为"无法选择活动"。
 
-- [ ] `auth.js` enterApp 末尾补 `Aoi.limits.render()`；`core.js nav('view-limits')` 时也触发（数据变化后回到页面即可见）。
+- [x] `auth.js` enterApp 末尾补 `Aoi.limits.render()`；`core.js nav('view-limits')` 时也触发（数据变化后回到页面即可见）。
 
 ### T2b 根因（包邮金额无货币概念）
 
@@ -59,9 +59,9 @@
 
 用户需求（原话）："每单包邮金额需要可以选择货币种类, 然后对照原价货币的金额, 即算包邮和限购的时候，检测一下对应的外币价格词条"。落地设计：
 
-- [ ] 商品表新增「外币原价」列：同 `type|model` 订单的 `priceOrig` 均价 + 币种符号（JP¥/₩/¥，与 orders.js formatOrig 同规则）。
-- [ ] 「每单包邮金额」旁加币种下拉（人民币/日元/韩元），非人民币经 `Aoi.calc.toRmb()`（calc.js:54-60，汇率配置 `d.calc`）换算为人民币包邮线参与 `planCore`；结果统计行同时显示所选币种金额与人民币等值。
-- [ ] `tests/limits.test.js` 增加货币换算路径用例。
+- [x] 商品表新增「外币原价」列：同 `type|model` 订单的 `priceOrig` 均价 + 币种符号（JP¥/₩/¥，与 orders.js formatOrig 同规则）。
+- [x] 「每单包邮金额」旁加币种下拉（人民币/日元/韩元），非人民币经 `Aoi.calc.toRmb()`（calc.js:54-60，汇率配置 `d.calc`）换算为人民币包邮线参与 `planCore`；结果统计行同时显示所选币种金额与人民币等值。
+- [x] `tests/limits.test.js` 增加货币换算路径用例。
 
 ---
 
@@ -79,8 +79,8 @@
 
 ### 任务
 
-- [ ] 三个输入框改 `input list=` + 动态 datalist（项目已有 `#oIp`/`#ipOptions` 等成熟模式）；购买人选中后自动回填 `d.addresses[cn]` 地址（可手改）。
-- [ ] 测试：候选收集与地址回填纯函数用例。
+- [x] 三个输入框改 `input list=` + 动态 datalist（项目已有 `#oIp`/`#ipOptions` 等成熟模式）；购买人选中后自动回填 `d.addresses[cn]` 地址（可手改）。
+- [x] 测试：候选收集与地址回填纯函数用例。
 
 ---
 
@@ -95,10 +95,10 @@
 
 ### 任务
 
-- [ ] 桌面端（≥768px）：订单表容器限高视口内滚动（overflow auto + max-height），sticky 表头 + sticky 首列；`#view-orders` 容器放宽（max-w-7xl）。
-- [ ] 列宽治理：内容列 max-width + 单行省略 + `title` 悬停全文（复用 `.remark-cell` 模式）；全局表规则 `width:max-content` 改 `min-width:100%`（移动端断点规则保持不变）。
-- [ ] 移除 index.html 5 处 `dark:bg-gray-800` 类（与全站其余部分一致的浅色面板，主线本无黑夜模式全局支持）。
-- [ ] 冒烟验证 ≤640px 卡片视图不受影响。
+- [x] 桌面端（≥768px）：订单表容器限高视口内滚动（overflow auto + max-height），sticky 表头 + sticky 首列；`#view-orders` 容器放宽（max-w-7xl）。
+- [x] 列宽治理：内容列 max-width + 单行省略 + `title` 悬停全文（复用 `.remark-cell` 模式）；全局表规则 `width:max-content` 改 `min-width:100%`（移动端断点规则保持不变）。
+- [x] 移除 index.html 5 处 `dark:bg-gray-800` 类（与全站其余部分一致的浅色面板，主线本无黑夜模式全局支持）。
+- [x] 冒烟验证 ≤640px 卡片视图不受影响。
 
 ---
 
@@ -110,13 +110,13 @@
 
 ### 任务
 
-- [ ] `core.js exportImage` 支持行过滤：所在表存在勾选行时弹三选（整表 / 仅选中行 / 取消）；克隆后按勾选框 `data-id` 删除未选中 `<tr>`（保留完整表头）。未勾选时维持现状直接整表导出。
-- [ ] 测试：行过滤裁剪逻辑用例。
+- [x] `core.js exportImage` 支持行过滤：所在表存在勾选行时弹三选（整表 / 仅选中行 / 取消）；克隆后按勾选框 `data-id` 删除未选中 `<tr>`（保留完整表头）。未勾选时维持现状直接整表导出。
+- [x] 测试：行过滤裁剪逻辑用例。
 
 ---
 
 ## T6 · 收尾
 
-- [ ] `npm test` 全绿 + debug 冒烟（导入往返 / 限购活动与币种 / 购买人回填 / 订单表滚动 / 导出三选）。
-- [ ] `CHANGELOG.md` v3.2.0；`docs/STATUS.md`、`docs/ROADMAP.md` 指针同步。
-- [ ] 逐任务 commit，完成后推 `origin`（不推 `deploy`）。
+- [x] `npm test` 全绿 + debug 冒烟（导入往返 / 限购活动与币种 / 购买人回填 / 订单表滚动 / 导出三选）。
+- [x] `CHANGELOG.md` v3.2.0；`docs/STATUS.md`、`docs/ROADMAP.md` 指针同步。
+- [x] 逐任务 commit，完成后推 `origin`（不推 `deploy`）。

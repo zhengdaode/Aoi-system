@@ -164,3 +164,10 @@ drop table team_data_bak_20260906;
 - [x] `docs/IMPROVEMENT_PLAN.md` 标记为历史归档，指向本文件。
 - [ ] 每个版本完成时：更新 `CHANGELOG.md`。
 - [ ] 最终汇总：`docs/STATUS.md` 更新至 v2.0.0；`README.md` / `CONTRIBUTING.md` 的项目结构同步为 15 模块现状；`DESIGN-claude.md` 并入 `DESIGN.md` 后删除。
+
+---
+
+## 后续迭代
+
+- **v3.0.0 账号体系重设计**（已完成）：见 `docs/PLAN-AUTH-REDESIGN.md`。
+- **v3.2.0 第二批实测反馈**（2026-09-06 已实施完成）：Excel 导入识别本站导出表格、限购计算器（活动下拉修复 + 包邮金额币种 + 外币原价列）、活动购买人/账号/地址搜索下拉、订单表桌面端 UI 重设计（视口内滚动/吸顶表头/首列吸附/列宽治理）、导出图片行选择——根因、任务与验收见 `docs/PLAN-v3.2.0.md`。

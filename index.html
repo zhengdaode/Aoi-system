@@ -468,6 +468,8 @@
             <span>购买人（圈名）</span><span>购买账号（邮箱）</span><span>送达地址</span>
           </div>
           <div id="actBuyerRows" class="grid gap-2 max-h-72 overflow-y-auto"></div>
+          <datalist id="abBuyerOptions"></datalist>
+          <datalist id="abAccountOptions"></datalist>
           <button onclick="Aoi.orders.addBuyerRow()" class="mt-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">＋ 添加一行</button>
           <div class="flex justify-end gap-3 mt-4">
             <button onclick="Aoi.orders.closeActBuyers()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>

@@ -952,13 +952,63 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
 Aoi.orders.actTarget = null;
 
 // 购买人一行：购买人 + 购买账号（邮箱）+ 送达地址
+// 三个输入均支持搜索下拉（datalist）：圈名/邮箱候选取全站已知值，
+// 选中已知圈名后自动带出团员端提交过的送达地址（可手改）
 Aoi.orders.buyerRowHtml = function (b) {
   b = b || {};
   return '<div class="grid grid-cols-3 gap-2 act-buyer-row">'
-    + '<input class="ab-buyer border border-gray-300 rounded px-2 py-1 text-sm" placeholder="圈名" value="' + Aoi.escapeHtml(b.buyer || '') + '">'
-    + '<input class="ab-account border border-gray-300 rounded px-2 py-1 text-sm" placeholder="邮箱" value="' + Aoi.escapeHtml(b.account || '') + '">'
+    + '<input class="ab-buyer border border-gray-300 rounded px-2 py-1 text-sm" list="abBuyerOptions" placeholder="圈名（可搜索）" oninput="Aoi.orders.autofillBuyerAddress(this)" value="' + Aoi.escapeHtml(b.buyer || '') + '">'
+    + '<input class="ab-account border border-gray-300 rounded px-2 py-1 text-sm" list="abAccountOptions" placeholder="邮箱（可搜索）" value="' + Aoi.escapeHtml(b.account || '') + '">'
     + '<input class="ab-address border border-gray-300 rounded px-2 py-1 text-sm" placeholder="送达地址" value="' + Aoi.escapeHtml(b.address || '') + '">'
     + '</div>';
+};
+
+// 购买人候选：订单购买者 ∪ 团员元数据圈名 ∪ 既有购买人
+Aoi.orders.buyerCandidates = function (d) {
+  var set = {};
+  Aoi.orders.collectBuyers(d).forEach(function (cn) { set[cn] = 1; });
+  Object.keys(d.memberMeta || {}).forEach(function (cn) { if (cn) set[cn] = 1; });
+  Object.keys(d.activityMeta || {}).forEach(function (a) {
+    ((d.activityMeta[a] || {}).buyers || []).forEach(function (b) { if (b.buyer) set[b.buyer] = 1; });
+  });
+  return Object.keys(set).sort();
+};
+
+// 购买账号（邮箱）候选：全站既有购买人信息中的账号去重
+Aoi.orders.accountCandidates = function (d) {
+  var set = {};
+  Object.keys(d.activityMeta || {}).forEach(function (a) {
+    ((d.activityMeta[a] || {}).buyers || []).forEach(function (b) { if (b.account) set[b.account] = 1; });
+  });
+  return Object.keys(set).sort();
+};
+
+// 某圈名在团员端提交过的送达地址（未登记返回空串）
+Aoi.orders.addressFor = function (d, cn) {
+  return (cn && d.addresses && d.addresses[cn]) || '';
+};
+
+// 圈名输入后自动带出送达地址（地址已填则不覆盖）
+Aoi.orders.autofillBuyerAddress = function (input) {
+  var row = input.closest ? input.closest('.act-buyer-row') : null;
+  if (!row) return;
+  var addr = row.querySelector('.ab-address');
+  if (!addr || addr.value.trim()) return;
+  var a = Aoi.orders.addressFor(Aoi.orders.ensure(), input.value.trim());
+  if (a) addr.value = a;
+};
+
+// 填充弹窗内三个 datalist 候选（openActBuyers 时调用一次）
+Aoi.orders.fillBuyerDatalists = function () {
+  var d = Aoi.orders.ensure();
+  var bl = document.getElementById('abBuyerOptions');
+  if (bl) bl.innerHTML = Aoi.orders.buyerCandidates(d).map(function (cn) {
+    return '<option value="' + Aoi.escapeHtml(cn) + '">';
+  }).join('');
+  var al = document.getElementById('abAccountOptions');
+  if (al) al.innerHTML = Aoi.orders.accountCandidates(d).map(function (acc) {
+    return '<option value="' + Aoi.escapeHtml(acc) + '">';
+  }).join('');
 };
 
 Aoi.orders.openActBuyers = function (name) {
@@ -972,6 +1022,7 @@ Aoi.orders.openActBuyers = function (name) {
     var rows = (m.buyers && m.buyers.length) ? m.buyers : [{}];
     box.innerHTML = rows.map(Aoi.orders.buyerRowHtml).join('');
   }
+  Aoi.orders.fillBuyerDatalists();
   document.getElementById('actBuyersModal').classList.remove('hidden');
 };
 

@@ -190,3 +190,44 @@ describe('Aoi.orders.quickAddType 类型面板快捷新建（v1.8.0）', () => {
     expect(doc.getElementById('oType').value).toBe('透卡');
   });
 });
+
+describe('活动购买人搜索下拉与地址回填（v3.2.0 T3）', () => {
+  const d = {
+    orders: [{ buyer: '小明' }, { buyer: '小红' }, { buyer: '小明' }],
+    memberMeta: { 小刚: { qq: '123' } },
+    addresses: { 小明: '广东省珠海市香洲区某某路1号' },
+    activityMeta: {
+      团A: { buyers: [{ buyer: '小樱', account: 'a@x.com', address: '' }] },
+      团B: { buyers: [{ buyer: '', account: 'b@x.com', address: '' }, { buyer: '小明', account: 'a@x.com', address: '' }] }
+    }
+  };
+
+  it('buyerCandidates 合并订单购买者/团员元数据/既有购买人并去重排序', () => {
+    expect(aoi.orders.buyerCandidates(d)).toEqual(['小刚', '小明', '小樱', '小红']);
+  });
+
+  it('accountCandidates 收集全站既有购买账号并去重', () => {
+    expect(aoi.orders.accountCandidates(d)).toEqual(['a@x.com', 'b@x.com']);
+  });
+
+  it('addressFor 取团员端提交过的地址', () => {
+    expect(aoi.orders.addressFor(d, '小明')).toBe('广东省珠海市香洲区某某路1号');
+    expect(aoi.orders.addressFor(d, '小刚')).toBe('');
+    expect(aoi.orders.addressFor(d, '')).toBe('');
+  });
+
+  it('圈名输入后自动带出地址；已手填地址不覆盖', () => {
+    aoi.state.data = d;
+    doc.getElementById('actBuyerRows').innerHTML =
+      aoi.orders.buyerRowHtml({}) + aoi.orders.buyerRowHtml({ address: '已有地址' });
+    const rows = doc.querySelectorAll('#actBuyerRows .act-buyer-row');
+    const in1 = rows[0].querySelector('.ab-buyer');
+    in1.value = '小明';
+    aoi.orders.autofillBuyerAddress(in1);
+    expect(rows[0].querySelector('.ab-address').value).toBe('广东省珠海市香洲区某某路1号');
+    const in2 = rows[1].querySelector('.ab-buyer');
+    in2.value = '小明';
+    aoi.orders.autofillBuyerAddress(in2);
+    expect(rows[1].querySelector('.ab-address').value).toBe('已有地址');
+  });
+});

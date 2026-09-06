@@ -135,6 +135,21 @@ Aoi.copyText = function (text) {
   });
 };
 
+// 币种符号（订单外币原价 / 限购商品原价显示共用）
+Aoi.currencySymbol = function (code) {
+  return code === 'jpy' ? 'JP¥' : (code === 'krw' ? '₩' : '¥');
+};
+
+// 下载 CSV 文本（自动加 BOM，保证 Excel 打开中文不乱码）
+Aoi.downloadCsv = function (csvText, filename) {
+  var blob = new Blob(['\ufeff' + csvText], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
 // 表内被勾选行的 data-id 集合（.row-check / .ship-check 等，供行选择导出）
 Aoi.exportSelectedIds = function (table) {
   var ids = [];
@@ -209,11 +224,7 @@ Aoi.tableExport = function (btn) {
     });
     rows.push(cells.join(','));
   });
-  var blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name + '.csv';
-  a.click();
+  Aoi.downloadCsv(rows.join('\n'), name + '.csv');
   Aoi.toast('已下载「' + name + '」.csv', 'success');
 };
 

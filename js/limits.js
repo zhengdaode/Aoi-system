@@ -91,7 +91,7 @@ Aoi.limits.productsForActivity = function (activity) {
 // 外币原价展示（与订单表 formatOrig 同符号规则）
 Aoi.limits.origText = function (p) {
   if (p.origAvg == null) return '—';
-  var sym = p.origCurrency === 'jpy' ? 'JP¥' : (p.origCurrency === 'krw' ? '₩' : p.origCurrency);
+  var sym = Aoi.currencySymbol(p.origCurrency);
   return sym + p.origAvg.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 };
 
@@ -163,7 +163,7 @@ Aoi.limits.plan = function () {
 
 // 币种符号（与订单表 formatOrig 同规则）
 Aoi.limits.currencySymbol = function (currency) {
-  return currency === 'jpy' ? 'JP¥' : (currency === 'krw' ? '₩' : '¥');
+  return Aoi.currencySymbol(currency);
 };
 
 // 渲染结果表（freeShip = 所选币种金额；freeShipRmb = 换算后人民币包邮线）

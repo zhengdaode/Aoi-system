@@ -105,15 +105,7 @@ Aoi.ship.setShipped = async function () {
 };
 
 Aoi.ship.refillBatches = function () {
-  var d = Aoi.orders.ensure();
-  var sel = document.getElementById('shipBatch');
-  if (!sel) return;
-  var cur = sel.value;
-  var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  sel.innerHTML = '<option value="">选择批次…</option>' + list.map(function (b) {
-    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
-  }).join('');
-  if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
+  Aoi.orders.refillBatchSelect(document.getElementById('shipBatch'), '选择批次…');
 };
 
 // 导出当前批次为 CSV（排发表）
@@ -135,14 +127,7 @@ Aoi.ship.export = function () {
       '状态': o.shipped || '未发'
     };
   });
-  var csv = '﻿' + XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(data));
-  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = '排发_' + Aoi.orders.batchDate(batchId) + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
+  var csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(data));
+  Aoi.downloadCsv(csv, '排发_' + Aoi.orders.batchDate(batchId) + '.csv');
   Aoi.toast('已导出 ' + rows.length + ' 条', 'success');
 };

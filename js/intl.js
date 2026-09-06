@@ -255,15 +255,7 @@ Aoi.intl.setDomesticFee = async function (batchId, buyer, value) {
   Aoi.toast(buyer + ' 国内额外金额已保存', 'success');
 };
 
-// 刷新批次下拉
+// 刷新批次下拉（通用实现见 orders.refillBatchSelect）
 Aoi.intl.refillBatches = function () {
-  var d = Aoi.orders.ensure();
-  var sel = document.getElementById('intlBatch');
-  if (!sel) return;
-  var cur = sel.value;
-  var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  sel.innerHTML = '<option value="">选择批次…</option>' + list.map(function (b) {
-    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
-  }).join('');
-  if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
+  Aoi.orders.refillBatchSelect(document.getElementById('intlBatch'), '选择批次…');
 };

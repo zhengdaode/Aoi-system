@@ -371,6 +371,18 @@ Aoi.orders.refillBatches = function () {
   }
 };
 
+// 通用批次下拉填充（intl/approval/ship/notify 共用；按日期排序 + 恢复当前选中值）
+Aoi.orders.refillBatchSelect = function (sel, placeholder) {
+  if (!sel) return;
+  var d = Aoi.orders.ensure();
+  var cur = sel.value;
+  var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  sel.innerHTML = '<option value="">' + (placeholder || '选择批次…') + '</option>' + list.map(function (b) {
+    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
+  }).join('');
+  if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
+};
+
 // 统一刷新所有批次下拉（订单筛选/标记到货/国际计算/审批/发货/通知）
 Aoi.orders.refillAllBatchSelects = function () {
   Aoi.orders.refillBatches();
@@ -396,7 +408,7 @@ Aoi.orders.priceText = function (o) {
 // 外币原价显示（人民币单显示 —）
 Aoi.orders.origText = function (o) {
   if (o.currency === 'cny' || o.priceOrig == null) return '—';
-  var sym = o.currency === 'jpy' ? 'JP¥' : (o.currency === 'krw' ? '₩' : o.currency);
+  var sym = Aoi.currencySymbol(o.currency);
   return sym + o.priceOrig;
 };
 

@@ -125,24 +125,10 @@ Aoi.approval.remind = function () {
 
 Aoi.approval.copyRemind = function () {
   var ta = document.getElementById('approvalRemind');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(ta.value).then(function () { Aoi.toast('已复制', 'success'); }, function () { ta.select(); });
-  } else {
-    ta.select();
-    document.execCommand('copy');
-    Aoi.toast('已复制', 'success');
-  }
+  Aoi.copyText(ta.value).then(function () { Aoi.toast('已复制', 'success'); }, function () { ta.select(); });
 };
 
-// 刷新批次下拉
+// 刷新批次下拉（通用实现见 orders.refillBatchSelect）
 Aoi.approval.refillBatches = function () {
-  var d = Aoi.orders.ensure();
-  var sel = document.getElementById('approvalBatch');
-  if (!sel) return;
-  var cur = sel.value;
-  var list = d.batches.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  sel.innerHTML = '<option value="">选择批次…</option>' + list.map(function (b) {
-    return '<option value="' + b.id + '">' + Aoi.escapeHtml(Aoi.orders.batchLabel(b) + '（' + Aoi.orders.batchCount(b.id) + '）') + '</option>';
-  }).join('');
-  if (cur && d.batches.some(function (b) { return b.id === cur; })) sel.value = cur;
+  Aoi.orders.refillBatchSelect(document.getElementById('approvalBatch'), '选择批次…');
 };

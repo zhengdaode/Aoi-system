@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>团期复盘统计 · 演示版（合成数据）</title>
+<style>
+  :root { --ink:#111827; --sub:#6b7280; --line:#e5e7eb; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:ui-sans-serif,system-ui,"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:#f9fafb; padding:24px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  header { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  h1 { font-size:1.5rem; font-weight:800; }
+  .badge { font-size:.75rem; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:999px; padding:2px 10px; }
+  .sub { color:var(--sub); font-size:.85rem; margin-bottom:20px; }
+  .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  select { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; font-size:.9rem; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .kpi .label { font-size:.75rem; color:var(--sub); }
+  .kpi .value { font-size:1.9rem; font-weight:800; margin-top:4px; }
+  .kpi .note { font-size:.72rem; color:var(--sub); margin-top:2px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+  @media (max-width:820px){ .grid2 { grid-template-columns:1fr; } }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .card h2 { font-size:1rem; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  th { text-align:left; color:var(--sub); font-weight:600; padding:8px 10px; background:#f3f4f6; }
+  td { padding:8px 10px; border-bottom:1px dotted var(--line); }
+  tr:nth-child(even) td { background:#fafafa; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .tag { font-size:.72rem; border-radius:999px; padding:1px 8px; white-space:nowrap; }
+  .tag.g { color:#166534; background:#dcfce7; }
+  .tag.a { color:#92400e; background:#fef3c7; }
+  .tag.r { color:#991b1b; background:#fee2e2; }
+  .bar-row { display:flex; align-items:center; gap:10px; margin:8px 0; font-size:.85rem; }
+  .bar-name { width:120px; flex:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar-track { flex:1; background:#f3f4f6; border-radius:999px; height:16px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#60a5fa,#3b82f6); }
+  .bar-val { width:90px; flex:none; text-align:right; color:var(--sub); font-variant-numeric:tabular-nums; }
+  .foot { color:#9ca3af; font-size:.75rem; text-align:center; margin-top:8px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>团期复盘统计</h1>
+    <span class="badge">演示版 · 内置合成数据，非真实订单</span>
+  </header>
+  <p class="sub">功能形态审核用 demo：按团期聚合订单、金额、交费回收与活动进度。独立页面，无需联网与安装。</p>
+
+  <div class="toolbar">
+    <label for="termSel" style="font-size:.85rem;color:var(--sub)">选择团期：</label>
+    <select id="termSel"></select>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h2>按活动聚合</h2>
+    <table>
+      <thead><tr><th>活动</th><th>IP</th><th class="num">订单数</th><th class="num">金额（¥ 折合）</th><th>币种</th><th>交费回收</th><th>进度</th></tr></thead>
+      <tbody id="actTbody"></tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>IP 排行（按折合金额）</h2>
+      <div id="ipBars"></div>
+    </div>
+    <div class="card">
+      <h2>交费状态分布（该团期）</h2>
+      <div id="payBars"></div>
+    </div>
+  </div>
+
+  <p class="foot">本页为功能形态审核用演示：全部数据为脚本内置的合成示例，不代表任何真实团队。<br>
+  审核通过后，正式版将并入 Aoi-system 主系统，读取真实团队数据并支持导出。</p>
+</div>
+
+<script>
+// —— 合成演示数据（虚构团名 / 圈名 / 金额），仅用于展示统计形态 ——
+var TERMS = {
+  "2026-08 团期（示例）": [
+    { act:"术力口 17周年纪念", ip:"术力口", count:6, cny:1580, jpy:22000, pay:{"已交":4,"待审核":1,"待交":1}, prog:"排发中" },
+    { act:"游戏五周年纪念",   ip:"游戏",   count:4, cny:920,  jpy:0,     pay:{"已交":3,"待审核":1,"待交":0}, prog:"排发中" },
+    { act:"三人组 缎带吧唧",  ip:"三人",   count:5, cny:640,  jpy:8600,  pay:{"已交":5,"待审核":0,"待交":0}, prog:"已发货" },
+    { act:"漫画 战力top",     ip:"漫画",   count:3, cny:410,  jpy:0,     pay:{"已交":1,"待审核":1,"待交":1}, prog:"已下单" }
+  ],
+  "2026-09 团期（示例）": [
+    { act:"术力口 魔法现场",  ip:"术力口", count:8, cny:2360, jpy:31000, pay:{"已交":5,"待审核":2,"待交":1}, prog:"已下单" },
+    { act:"漫画 剧场版",      ip:"漫画",   count:4, cny:780,  jpy:0,     pay:{"已交":2,"待审核":1,"待交":1}, prog:"进行中" },
+    { act:"三人组 色纸",      ip:"三人",   count:6, cny:930,  jpy:12400, pay:{"已交":6,"待审核":0,"待交":0}, prog:"排发中" }
+  ]
+};
+var RATE_JPY = 0.048; // 演示固定汇率（合成）
+
+function fmt(n){ return n.toLocaleString("zh-CN", {maximumFractionDigits:0}); }
+
+function render(term){
+  var acts = TERMS[term];
+  var orders = acts.reduce(function(s,a){ return s + a.count; }, 0);
+  var cny = acts.reduce(function(s,a){ return s + a.cny + a.jpy * RATE_JPY; }, 0);
+  var paid = 0, all = 0;
+  acts.forEach(function(a){ for (var k in a.pay){ all += a.pay[k]; if (k === "已交") paid += a.pay[k]; } });
+
+  document.getElementById("kpis").innerHTML =
+    kpi("订单总数", orders + " 件", "含全部活动") +
+    kpi("折合总金额", "¥" + fmt(cny), "按演示汇率 " + RATE_JPY + " 折算") +
+    kpi("交费回收率", Math.round(paid / all * 100) + "%", "已交 " + paid + " / 共 " + all + " 笔") +
+    kpi("进行中活动", acts.filter(function(a){ return a.prog !== "已发货"; }).length + " 个", "共 " + acts.length + " 个活动");
+
+  document.getElementById("actTbody").innerHTML = acts.map(function(a){
+    var total = a.cny + a.jpy * RATE_JPY;
+    var cur = a.jpy > 0 ? "¥ + JP¥" : "¥";
+    return "<tr><td>" + a.act + "</td><td>" + a.ip + "</td>" +
+      "<td class='num'>" + a.count + "</td><td class='num'>¥" + fmt(total) + "</td>" +
+      "<td>" + cur + "</td>" +
+      "<td>" + payTag(a.pay) + "</td><td><span class='tag " + (a.prog === "已发货" ? "g" : "a") + "'>" + a.prog + "</span></td></tr>";
+  }).join("");
+
+  var ipMap = {};
+  acts.forEach(function(a){ ipMap[a.ip] = (ipMap[a.ip] || 0) + a.cny + a.jpy * RATE_JPY; });
+  document.getElementById("ipBars").innerHTML = bars(ipMap, "¥");
+
+  var payAll = { "已交":0, "待审核":0, "待交":0 };
+  acts.forEach(function(a){ for (var k in a.pay) payAll[k] = (payAll[k] || 0) + a.pay[k]; });
+  document.getElementById("payBars").innerHTML = bars(payAll, "笔");
+}
+function kpi(label, value, note){
+  return "<div class='kpi'><div class='label'>" + label + "</div><div class='value'>" + value + "</div><div class='note'>" + note + "</div></div>";
+}
+function payTag(p){
+  var s = "<span class='tag g'>已交 " + (p["已交"] || 0) + "</span> ";
+  if (p["待审核"]) s += "<span class='tag a'>待审核 " + p["待审核"] + "</span> ";
+  if (p["待交"]) s += "<span class='tag r'>待交 " + p["待交"] + "</span>";
+  return s;
+}
+function bars(map, unit){
+  var keys = Object.keys(map), max = Math.max.apply(null, keys.map(function(k){ return map[k]; }));
+  return keys.map(function(k){
+    var w = Math.round(map[k] / max * 100);
+    return "<div class='bar-row'><div class='bar-name'>" + k + "</div>" +
+      "<div class='bar-track'><div class='bar-fill' style='width:" + w + "%'></div></div>" +
+      "<div class='bar-val'>" + unit + fmt(map[k]) + "</div></div>";
+  }).join("");
+}
+
+var sel = document.getElementById("termSel");
+sel.innerHTML = Object.keys(TERMS).map(function(t){ return "<option>" + t + "</option>"; }).join("");
+sel.onchange = function(){ render(sel.value); };
+render(sel.value);
+</script>
+</body>
+</html>

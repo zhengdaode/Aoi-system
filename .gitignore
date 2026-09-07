@@ -8,3 +8,4 @@ js/config.js
 .zcode/
 backups/
 supabase/.temp/
+demo/*.zip

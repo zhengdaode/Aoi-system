@@ -83,6 +83,34 @@ Aoi.regenerateMemberKey = async function () {
   return r.data;
 };
 
+// —— v3.4.0 B1：服务端 blob 历史快照（设置页「数据备份与恢复」用）——
+// 每次保存（管理端/团员端）时服务端自动存档旧版本，保留近 30 天 / 每团最多 100 份。
+
+// 快照列表（摘要：id/source/savedAt/ordersCount/bytes，不含数据全文）
+Aoi.listDataHistory = async function (limit) {
+  if (Aoi.state.user && Aoi.state.user.isDebug) return []; // debug 走 localStorage，无服务端历史
+  var s = Aoi.adminLoadSession();
+  if (!s) throw new Error('登录会话已失效，请重新登录');
+  var r = await Aoi.db.rpc('admin_list_team_data_history', { p_token: s.token, p_limit: limit || 20 });
+  if (r.error) {
+    var hint = Aoi.explainRpcError(r.error.message, '历史快照读取');
+    throw new Error(hint || ('读取历史快照失败：' + r.error.message));
+  }
+  return r.data || [];
+};
+
+// 读取单份快照全文（恢复前取回；恢复动作走 saveTeamData，覆盖前服务端又会自动存档）
+Aoi.getDataHistorySnapshot = async function (id) {
+  var s = Aoi.adminLoadSession();
+  if (!s) throw new Error('登录会话已失效，请重新登录');
+  var r = await Aoi.db.rpc('admin_get_team_data_history', { p_token: s.token, p_id: id });
+  if (r.error) {
+    var hint = Aoi.explainRpcError(r.error.message, '历史快照读取');
+    throw new Error(hint || ('读取历史快照失败：' + r.error.message));
+  }
+  return r.data;
+};
+
 // —— 团员端：按团员密钥读取/保存（与 v1.7.0 一致，未改动）——
 
 Aoi.getTeamDataByMemberKey = async function (key) {

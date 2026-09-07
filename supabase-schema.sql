@@ -158,7 +158,6 @@ as $$
 declare
   caller uuid := auth.uid();
   team_id uuid;
-  new_code text := substr(md5(random()::text), 1, 8);
 begin
   if caller is null then
     raise exception '未登录';
@@ -169,8 +168,9 @@ begin
     raise exception '仅团长可生成团员密钥';
   end if;
 
-  update teams set member_key = new_code where id = team_id;
-  return new_code;
+  -- v3.4.0 B2：8 位 hex（~32bit）可被穷举，升到 128bit 随机；旧密钥在下次重新生成时自然替换
+  update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = team_id;
+  return (select member_key from teams where id = team_id);
 end;
 $$;
 
@@ -184,12 +184,16 @@ $$;
 -- =====================================================================
 
 -- 按团员密钥读取团队名 + 业务数据 blob + 数据版本（匿名，无 auth.uid）
--- drop 再建：create or replace 无法变更返回结构，旧签名残留会导致重跑报错。
+-- drop 再建：create or replace 无法变更返回结构/签名，旧签名残留会导致重跑报错。
 -- 注意：用 plpgsql + #variable_conflict use_variable——若用 language sql，
 -- `where t.member_key = member_key` 的裸 member_key 会被解析成列名（列优先于参数），
 -- 恒为真导致任意密钥都能读到第一个团队（安全漏洞）。
+-- v3.4.0 B2 Phase 1：新增可选 p_cn（团员输入的圈名或 QQ 号）。
+--   服务端把 addresses / memberMeta / cnChanges 裁剪到本人条目后返回，
+--   并回传解析后的 cn；p_cn 为空（旧客户端）时整体剔除这三类 PII 字段。
 drop function if exists public.get_team_by_member_key(text);
-create function public.get_team_by_member_key(member_key text)
+drop function if exists public.get_team_by_member_key(text, text);
+create function public.get_team_by_member_key(member_key text, p_cn text default null)
 returns json
 language plpgsql
 security definer
@@ -197,17 +201,51 @@ stable
 set search_path = public
 as $$
 #variable_conflict use_variable
+declare
+  v_row record;
+  v_data jsonb;
+  v_cn text;
+  v_qq_cn text;
 begin
-  return (
-    select json_build_object(
-      'name', t.name,
-      'data', coalesce(d.data, '{}'::jsonb),
-      'updatedAt', d.updated_at
-    )
+  select t.name, coalesce(d.data, '{}'::jsonb) as data, d.updated_at
+    into v_row
     from teams t
     left join team_data d on d.team_id = t.id
     where t.member_key = member_key
-    limit 1
+    limit 1;
+  if v_row.name is null then
+    return null;
+  end if;
+
+  v_data := v_row.data;
+  v_cn := p_cn;
+
+  -- 输入可能是 QQ 号：memberMeta 命中则换算为对应 CN
+  if v_cn is not null and v_data->'memberMeta' is not null then
+    select k into v_qq_cn
+    from jsonb_each(v_data->'memberMeta')
+    where value->>'qq' = v_cn
+    limit 1;
+    if v_qq_cn is not null then v_cn := v_qq_cn; end if;
+  end if;
+
+  if v_cn is null then
+    v_data := v_data - 'addresses' - 'memberMeta' - 'cnChanges';
+  else
+    v_data := jsonb_set(v_data, '{addresses}',
+      coalesce((select jsonb_object_agg(k, v) from jsonb_each(coalesce(v_data->'addresses', '{}'::jsonb)) where k = v_cn), '{}'::jsonb), true);
+    v_data := jsonb_set(v_data, '{memberMeta}',
+      coalesce((select jsonb_object_agg(k, v) from jsonb_each(coalesce(v_data->'memberMeta', '{}'::jsonb)) where k = v_cn), '{}'::jsonb), true);
+    v_data := jsonb_set(v_data, '{cnChanges}',
+      coalesce((select jsonb_agg(e) from jsonb_array_elements(coalesce(v_data->'cnChanges', '[]'::jsonb)) e
+                where e->>'oldCn' = v_cn or e->>'newCn' = v_cn), '[]'::jsonb), true);
+  end if;
+
+  return json_build_object(
+    'name', v_row.name,
+    'data', v_data,
+    'updatedAt', v_row.updated_at,
+    'cn', v_cn
   );
 end;
 $$;
@@ -231,6 +269,22 @@ as $$
          ));
 $$;
 
+-- jsonb 数组按 id 合并单条（v3.4.0 B2 辅助）：存在同 id 则整条替换，不存在则追加
+create or replace function public.jsonb_array_upsert_by_id(p_array jsonb, p_item jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  select case
+    when p_item ? 'id' and exists (
+      select 1 from jsonb_array_elements(coalesce(p_array, '[]'::jsonb)) o
+      where o->>'id' = p_item->>'id')
+    then (select coalesce(jsonb_agg(case when o->>'id' = p_item->>'id' then p_item else o end), '[]'::jsonb)
+          from jsonb_array_elements(coalesce(p_array, '[]'::jsonb)) o)
+    else coalesce(p_array, '[]'::jsonb) || p_item
+  end;
+$$;
+
 -- 按团员密钥写入业务数据 blob（匿名，覆盖整份数据；密钥即授权）
 -- v1.7.0 修复：
 --   ① insert ... on conflict upsert —— 旧版只 update，team_data 缺行时
@@ -240,12 +294,21 @@ $$;
 --   ③ 返回写入后的 updated_at，供前端下次写入作为乐观锁版本。
 --   ④ plpgsql + #variable_conflict use_variable —— 裸 member_key 按参数解析，
 --      否则默认策略下与 teams.member_key 列同名产生 42702 二义性错误。
+--   ⑤ v3.4.0 B2 Phase 1：新增可选 p_cn（团员端解析出的圈名）。
+--      团员写入从「整份覆盖」改为「按 CN 白名单合并」：
+--        可写 = 本人 addresses/memberMeta 条目、本人 orders（整条，实际只差 received）、
+--               本人 payments（凭证字段 + 状态上限：已交/已驳回只能由管理端写）、
+--               本人 transfers / cnChanges 条目、本人产生的 address/cnchange 通知；
+--        其余字段一律以服务端现值为准。
+--      p_cn 为空 = 旧版客户端兼容桥（保持整份覆盖）；p_cn 超 64 字符直接拒绝。
 drop function if exists public.update_team_data_by_member_key(text, jsonb);
 drop function if exists public.update_team_data_by_member_key(text, jsonb, timestamptz);
+drop function if exists public.update_team_data_by_member_key(text, jsonb, timestamptz, text);
 create function public.update_team_data_by_member_key(
   member_key text,
   new_data jsonb,
-  expected_updated_at timestamptz default null
+  expected_updated_at timestamptz default null,
+  p_cn text default null
 )
 returns timestamptz
 language plpgsql
@@ -256,6 +319,11 @@ as $$
 declare
   target_team_id uuid;
   new_updated_at timestamptz;
+  v_old jsonb;
+  v_merged jsonb;
+  v_arr jsonb;
+  v_item jsonb;
+  v_existed boolean;
 begin
   select t.id into target_team_id from teams t where t.member_key = member_key limit 1;
   if target_team_id is null then
@@ -274,8 +342,91 @@ begin
   select team_id, data, 'member' from team_data where team_id = target_team_id;
   perform public.team_data_history_prune(target_team_id);
 
+  if p_cn is null then
+    v_merged := new_data;  -- 旧版客户端兼容桥：整份覆盖
+  elsif length(trim(p_cn)) = 0 or length(p_cn) > 64 then
+    raise exception '圈名不合法（空或超 64 字符）';
+  else
+    select coalesce(data, '{}'::jsonb) into v_old from team_data where team_id = target_team_id;
+    v_merged := v_old;
+
+    -- 本人 addresses / memberMeta 条目
+    if new_data ? 'addresses' and new_data->'addresses' ? p_cn then
+      v_merged := jsonb_set(v_merged, array['addresses', p_cn], new_data#>array['addresses', p_cn], true);
+    end if;
+    if new_data ? 'memberMeta' and new_data->'memberMeta' ? p_cn then
+      v_merged := jsonb_set(v_merged, array['memberMeta', p_cn], new_data#>array['memberMeta', p_cn], true);
+    end if;
+
+    -- 本人 orders（团员端唯一会改的是 received）
+    for v_item in select e from jsonb_array_elements(coalesce(new_data->'orders', '[]'::jsonb)) e
+                  where e->>'buyer' = p_cn and e->>'id' is not null
+    loop
+      v_merged := jsonb_set(v_merged, '{orders}',
+        public.jsonb_array_upsert_by_id(v_merged->'orders', v_item), true);
+    end loop;
+
+    -- 本人 payments：凭证字段可写；状态仅接受 待交/待审核（防自批「已交」）
+    for v_item in select e from jsonb_array_elements(coalesce(new_data->'payments', '[]'::jsonb)) e
+                  where e->>'buyer' = p_cn and e->>'id' is not null
+    loop
+      select exists (
+        select 1 from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o
+        where o->>'id' = v_item->>'id'
+      ) into v_existed;
+      if v_existed then
+        v_merged := jsonb_set(v_merged, '{payments}',
+          (select coalesce(jsonb_agg(
+             case when o->>'id' = v_item->>'id' then
+               jsonb_set(
+                 jsonb_set(jsonb_set(o,
+                   '{receipt}', coalesce(v_item->'receipt', o->'receipt')),
+                   '{receiptDate}', coalesce(v_item->'receiptDate', o->'receiptDate')),
+                 '{status}',
+                   case when coalesce(v_item->>'status', '') in ('待交', '待审核')
+                        then coalesce(v_item->'status', o->'status')
+                        else coalesce(o->'status', '"待交"'::jsonb) end)
+             else o end), '[]'::jsonb)
+           from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o));
+      else
+        v_arr := coalesce(v_merged->'payments', '[]'::jsonb) || jsonb_build_object(
+          'id', v_item->'id',
+          'batchId', v_item->'batchId',
+          'buyer', coalesce(v_item->'buyer', to_jsonb(p_cn)),
+          'status', case when coalesce(v_item->>'status', '') in ('待交', '待审核')
+                         then coalesce(v_item->'status', '"待审核"'::jsonb)
+                         else '"待审核"'::jsonb end,
+          'receipt', v_item->'receipt',
+          'receiptDate', v_item->'receiptDate');
+        v_merged := jsonb_set(v_merged, '{payments}', v_arr, true);
+      end if;
+    end loop;
+
+    -- 本人 transfers / cnChanges 条目（按 id 合并，团长处理的其余条目不受影响）
+    for v_item in select e from jsonb_array_elements(coalesce(new_data->'transfers', '[]'::jsonb)) e
+                  where e->>'buyer' = p_cn and e->>'id' is not null
+    loop
+      v_merged := jsonb_set(v_merged, '{transfers}',
+        public.jsonb_array_upsert_by_id(v_merged->'transfers', v_item), true);
+    end loop;
+    for v_item in select e from jsonb_array_elements(coalesce(new_data->'cnChanges', '[]'::jsonb)) e
+                  where (e->>'oldCn' = p_cn or e->>'newCn' = p_cn) and e->>'id' is not null
+    loop
+      v_merged := jsonb_set(v_merged, '{cnChanges}',
+        public.jsonb_array_upsert_by_id(v_merged->'cnChanges', v_item), true);
+    end loop;
+
+    -- 仅接受团员产生的 address / cnchange 通知（按 id 合并，催缴/发货等管理端通知不可写）
+    for v_item in select e from jsonb_array_elements(coalesce(new_data->'notifications', '[]'::jsonb)) e
+                  where coalesce(e->>'type', '') in ('address', 'cnchange') and e->>'id' is not null
+    loop
+      v_merged := jsonb_set(v_merged, '{notifications}',
+        public.jsonb_array_upsert_by_id(v_merged->'notifications', v_item), true);
+    end loop;
+  end if;
+
   insert into team_data (team_id, data, updated_at)
-  values (target_team_id, new_data, now())
+  values (target_team_id, v_merged, now())
   on conflict (team_id) do update
     set data = excluded.data, updated_at = excluded.updated_at
   returning updated_at into new_updated_at;
@@ -755,13 +906,13 @@ as $$
 #variable_conflict use_variable
 declare
   v_admin json;
-  new_code text := substr(md5(random()::text), 1, 8);
 begin
   v_admin := public.admin_verify_session(p_token);
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
   if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可重新生成团员密钥'; end if;
-  update teams set member_key = new_code where id = (select id from teams limit 1);
-  return new_code;
+  -- v3.4.0 B2：与 regenerate_member_key 同步升级为 128bit 随机
+  update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = (select id from teams limit 1);
+  return (select member_key from teams where id = (select id from teams limit 1));
 end;
 $$;
 

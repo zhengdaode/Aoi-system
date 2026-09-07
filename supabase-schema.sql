@@ -34,6 +34,21 @@ create table if not exists team_data (
   updated_at timestamptz not null default now()
 );
 
+-- 4. 团队数据历史表（v3.4.0 B1）：两个写入口 RPC 在每次覆盖前自动存档旧版本，
+--    作为整 blob 覆盖事故（2026-09-06，orders 34→0）的系统性兜底。
+--    开 RLS 且无任何策略：anon/authenticated 均不可直读直写，
+--    仅经下方 admin_list_team_data_history / admin_get_team_data_history RPC 访问。
+create table if not exists team_data_history (
+  id        bigint generated always as identity primary key,
+  team_id   uuid not null references teams(id) on delete cascade,
+  data      jsonb not null,
+  source    text not null default 'admin' check (source in ('admin', 'member')),
+  saved_at  timestamptz not null default now()
+);
+create index if not exists team_data_history_team_saved
+  on team_data_history (team_id, saved_at desc);
+alter table team_data_history enable row level security;
+
 -- =====================================================================
 -- RPC（security definer：绕过 RLS，由函数内部校验身份）
 -- =====================================================================
@@ -197,6 +212,25 @@ begin
 end;
 $$;
 
+-- 历史快照保留策略（v3.4.0 B1）：每团保留近 30 天且最多 100 份。
+-- 由两个写入口 RPC 在每次保存时顺带调用（保存频率低，无需 pg_cron）。
+create or replace function public.team_data_history_prune(p_team_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  delete from team_data_history
+  where team_id = p_team_id
+    and (saved_at < now() - interval '30 days'
+         or id not in (
+           select id from team_data_history
+           where team_id = p_team_id
+           order by saved_at desc, id desc
+           limit 100
+         ));
+$$;
+
 -- 按团员密钥写入业务数据 blob（匿名，覆盖整份数据；密钥即授权）
 -- v1.7.0 修复：
 --   ① insert ... on conflict upsert —— 旧版只 update，team_data 缺行时
@@ -235,6 +269,11 @@ begin
     end if;
   end if;
 
+  -- v3.4.0 B1：覆盖前把当前版本存档（team_data 缺行时不存档），并按保留策略清理
+  insert into team_data_history (team_id, data, source)
+  select team_id, data, 'member' from team_data where team_id = target_team_id;
+  perform public.team_data_history_prune(target_team_id);
+
   insert into team_data (team_id, data, updated_at)
   values (target_team_id, new_data, now())
   on conflict (team_id) do update
@@ -255,6 +294,10 @@ $$;
 --   select has_function_privilege('anon','public.get_team_by_member_key(text)','EXECUTE'),
 --          has_function_privilege('anon','public.update_team_data_by_member_key(text,jsonb,timestamptz)','EXECUTE');
 -- ③ 团队密钥是否为 null：select id, name, member_key from teams;
+-- ④ v3.4.0 历史快照链路（备份/恢复）：存在性 + 匿名不可直读
+--   select proname from pg_proc where pronamespace = 'public'::regnamespace
+--     and proname in ('team_data_history_prune','admin_list_team_data_history','admin_get_team_data_history');
+--   select count(*) from team_data_history;  -- security definer 外直查应报权限错误（RLS 无策略）
 
 -- =====================================================================
 -- 行级安全策略（RLS）
@@ -642,6 +685,11 @@ begin
     end if;
   end if;
 
+  -- v3.4.0 B1：覆盖前把当前版本存档（team_data 缺行时不存档），并按保留策略清理
+  insert into team_data_history (team_id, data, source)
+  select team_id, data, 'admin' from team_data where team_id = target_team_id;
+  perform public.team_data_history_prune(target_team_id);
+
   insert into team_data (team_id, data, updated_at)
   values (target_team_id, p_data, now())
   on conflict (team_id) do update
@@ -649,6 +697,51 @@ begin
   returning updated_at into new_updated_at;
 
   return new_updated_at;
+end;
+$$;
+
+-- blob 历史快照列表（v3.4.0 B1；摘要不含数据全文，供设置页「数据备份与恢复」卡展示/回滚）
+create or replace function public.admin_list_team_data_history(p_token text, p_limit int default 20)
+returns json
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+#variable_conflict use_variable
+declare
+  v_admin json;
+begin
+  v_admin := public.admin_verify_session(p_token);
+  if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
+  return coalesce(json_agg(row_to_json(x) order by x."savedAt" desc), '[]'::json)
+  from (
+    select h.id, h.source, h.saved_at as "savedAt",
+           coalesce(jsonb_array_length(h.data -> 'orders'), 0) as "ordersCount",
+           octet_length(h.data::text) as "bytes"
+    from team_data_history h
+    where h.team_id = (select id from teams order by created_at limit 1)
+    limit greatest(coalesce(p_limit, 20), 1)
+  ) x;
+end;
+$$;
+
+-- 读取单份历史快照全文（恢复 = 取回后走 admin_save_team_data 写回，覆盖前又会自动存档）
+create or replace function public.admin_get_team_data_history(p_token text, p_id bigint)
+returns json
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+#variable_conflict use_variable
+declare
+  v_admin json;
+  v_row team_data_history%rowtype;
+begin
+  v_admin := public.admin_verify_session(p_token);
+  if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
+  select * into v_row from team_data_history where id = p_id limit 1;
+  if v_row.id is null then raise exception '快照不存在'; end if;
+  return json_build_object('data', v_row.data, 'savedAt', v_row.saved_at, 'source', v_row.source);
 end;
 $$;
 

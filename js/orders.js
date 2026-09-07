@@ -609,7 +609,21 @@ Aoi.orders.markArrived = async function () {
   var idSet = {};
   ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
-  d.orders.forEach(function (o) { if (idSet[o.id]) { o.status = '已到货'; o.batchId = batchId; } });
+  // v3.4.0 F1：到货自动通知（按买家去重：type|buyer|batchId 已存在则不重复生成）
+  var notified = {};
+  d.notifications.forEach(function (n) { notified[Aoi.notify.keyOf(n)] = 1; });
+  var buyers = {};
+  d.orders.forEach(function (o) {
+    if (idSet[o.id]) {
+      o.status = '已到货'; o.batchId = batchId;
+      if (o.buyer && !buyers[o.buyer]) {
+        var n = Aoi.notify.buildAction('arrived', batchId, o.buyer,
+          '你购买的商品已到货（批次 ' + Aoi.orders.batchDate(batchId) + '），交费/分摊完成后团长会安排发货');
+        if (!notified[Aoi.notify.keyOf(n)]) { d.notifications.push(n); notified[Aoi.notify.keyOf(n)] = 1; }
+        buyers[o.buyer] = 1;
+      }
+    }
+  });
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
   Aoi.orders.refillAllBatchSelects();

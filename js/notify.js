@@ -6,7 +6,10 @@ Aoi.notify.TYPES = {
   remind: { label: '催缴通知', color: 'text-amber-500' },
   shipped: { label: '发货通知', color: 'text-green-600' },
   address: { label: '收件地址更新', color: 'text-blue-500' },
-  cnchange: { label: '改圈名申请', color: 'text-purple-500' }
+  cnchange: { label: '改圈名申请', color: 'text-purple-500' },
+  paid: { label: '交费确认', color: 'text-green-600' },
+  rejected: { label: '交费驳回', color: 'text-red-500' },
+  arrived: { label: '到货通知', color: 'text-blue-500' }
 };
 
 // 补齐 notifications 结构
@@ -37,6 +40,17 @@ Aoi.notify.buildShipped = function (batchId, buyer, orders) {
     id: Aoi.genId(), type: 'shipped', buyer: buyer, batchId: batchId,
     title: '发货通知',
     body: buyer + '：你的 ' + orders.length + ' 件商品已发货，快递单号：' + tracks,
+    date: new Date().toISOString().slice(0, 10), sent: false
+  };
+};
+
+// 动作触发的通知（v3.4.0 F1）：审批结果 / 标记到货。type ∈ paid | rejected | arrived
+Aoi.notify.buildAction = function (type, batchId, buyer, detail) {
+  var titles = { paid: '交费确认', rejected: '交费驳回', arrived: '到货通知' };
+  return {
+    id: Aoi.genId(), type: type, buyer: buyer, batchId: batchId,
+    title: titles[type] || type,
+    body: buyer + '：' + detail,
     date: new Date().toISOString().slice(0, 10), sent: false
   };
 };

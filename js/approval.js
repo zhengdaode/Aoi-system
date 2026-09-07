@@ -105,6 +105,14 @@ Aoi.approval.setStatus = async function (batchId, buyer, status) {
   if (!ok) return;
   if (p) p.status = status;
   else d.payments.push({ id: Aoi.genId(), batchId: batchId, buyer: buyer, status: status });
+  // v3.4.0 F1：审批结果自动生成通知（进通知列表，可走 QQ 双通道推送）
+  d.notifications = d.notifications || [];
+  d.notifications.push(Aoi.notify.buildAction(
+    status === '已交' ? 'paid' : 'rejected', batchId, buyer,
+    status === '已交'
+      ? '你的国际费已确认到账（批次 ' + Aoi.orders.batchDate(batchId) + '），无需再操作'
+      : '你的交费凭证被驳回（批次 ' + Aoi.orders.batchDate(batchId) + '），请重新提交付款凭证'
+  ));
   await Aoi.saveTeamData(d);
   Aoi.approval.render();
   Aoi.toast(buyer + ' → ' + status, 'success');

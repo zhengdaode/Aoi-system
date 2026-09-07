@@ -1,24 +1,23 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-09-07 · 版本 **v3.3.0**（v3.3：冗余清理与重构——死代码/死 DOM 删除、四份重复批次下拉/剪贴板/CSV/币种符号实现合并、测试 106→134 用例、文档一致性修正、隐私快照清理；v3.2：第二批实测反馈——Excel 导入识别本站导出表格、限购计算器活动下拉修复 + 包邮金额币种、购买人搜索下拉、订单表桌面端 UI 重设计、导出图片行选择；v3.1：QQ 推送双通道（私聊+群@）、公告推群、收件地址更新仅管理员可见；v3：管理员账号体系重设计——部署时初始化超管 + 应用内管理员管理，脱离 Supabase Auth，详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）（含 2026-09-06 十项问题迭代：v1.7.0 团员侧修复 + QQ 机器人 + 测试基建 → v1.8.0 订单改版 → v1.9.0 国际计算/活动管理 → v2.0.0 限购计算器/导出/响应式；变更明细见 CHANGELOG.md，任务溯源见 ROADMAP.md）
+> 更新日期：2026-09-08 · 版本 **v3.4.0**（v3.4：数据安全兜底 + 团员感知增强——服务端 blob 历史快照与「数据备份与恢复」卡（B1/F4）、团员读接口按 CN 裁剪 PII + 写接口白名单合并 + 团员密钥升 128bit（B2 Phase 1）、审批/到货自动通知（F1）、团员端订单进度时间线（F2）；F5 QQ 机器人双向移出为独立项目（设计待审核）；F6 统计页产出独立本地 demo 待管理层审核；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
 
-## 当前状态速览（2026-09-06 迭代后）
+## 当前状态速览（2026-09-08 v3.4.0 后）
 
-- **代码层**：十项实测问题 + 第二批实测反馈（v3.2.0）全部修复/实现，v3.3.0 完成冗余清理与重构；vitest 134 用例全绿（`npm test`）。
-- **⚠️ 待线上操作（用户执行）**：
-  1. ✅ 线上 Supabase 已于 2026-09-06 重跑 `supabase-schema.sql`（团员端两个 RPC drop 重建 + 42702 二义性修复 + 任意密钥可读漏洞修复；写入探针 `probe_written = true` 验证通过，见 `docs/ITERATION_LOG.md` 第 5 轮）。
-  2. 重新部署前端（Netlify / GitHub Pages）。
-  3. QQ 机器人（2026-09-07 链路全部就绪，剩一步用户操作：设置页换 relay 地址）：
-     - ✅ ECS（47.101.194.103）`/root/relay/relay.js` 为 v3 校验逻辑（systemd 服务 `qq-relay.service`，**不是 pm2**；`systemctl restart qq-relay`；旧版备份 `relay.js.bak-20260906`）。
-     - ✅ **https 入口已切换为 Supabase Edge Function**（2026-09-07 部署并验证）：`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay` → ECS:8080。函数源码 `supabase/functions/qq-relay/index.ts`（纯透传，鉴权仍在 ECS relay）；部署命令 `supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt`（access token 在仓库根目录 `.env`）。**设置页 relay 地址填上面的函数地址**。
-     - ✅ trycloudflare 临时隧道已全部删除（2026-09-07，含 WebUI 与 relay 两条；旧地址已失效）。Netlify `/qqbot` 代理（netlify.toml）为备选方案，未启用。
-     - ✅ **NapCat 已登录在线**（2026-09-07 确认 `get_status` online:true；机器人「艾娃拉斯汀」/QQ 2364785311，HTTP API 127.0.0.1:3000 监听正常）。
-     - ✅ ECS 已加 2GB swap（`/swapfile`，已写入 fstab 重启持久；为后续装 AstrBot 腾空间；参照 jm 服务器做法）。
-     - ⬜ **用户最后一步**：用真实管理员账号（非 debug，debug 无管理员会话无法推送）在设置页把 relay 地址改为 Edge Function 地址并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
-     - 备注：v3 主线不包含旧部署线的 P15 自定义背景 / P6 黑夜模式全局切换 / P16 图床 UI（保留在 `backup-before-cleanup` 分支，需要时可移植）。
-- **已知限制（未变）**：member_key 即全权凭证（blob 整份读写，v1.7.0 已加乐观锁缓解覆盖竞态）；地址/QQ 等 PII 仍随 blob 下发，商用前需拆表；默认图床 SSL 过期问题（P14）未处理。
+- **代码层**：v3.4.0 实施完成（B1 备份兜底 / B2 Phase 1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / F4 备份卡）；vitest 170 用例全绿（`npm test`）。
+- **✅ 线上库已升级并验证（2026-09-08）**：先建快照表（`team_data_bak_20260908` / `teams_bak_20260908`）→ 经 `scripts/sb.js` 重跑 `supabase-schema.sql` → 探针全过：①团员读回 blob 已无 addresses（PII 裁剪生效）；②写链路端到端可用（同数据回写返回新版本号，`team_data_history` 自动存档）；③业务 blob 完好（orders 完整）。
+- **⚠️ 待用户操作**：
+  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。
+  2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
+  3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
+- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目（详细设计**待审核**：`docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md`，含六项待拍板问题）；F6 统计页产出独立本地 demo（`demo/stats-demo/`，压缩包 `demo/F6-团期复盘统计-demo.zip` 供外发，待管理层审核后再定并入版本）；F7/F8 取消，v4.0.0 商用化路线不再排期。
+- **已知限制（v3.4.0 后）**：
+  - member_key 仍为团队级凭证（一个团一把），但读已按 CN 裁剪 PII、写已白名单合并（防整份覆盖与自批「已交」）、密钥已升 128bit；设置页重新生成即作废旧密钥。
+  - 服务端历史快照保留近 30 天 / 每团 100 份；更早的版本依赖手动「下载全量备份」文件。
+  - 默认图床 SSL 过期问题（P14）未处理（B7 Storage 方案随商用化路线一并暂缓）。
+  - v3 主线不包含旧部署线的 P15 自定义背景 / P6 黑夜模式全局切换 / P16 图床 UI（保留在 `backup-before-cleanup` 分支）。
 - **测试**：`tests/`（vitest + jsdom），harness 加载 index.html + js 模块；新增 js 模块需加入 `tests/helpers/aoi.js` 的 MODULES 列表。
-- **⚠️ 2026-09-06 数据事故记录**：生产站旧前端陈旧内存覆盖曾清空 cyberbutter 团 blob（orders 34→0），当日经备份还原至 32 条（**经与部署者确认为测试数据**）。取证结论：使用者真实数据 = 旧表 `leader_data` 中 `ICGPClick` 键 12 条订单（归属 2360690621@qq.com，已导出 `backups/`）；团员地址/QQ/凭证及 8/16 后录入的数据因当时保存缺陷从未落库，不可恢复。完整过程见 `docs/ITERATION_LOG.md` 第 6 轮。
+- **⚠️ 2026-09-06 数据事故记录**：生产站旧前端陈旧内存覆盖曾清空 cyberbutter 团 blob（orders 34→0），当日经备份还原至 32 条（**经与部署者确认为测试数据**）。取证结论：使用者真实数据 = 旧表 `leader_data` 中 `ICGPClick` 键 12 条订单（归属 2360690621@qq.com，已导出 `backups/`）；团员地址/QQ/凭证及 8/16 后录入的数据因当时保存缺陷从未落库，不可恢复。完整过程见 `docs/ITERATION_LOG.md` 第 6 轮。**v3.4.0 B1 即针对此类事故的系统性兜底**（每次保存自动存档 + 一键备份/恢复）。
 
 ## 项目定位
 

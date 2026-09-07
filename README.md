@@ -2,7 +2,7 @@
 
 > **原作者：秋洛 (QiuLuo)** · 原项目：[mossasari/Group-Buy-Management-System](https://github.com/mossasari/Group-Buy-Management-System)
 > **当前维护者：郑 (zhengdaode)** · [GitHub](https://github.com/zhengdaode)
-> **当前版本：v3.3.0**（2026-09-07）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
+> **当前版本：v3.4.0**（2026-09-08）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/zhengdaode/Aoi-system)
 
@@ -24,13 +24,14 @@
 | 国际计算 | 按重量分摊国际运费；**均价/加权单价拆列**（手动覆盖 + ↺ 恢复）；**目标金额差值** + **悬浮仪表盘**（插值进度，滚动常驻） |
 | 事务审批 | 按批次逐人审核国际费交费（已交/驳回），一键生成催缴名单 |
 | 发货管理 | 按批次录快递单号、批量合照、发货状态 |
-| 通知公告 | 催缴/发货通知自动生成；QQ 机器人推送——**双通道（推荐）**：自动私聊已绑定者 + 群@全员兜底；另保留仅群发/仅私聊；**收件地址更新仅管理员可见不推送**；公告可一键「发布并推送 QQ 群」 |
+| 通知公告 | 催缴、发货、审批结果、到货通知自动生成；QQ 机器人推送——**双通道（推荐）**：自动私聊已绑定者 + 群@全员兜底；另保留仅群发/仅私聊；**收件地址更新仅管理员可见不推送**；公告可一键「发布并推送 QQ 群」 |
 | 活动管理 | 购买时间/出货日期（**精确 + 模糊：上中下旬/季节/季度**）/链接/进度；**购买人信息**（圈名+账号邮箱+送达地址）、**快递单号多行**、**备注** |
 | 买家（CN）管理 | 买家清单、未完成订单数、删除级联清理、改圈名审批全局迁移 |
 | 工具·计算器 | 中日韩汇率 + 加价公式（0.5 圆整），单笔/批量换算 |
 | 工具·限购计划 | **限购购买计划计算器**：选活动→设限购→填包邮金额/账号数/每账号种类上限，贪心装箱输出每账号购买清单与包邮状态，结果可导出 |
-| 团员端 | 凭**团员密钥 + 圈名**免登录：查订单/国际费/公告、提交凭证、确认收货、地址与 QQ 绑定（**掩码回执**） |
+| 团员端 | 凭**团员密钥 + 圈名**免登录：查订单/国际费/公告、**订单进度时间线**、提交凭证、确认收货、地址与 QQ 绑定（**掩码回执**） |
 | 导出 | 12 张数据表统一「**导出图片 / 下载表格**」双按钮（PNG / XLSX，CSV 回退） |
+| 数据安全 | **服务端历史快照**（每次保存自动存档，保留 30 天/100 份）+ 设置页一键备份/恢复；团员读写按 CN 白名单隔离（他人地址/QQ 不再随密钥下发） |
 | 界面 | 移动端抽屉导航 + 订单表卡片视图、表格自适应（首列 sticky / 换行折叠）；黑夜模式 / 自定义背景不在 v3 主线（保留在 `backup-before-cleanup` 分支，需要时可移植） |
 
 ---
@@ -64,6 +65,7 @@
    > ### ⚠️ 老库升级必读
    >
    > - **v3.0.0 起管理员账号不再走 Supabase Auth 邮箱注册**：改为部署时初始化超管 + 应用内添加管理员（用户名/密码，bcrypt 哈希存 `admins` 表）。重跑最新 schema 后，首次打开网站会显示初始化页；旧邮箱账号自然失效，业务数据（`team_data` blob）不受影响。
+   > - **v3.4.0（2026-09-08 已应用线上）**：新增历史快照表与 6 个 RPC；团员两个 RPC 签名扩展（旧调用兼容）。重跑本 schema 即完成升级。
    > - **v1.7.0 修复**：团员端两个 RPC 曾存在「保存静默丢失」（只 update 不 insert）与「参数名二义性」缺陷，均已修复且签名有变（脚本自动 drop 重建，重跑不会报错）。
    > - 重跑后执行文件尾部「排查 SQL」确认 RPC 就绪；忘记超管密码时，用 Supabase Dashboard → Authentication 删除后重初始化，或经 `scripts/sb.js` 重置。
 
@@ -125,7 +127,7 @@
 
 ```bash
 npm install        # 安装 vitest + jsdom（仅测试用，前端本体零依赖）
-npm test           # 134 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
+npm test           # 170 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
 npm run test:watch # 监听模式
 ```
 
@@ -137,7 +139,7 @@ npm run test:watch # 监听模式
 
 ## 安全注意事项
 
-- **Supabase**：只用 anon key + RLS + security definer RPC；已知权衡——团员密钥即全权凭证（整 blob 读写，v1.7.0 已加乐观锁缓解覆盖竞态），地址/QQ 等 PII 随 blob 下发，商用前建议拆表（见 [docs/STATUS.md](docs/STATUS.md) 已知限制）。
+- **Supabase**：只用 anon key + RLS + security definer RPC；已知权衡——团员密钥仍为团队级凭证，但 v3.4.0 起读接口按 CN 裁剪 PII、写接口白名单合并（防整份覆盖与自批），密钥已升 128bit；服务端历史快照 + 备份文件兜底（见 [docs/STATUS.md](docs/STATUS.md) 已知限制）。
 - **XSS**：所有用户/云端数据插入 DOM 前经 `escapeHtml()` 转义；确认弹窗统一自定义组件。
 - **QQ 机器人**：token 只存 relay 服务端；前端不存任何密钥。
 - 邮箱确认（Custom SMTP）建议开启。

@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.4.0 (2026-09-08)
+
+> 数据安全兜底 + 团员感知增强（PLAN-NEXT v3.4.0：B1 / B2 Phase 1 / F1 / F2 / F4），后端改进路线首批落地。
+> 另：F5（QQ 机器人双向）按用户决策移出为独立项目（设计见 `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md`，待审核）；
+> F6 产出独立本地 demo（`demo/stats-demo/`，供管理层审核）；F7/F8 取消。
+
+### Added
+- **服务端 blob 历史快照（B1）** — 新表 `team_data_history`：管理端/团员端每次保存前自动存档旧版本（保留近 30 天 / 每团 100 份，写入口顺带清理，无需 cron）；`admin_list_team_data_history`（摘要：时间/来源/订单数/体积）/ `admin_get_team_data_history`（全文）供回滚；RLS 无策略，仅经 RPC 访问
+- **设置页「数据备份与恢复」卡（F4）** — 下载全量备份 JSON（带 kind/version/exportedAt 元信息）；从备份文件恢复（parseImport 校验防任意 JSON 覆盖 + 确认摘要 + 乐观锁写回 + 全视图刷新）；服务端历史快照列表 +「恢复此版」一键回滚（恢复前服务端又会自动存档当前版本，可连续回滚）；debug 模式提示无服务端历史
+- **审批/到货自动通知（F1）** — 新类型 paid（交费确认）/ rejected（交费驳回）/ arrived（到货通知）；审批标记已交/驳回、订单标记到货时自动生成（到货按「买家×批次」幂等去重），走既有 QQ 双通道推送；address 类仅管理员可见策略不变
+- **团员端订单进度时间线（F2）** — 我的订单新增「进度」列：排单→到货→交费→发货→收货，●已完成/○待完成，交费节点带状态色（待审核琥珀/已驳回红/待交灰/已交绿）
+
+### Security
+- **团员读接口按 CN 裁剪 PII（B2 Phase 1）** — `get_team_by_member_key(+p_cn)`：addresses/memberMeta/cnChanges 只回本人条目（QQ 号输入由服务端映射为 CN 并回传）；p_cn 为空（旧客户端）时整体剔除三类 PII——STATUS「已知限制」中「一份密钥读全团地址/QQ 原文」就此关闭
+- **团员写接口白名单合并（B2 Phase 1）** — `update_team_data_by_member_key(+p_cn)`：整份覆盖改为按 CN 白名单合并（本人地址/QQ 绑定/收货确认/付款凭证/换囤货地/改圈名申请/address·cnchange 两类通知）；payments 状态设上限——「已交/已驳回」仅管理端可写（防自批）；其余字段一律以服务端现值为准；旧客户端（p_cn 为空）走整份覆盖兼容桥
+- **团员密钥升 128bit** — regenerate_member_key / admin_regenerate_member_key 从 8 位 hex（~32bit，可穷举）改为 gen_random_bytes(16)（32 字符）；旧密钥在下次重新生成时自然替换
+
+### Tests
+- 152 → 170 用例：backup-restore（18）+ member-pii（9）+ action-notify（9）；含 schema 守护用例（历史链路 / 白名单合并 / 状态上限 / 密钥强度防回退）
+
+### 线上操作（2026-09-08 已完成）
+- 快照表（`team_data_bak_20260908` / `teams_bak_20260908`）→ `scripts/sb.js` 重跑 `supabase-schema.sql` → 探针验证：PII 裁剪生效（anon 读回无 addresses）、写链路端到端可用（同数据回写 + history 自动存档 1 行）、业务 blob 完好
+- 建议下一步：重新部署前端（团员端 PII 隔离与全部新功能生效；旧前端经兼容桥仍可用，但 QQ 号输入进看板依赖新版）
+
 ## v3.3.0 (2026-09-07)
 
 > 冗余清理与重构：全仓审计（死代码 / 重复实现 / 文档漂移 / 隐私风险）后的集中清理版本。

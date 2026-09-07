@@ -12,11 +12,11 @@ Aoi.member.ensure = function () {
   return d;
 };
 
-// 团员端统一保存：带上次读到的数据版本（乐观锁），成功后记录新版本。
-// 版本冲突时清空本地版本并抛错（提示刷新重进），避免基于过期数据反复覆盖。
+// 团员端统一保存：带上次读到的数据版本（乐观锁）+ 本人圈名（服务端按 CN 白名单合并），
+// 成功后记录新版本。版本冲突时清空本地版本并抛错（提示刷新重进），避免基于过期数据反复覆盖。
 Aoi.member.persist = async function (d) {
   try {
-    var newTs = await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d, Aoi.member.state.updatedAt);
+    var newTs = await Aoi.saveTeamDataByMemberKey(Aoi.member.state.key, d, Aoi.member.state.updatedAt, Aoi.member.state.cn);
     if (newTs) Aoi.member.state.updatedAt = newTs;
   } catch (e) {
     if (/已被他人修改/.test(e.message || '')) Aoi.member.state.updatedAt = null;
@@ -40,7 +40,9 @@ Aoi.member.enter = async function () {
   Aoi.showLoading('加载中...');
   var res;
   try {
-    res = await Aoi.getTeamDataByMemberKey(key);
+    // v3.4.0 B2：把输入（圈名或 QQ 号）一并交给服务端——返回的数据已按本人裁剪 PII，
+    // res.cn 为服务端解析结果（QQ 号输入会映射为对应 CN）
+    res = await Aoi.getTeamDataByMemberKey(key, id);
   } catch (e) {
     Aoi.hideLoading();
     Aoi.toast(e.message || '加载失败', 'error');
@@ -54,8 +56,12 @@ Aoi.member.enter = async function () {
   Aoi.member.ensure();
   Aoi.member.state.updatedAt = res.updatedAt || null;
 
-  var cn = Aoi.member.resolveCn(id);
-  if (!cn) { Aoi.toast('未找到该圈名（CN）或 QQ 号，请确认后重试', 'error'); return; }
+  var cn = res.cn || Aoi.member.resolveCn(id);
+  // 服务端和本地都无法把输入解析到任何已知圈名/QQ → 按原逻辑拒绝
+  if (!cn || (res.cn === id && !Aoi.member.resolveCn(id))) {
+    Aoi.toast('未找到该圈名（CN）或 QQ 号，请确认后重试', 'error');
+    return;
+  }
 
   Aoi.member.state.key = key;
   Aoi.member.state.cn = cn;

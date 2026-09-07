@@ -113,7 +113,7 @@ Aoi.getDataHistorySnapshot = async function (id) {
 
 // —— 团员端：按团员密钥读取/保存（与 v1.7.0 一致，未改动）——
 
-Aoi.getTeamDataByMemberKey = async function (key) {
+Aoi.getTeamDataByMemberKey = async function (key, cnOrQq) {
   var debugTeam = JSON.parse(localStorage.getItem('aoi_debug_team') || 'null');
   if (debugTeam && (debugTeam.member_key || 'DEMO') === key) {
     return {
@@ -122,7 +122,11 @@ Aoi.getTeamDataByMemberKey = async function (key) {
       updatedAt: null
     };
   }
-  var r = await Aoi.db.rpc('get_team_by_member_key', { member_key: key });
+  // v3.4.0 B2：携带输入（圈名或 QQ 号），服务端把 addresses/memberMeta/cnChanges
+  // 裁剪到本人条目后返回（含解析出的 cn）；不传则服务端整体剔除这三类 PII。
+  var params = { member_key: key };
+  if (cnOrQq) params.p_cn = cnOrQq;
+  var r = await Aoi.db.rpc('get_team_by_member_key', params);
   if (r.error) {
     var hint = Aoi.explainRpcError(r.error.message, '团员端读取');
     throw new Error(hint || ('读取团队数据失败：' + r.error.message));
@@ -131,7 +135,7 @@ Aoi.getTeamDataByMemberKey = async function (key) {
   return r.data;
 };
 
-Aoi.saveTeamDataByMemberKey = async function (key, data, expectedUpdatedAt) {
+Aoi.saveTeamDataByMemberKey = async function (key, data, expectedUpdatedAt, cn) {
   var debugTeam = JSON.parse(localStorage.getItem('aoi_debug_team') || 'null');
   if (debugTeam && (debugTeam.member_key || 'DEMO') === key) {
     localStorage.setItem('aoi_debug_data', JSON.stringify(data));
@@ -139,6 +143,7 @@ Aoi.saveTeamDataByMemberKey = async function (key, data, expectedUpdatedAt) {
   }
   var params = { member_key: key, new_data: data };
   if (expectedUpdatedAt) params.expected_updated_at = expectedUpdatedAt;
+  if (cn) params.p_cn = cn; // v3.4.0 B2：写入口按 CN 白名单合并（防整份覆盖管理端数据）
   var r = await Aoi.db.rpc('update_team_data_by_member_key', params);
   if (r.error) {
     var hint = Aoi.explainRpcError(r.error.message, '团员端写入');

@@ -20,6 +20,8 @@ Aoi.renderSettings = function () {
   var amSection = document.getElementById('adminMgmtSection');
   if (amSection) amSection.classList.toggle('hidden', !isSuper);
   if (isSuper) Aoi.adminMgmt.render();
+
+  if (Aoi.backup) Aoi.backup.renderHistory(); // v3.4.0：服务端历史快照列表（异步，失败在列表内提示）
 };
 
 // —— 管理员账号管理（仅 super，走 admin_* RPC）——
@@ -170,4 +172,121 @@ document.getElementById('adminMgmtList').addEventListener('click', function (e) 
 document.getElementById('announceList').addEventListener('click', function (e) {
   var btn = e.target.closest('[data-remove-announce]');
   if (btn) Aoi.announce.remove(btn.getAttribute('data-remove-announce'));
+});
+
+// —— 数据备份与恢复（v3.4.0 B1/F4）：本地备份文件 + 服务端历史快照回滚 ——
+// 服务端侧：两个写入口 RPC 每次保存前自动存档旧版（保留近 30 天 / 每团最多 100 份）；
+// 恢复动作统一走 Aoi.saveTeamData（乐观锁），覆盖前服务端又会先存档当前版本，可连续回滚。
+Aoi.backup = {};
+
+// 备份文件标识与版本号：导入时校验，防止拿任意 JSON 覆盖数据
+Aoi.backup.KIND = 'aoi-backup';
+
+// 构造备份文件内容（data 为当前内存中的整份团队数据）
+Aoi.backup.buildExport = function (data) {
+  return {
+    kind: Aoi.backup.KIND,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    teamName: (Aoi.state.team && Aoi.state.team.name) || '',
+    data: data
+  };
+};
+
+// 校验导入文件内容 → 返回 { data, exportedAt, teamName }，不合法抛错（文案面向普通管理员）
+Aoi.backup.parseImport = function (text) {
+  var obj;
+  try { obj = JSON.parse(text); } catch (e) { throw new Error('不是有效的 JSON 文件'); }
+  if (!obj || obj.kind !== Aoi.backup.KIND || typeof obj.data !== 'object' || obj.data === null) {
+    throw new Error('文件不是本系统导出的备份（缺少备份标识或 data 字段）');
+  }
+  return obj;
+};
+
+// 下载全量备份（当前内存数据 → JSON 文件）
+Aoi.backup.download = function () {
+  var payload = Aoi.backup.buildExport(Aoi.orders.ensure());
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'aoi-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  Aoi.toast('备份已下载（' + a.download + '）', 'success');
+};
+
+// 「从备份文件恢复」入口：读取 <input type=file>，校验后走统一恢复流程
+Aoi.backup.onImportFile = async function (ev) {
+  var file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // 允许重复选择同一文件
+  if (!file) return;
+  var payload;
+  try {
+    payload = Aoi.backup.parseImport(await file.text());
+  } catch (e) {
+    Aoi.toast(e.message, 'error');
+    return;
+  }
+  await Aoi.backup.restoreFromObject(payload);
+};
+
+// 统一恢复流程：确认摘要 → saveTeamData 写回 → 刷新全部视图
+Aoi.backup.restoreFromObject = async function (payload) {
+  var d = payload.data;
+  var orders = Array.isArray(d.orders) ? d.orders.length : 0;
+  var when = payload.exportedAt ? String(payload.exportedAt).slice(0, 19).replace('T', ' ') : '未知时间';
+  var ok = await Aoi.confirm(
+    '确定用这份备份覆盖当前全部数据？备份时间 ' + when + '，含 ' + orders + ' 条订单。'
+    + '覆盖前服务端会自动存档当前版本，可再回滚',
+    { danger: true, okText: '覆盖恢复' });
+  if (!ok) return;
+  await Aoi.saveTeamData(d);
+  Aoi.state.data = d;
+  Aoi.refreshViews();
+  Aoi.toast('已从备份恢复数据', 'success');
+};
+
+// 服务端历史快照列表（新→旧）。debug 模式数据在本机 localStorage，无服务端历史
+Aoi.backup.renderHistory = async function () {
+  var el = document.getElementById('backupHistoryList');
+  if (!el) return;
+  if (Aoi.state.user && Aoi.state.user.isDebug) {
+    el.innerHTML = '<li class="text-sm text-gray-400 py-1">调试模式数据存本机，无服务端历史快照</li>';
+    return;
+  }
+  el.innerHTML = '<li class="text-sm text-gray-400 py-1">加载中…</li>';
+  try {
+    var list = await Aoi.listDataHistory(10);
+    el.innerHTML = list.length ? list.map(function (h) {
+      var label = (h.savedAt || '').slice(0, 19).replace('T', ' ')
+        + ' · ' + (h.source === 'member' ? '团员保存' : '管理端保存')
+        + ' · ' + (h.ordersCount || 0) + ' 单 · ' + Math.round((h.bytes || 0) / 1024) + ' KB';
+      return '<li class="flex items-center justify-between border-b border-gray-100 py-1 text-sm">'
+        + '<span>' + Aoi.escapeHtml(label) + '</span>'
+        + '<button data-bk-restore="' + h.id + '" class="text-blue-500 hover:underline">恢复此版</button></li>';
+    }).join('') : '<li class="text-sm text-gray-400 py-1">暂无历史快照（每次保存自动生成，保留近 30 天 / 最多 100 份）</li>';
+  } catch (e) {
+    el.innerHTML = '<li class="text-sm text-red-500 py-1">' + Aoi.escapeHtml(e.message) + '</li>';
+  }
+};
+
+// 恢复到指定历史快照
+Aoi.backup.restoreSnapshot = async function (id) {
+  var ok = await Aoi.confirm('确定恢复到这份历史快照？当前数据会先被服务端自动存档，可再次回滚',
+    { danger: true, okText: '恢复' });
+  if (!ok) return;
+  var snap = await Aoi.getDataHistorySnapshot(id);
+  await Aoi.saveTeamData(snap.data);
+  Aoi.state.data = snap.data;
+  Aoi.refreshViews();
+  Aoi.toast('已恢复到 ' + String(snap.savedAt || '').slice(0, 19).replace('T', ' '), 'success');
+  Aoi.backup.renderHistory();
+};
+
+// 事件委托：历史快照列表里的「恢复此版」按钮
+document.getElementById('backupHistoryList').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-bk-restore]');
+  if (btn) Aoi.backup.restoreSnapshot(btn.getAttribute('data-bk-restore'));
 });

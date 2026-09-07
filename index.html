@@ -290,6 +290,18 @@
           </div>
         </div>
 
+        <div id="backupSection" class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">数据备份与恢复</h3>
+          <p class="text-sm text-gray-500 mb-3">每次保存数据时服务端自动存档旧版本（保留近 30 天 / 最多 100 份）；也可下载备份文件到本地，或从备份文件 / 历史快照恢复</p>
+          <div class="flex flex-wrap gap-3 mb-3">
+            <button onclick="Aoi.backup.download()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">下载全量备份（JSON）</button>
+            <button onclick="document.getElementById('backupImportFile').click()" class="px-4 py-2 bg-white border border-gray-300 text-sm font-bold rounded hover:bg-gray-50">从备份文件恢复…</button>
+            <input id="backupImportFile" type="file" accept=".json,application/json" class="hidden" onchange="Aoi.backup.onImportFile(event)">
+          </div>
+          <p class="text-xs text-gray-500 mb-1">服务端历史快照（新→旧，「恢复此版」回滚到该时刻）：</p>
+          <ul id="backupHistoryList"></ul>
+        </div>
+
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">图床设置</h3>
           <p class="text-sm text-gray-500 mb-3">图片上传到可配置图床（默认免费图床，支持 Chevereto / Lsky Pro / 通用格式）</p>

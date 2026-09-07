@@ -8,6 +8,8 @@
 >
 > 优先级排序原则：**线上稳定性与数据安全 > 团长效率/自动化 > 团员自助体验 > 长期架构健康。**
 > 约束假设：保持「无框架、无构建」；以 Supabase 免费档能力为限；`deploy` 冻结期间本计划不涉及上线操作。
+> 注：审查期间基线有漂移——2026-09-07 晚 `ffb7d37` 合入了 Edge Function https 入口并清理临时隧道
+> （QQ 链路定型），本文 B4 已按该事实修订为「定型后加固」清单。
 
 ---
 
@@ -20,9 +22,10 @@ v3.3.0 的功能面已经完整覆盖「排单录入 → 到货分批 → 国际
    （ITERATION_LOG 第 6 轮，orders 34→0）；同类事故再发生时仍只能靠手工快照表抢救。
 2. **团员密钥即全权凭证 + PII 随整 blob 下发** —— STATUS「已知限制」两条红线未动：
    任何持 member_key 者可读全员地址/QQ 原文、可整份覆盖团队数据（乐观锁只防误覆盖，不防恶意）。
-3. **推送链路处于临时态** —— https 入口靠 trycloudflare 临时隧道（ECS 重启 URL 即变），
-   `supabase/functions/qq-relay/index.ts` 半成品未部署、`netlify.toml` 的 `/qqbot` 代理未接通，
-   三条备选路径都停在「待选」。
+3. **推送链路刚定型、尚余加固项** —— https 入口已于 2026-09-07 晚切换为 Supabase Edge Function
+   （`ffb7d37`，本审查进行中合入；trycloudflare 临时隧道已删除、NapCat 已登录），但：Edge Function 内
+   `UPSTREAM` 仍硬编码 ECS IP、推送无审计与长度上限、CSP `connect-src` 放行任意 https、
+   NapCat WebUI 6099 未收紧、端到端推送验证待用户执行。
 
 因此后端路线以「备份兜底 → 凭证/PII 收敛 → 链路定型」为主线；新功能路线围绕 PRODUCT.md 的成功标准
 （团员不用反复问团长「我的单子到哪了」）做推送闭环与团员端可视化，而非新增大模块。
@@ -75,19 +78,21 @@ v3.3.0 的功能面已经完整覆盖「排单录入 → 到货分批 → 国际
   3. 设置页（仅 super）提供审计记录查看 + 清理。
 - **工作量**：~1 天。**理由**：v3 已有多管理员（super/admin），权限有了、可追责没有；成本极低。
 
-### B4（P1）QQ 推送链路定型（三选一并收尾）
+### B4（P1）QQ 推送链路加固（入口已定型，收尾清单）
 
-- **问题**：https 入口当前是临时 Cloudflare 隧道，ECS 重启 URL 变化即全链路失效（STATUS 待办第 3 条）；
-  三条持久化路径均已半成品：netlify.toml:7 已配 `/qqbot` 代理（但 Netlify 站点未连接）、
-  `supabase/functions/qq-relay/index.ts` 已写好未部署（且 `UPSTREAM` 硬编码 ECS IP）、自有域名未绑。
-- **建议决策**：**优先部署 Supabase Edge Function 方案**（零新增基建、不受 ECS/Netlify 站点状态牵连），
-  硬编码 IP 移到 function env；Netlify `/qqbot` 作为备用路径保留。仓库里未跟踪的 `supabase/` 目录应纳入版本管理。
-- **连带收尾**：
-  - relay（或 Edge Function）加推送审计（谁/何时/私聊 or 群发/成功与否）与单条消息长度上限；
-  - CSP `connect-src` 收紧（netlify.toml:30 现为裸 `https:`，Edge Function 定型后改为 `https://*.supabase.co`）；
-  - NapCat WebUI 6099 收紧为仅本机（STATUS 安全提醒，验证完成后的遗留）；
-  - 小修订：relay/relay.js:8 头注释仍写 pm2，线上实际是 systemd `qq-relay.service`（文档漂移）。
-- **工作量**：~0.5–1 天。**理由**：推送是核心运营链路，当前任何一次 ECS 重启都会静默打断它。
+- **现状**：https 入口已于 2026-09-07 切换为 Supabase Edge Function 并线上验证
+  （`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay` → ECS:8080，commit `ffb7d37`；
+  trycloudflare 临时隧道已全部删除，NapCat 已登录在线）。三选一的「定型」问题已解决，
+  剩余为加固收尾：
+- **收尾清单**：
+  1. Edge Function 内 `UPSTREAM`（supabase/functions/qq-relay/index.ts:7）硬编码 ECS IP → 移到 function env；
+  2. relay（或 Edge Function）加推送审计（谁/何时/私聊 or 群发/成功与否）与单条消息长度上限；
+  3. CSP `connect-src` 收紧（netlify.toml:30 现为裸 `https:`，Edge Function 已定型，可改为
+     `https://*.supabase.co` 加明确白名单域）；Netlify `/qqbot` 代理保留为备选路径（未启用）；
+  4. NapCat WebUI 6099 收紧为仅本机（隧道已删，暴露面已小，仍建议收口）；
+  5. 小修订：relay/relay.js:8 头注释仍写 pm2，线上实际是 systemd `qq-relay.service`（文档漂移）；
+  6. 用户侧最后一步（见 STATUS）：设置页把 relay 地址换成 Edge Function 地址，端到端推送验证。
+- **工作量**：~0.5 天。**理由**：推送是核心运营链路，定型后应尽快补审计与暴露面收口，防止回退到临时态。
 
 ### B5（P2）schema 版本化迁移 + 线上自检例行化
 
@@ -177,7 +182,7 @@ v3.3.0 的功能面已经完整覆盖「排单录入 → 到货分批 → 国际
 | 版本 | 主题 | 内容 | 量级 |
 |------|------|------|------|
 | v3.4.0 | 数据安全兜底 | B1（历史表+备份 RPC）+ F4（备份 UI）+ B2 Phase 1（PII 剥离/写白名单/密钥升强）+ F1（审批/到货通知）+ F2（团员时间线） | ~3–4 天 |
-| v3.5.0 | 链路定型与加固 | B4（Edge Function 定型 + relay 审计 + CSP/6099 收尾）+ B3（登录防爆破 + 审计日志）+ F3（汇率同步） | ~2–3 天 |
+| v3.5.0 | 链路加固与追责 | B4（推送审计 + UPSTREAM 移 env + CSP/6099 收尾）+ B3（登录防爆破 + 审计日志）+ F3（汇率同步） | ~2 天 |
 | v3.6.0 | 治理与复盘 | B5（迁移版本化 + 自检）+ B6（blob 治理）+ F6（统计页）+ F5 低配版（通知带链接） | ~2–3 天 |
 | v4.0.0（待定） | 商用门槛 | B2 Phase 2（PII 拆表）+ B7（Storage 图床）+ F5 完整双向 + F8 多团 —— 是否启动取决于商用决策 | 待评估 |
 
@@ -197,7 +202,7 @@ v3.3.0 的功能面已经完整覆盖「排单录入 → 到货分批 → 国际
 - 团员读整 blob 含 PII：supabase-schema.sql:177–198；写整 blob：schema:211–246
 - 登录无防爆破：schema:436–462；会话清理随读放大：schema:375（verify 内 delete）
 - 备份缺失与事故：docs/ITERATION_LOG.md 第 6 轮；docs/STATUS.md「数据事故记录」「已知限制」
-- 隧道临时态与三备选路径：docs/STATUS.md 待办第 3 条；netlify.toml:7–11；supabase/functions/qq-relay/index.ts:7（未跟踪、UPSTREAM 硬编码）
+- 隧道临时态已解除（2026-09-07 Edge Function 定型，commit `ffb7d37`）：supabase/functions/qq-relay/index.ts:7（UPSTREAM 硬编码待移 env）；netlify.toml:7–11（/qqbot 备选未启用）
 - CSP 宽松：netlify.toml:30（`connect-src … https:`）
 - relay 注释 pm2 漂移：relay/relay.js:8（线上为 systemd qq-relay.service，见 STATUS）
 - 通知无上限增长：js/notify.js（sync 只增、clearSent 仅手动）

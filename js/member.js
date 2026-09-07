@@ -151,6 +151,27 @@ Aoi.member.renderFees = function (cn) {
   if (stat) stat.textContent = ids.length ? '共 ' + ids.length + ' 个到货批次' : '';
 };
 
+// 订单进度链（v3.4.0 F2）：排单 → 到货 → 交费（带状态色）→ 发货 → 收货
+Aoi.member.progressChain = function (o, cn) {
+  var rec = o.batchId ? Aoi.approval.getRecord(o.batchId, cn) : null;
+  var payStatus = rec ? rec.status : '待交';
+  var pay = { t: '交费', on: payStatus === '已交', cls: '' };
+  if (payStatus === '待审核') pay.cls = 'text-amber-500';
+  else if (payStatus === '已驳回') pay.cls = 'text-red-500';
+  else if (payStatus === '待交') pay.cls = 'text-gray-400';
+  var steps = [
+    { t: '排单', on: true },
+    { t: '到货', on: o.status === '已到货' },
+    pay,
+    { t: '发货', on: (o.shipped || '未发') === '已发' },
+    { t: '收货', on: !!o.received }
+  ];
+  return steps.map(function (s) {
+    return '<span class="' + (s.on ? 'text-green-600' : (s.cls || 'text-gray-300')) + ' whitespace-nowrap">'
+      + (s.on ? '●' : '○') + s.t + '</span>';
+  }).join('<span class="text-gray-200 mx-0.5">›</span>');
+};
+
 // 我的订单：按圈名过滤
 Aoi.member.renderOrders = function (cn) {
   var d = Aoi.orders.ensure();
@@ -180,10 +201,11 @@ Aoi.member.renderOrders = function (cn) {
       + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
       + '<td class="px-3 py-2 text-right">' + ((o.price != null) ? sum.toFixed(2) : '—') + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.batchId ? Aoi.orders.batchDate(o.batchId) : '—') + '</td>'
+      + '<td data-label="进度" class="px-3 py-2 text-xs whitespace-nowrap">' + Aoi.member.progressChain(o, cn) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(tracking) + '</td>'
       + '<td class="px-3 py-2">' + confirm + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="9" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
+  }).join('') : '<tr><td colspan="10" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
 };
 
 // —— 收件地址：只写不读（保护隐私），提交后在 QQ 通知团长 ——

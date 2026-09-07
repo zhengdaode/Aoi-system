@@ -1,0 +1,33 @@
+// Supabase Edge Function — QQ relay 的 https 入口（纯透传，不存任何密钥）
+// 浏览器（GitHub Pages, https）→ 本函数 → ECS relay（http://47.101.194.103:8080）→ NapCat
+// 鉴权在 ECS relay 完成（admin_verify_session），本函数只做协议桥接：
+//   解决 https 页面无法直接 fetch http 地址的混合内容拦截，替代 trycloudflare 临时隧道。
+// 部署：supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt
+//   （verify_jwt 必须关：前端携带的是 Aoi 管理员 token，不是 Supabase JWT）
+const UPSTREAM = 'http://47.101.194.103:8080/';
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'method not allowed' }),
+      { status: 405, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  }
+  const r = await fetch(UPSTREAM, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: req.headers.get('Authorization') ?? '',
+    },
+    body: await req.text(),
+  });
+  return new Response(await r.text(), {
+    status: r.status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+});

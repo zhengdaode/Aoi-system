@@ -8,13 +8,14 @@
 - **⚠️ 待线上操作（用户执行）**：
   1. ✅ 线上 Supabase 已于 2026-09-06 重跑 `supabase-schema.sql`（团员端两个 RPC drop 重建 + 42702 二义性修复 + 任意密钥可读漏洞修复；写入探针 `probe_written = true` 验证通过，见 `docs/ITERATION_LOG.md` 第 5 轮）。
   2. 重新部署前端（Netlify / GitHub Pages）。
-  3. QQ 机器人（2026-09-06 晚 relay v3 + https 入口 + v3 前端均已上线，剩两步用户操作）：
-     - ✅ ECS（47.101.194.103）`/root/relay/relay.js` 已更新为 v3 校验逻辑（systemd 服务 `qq-relay.service`，**不是 pm2**；`systemctl restart qq-relay`；旧版备份 `relay.js.bak-20260906`）。
-     - ✅ https 入口（临时）：Cloudflare 快速隧道 `https://api-gsm-phenomenon-freely.trycloudflare.com` → ECS:8080（`nohup cloudflared tunnel --url http://localhost:8080`，ECS 重启后需重跑且 **URL 会变**）。设置页 relay 地址填它。持久方案待选：绑自有域名 / 连接 Netlify 仓库（netlify.toml 已备好 `/qqbot` 代理）/ Supabase Edge Function。
-     - ✅ v3 前端已部署 GitHub Pages：https://icgp-click.github.io/Click_sales_system/ （deploy 分支曾停滞在 8-11 旧前端，已用 merge -s ours 对齐；Netlify 通道未连接，icgp-click-01 为空站）。
-     - ⬜ **NapCat 未登录**：容器在跑但 QQ 2364785311 停在扫码页（HTTP API 3000 未监听）。安全组未放行 6099，走临时隧道访问 WebUI 扫码：`https://sleeping-blanket-try-paintball.trycloudflare.com/webui?token=7001fa123d2e`（token 同服务器 `/root/napcat/config/webui.json`）。
-     - ⬜ 用真实管理员账号（非 debug，debug 无管理员会话无法推送）在设置页保存 relay 地址后，通知页点群发验证。
-     - 安全提醒：NapCat WebUI 6099 与隧道均对公网开放，验证完成后建议 6099 收紧为仅放行 8080。另：v3 主线不包含旧部署线的 P15 自定义背景 / P6 黑夜模式全局切换 / P16 图床 UI（保留在 `backup-before-cleanup` 分支与 deploy 分支历史，需要时可移植）。
+  3. QQ 机器人（2026-09-07 链路全部就绪，剩一步用户操作：设置页换 relay 地址）：
+     - ✅ ECS（47.101.194.103）`/root/relay/relay.js` 为 v3 校验逻辑（systemd 服务 `qq-relay.service`，**不是 pm2**；`systemctl restart qq-relay`；旧版备份 `relay.js.bak-20260906`）。
+     - ✅ **https 入口已切换为 Supabase Edge Function**（2026-09-07 部署并验证）：`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay` → ECS:8080。函数源码 `supabase/functions/qq-relay/index.ts`（纯透传，鉴权仍在 ECS relay）；部署命令 `supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt`（access token 在仓库根目录 `.env`）。**设置页 relay 地址填上面的函数地址**。
+     - ✅ trycloudflare 临时隧道已全部删除（2026-09-07，含 WebUI 与 relay 两条；旧地址已失效）。Netlify `/qqbot` 代理（netlify.toml）为备选方案，未启用。
+     - ✅ **NapCat 已登录在线**（2026-09-07 确认 `get_status` online:true；机器人「艾娃拉斯汀」/QQ 2364785311，HTTP API 127.0.0.1:3000 监听正常）。
+     - ✅ ECS 已加 2GB swap（`/swapfile`，已写入 fstab 重启持久；为后续装 AstrBot 腾空间；参照 jm 服务器做法）。
+     - ⬜ **用户最后一步**：用真实管理员账号（非 debug，debug 无管理员会话无法推送）在设置页把 relay 地址改为 Edge Function 地址并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
+     - 备注：v3 主线不包含旧部署线的 P15 自定义背景 / P6 黑夜模式全局切换 / P16 图床 UI（保留在 `backup-before-cleanup` 分支，需要时可移植）。
 - **已知限制（未变）**：member_key 即全权凭证（blob 整份读写，v1.7.0 已加乐观锁缓解覆盖竞态）；地址/QQ 等 PII 仍随 blob 下发，商用前需拆表；默认图床 SSL 过期问题（P14）未处理。
 - **测试**：`tests/`（vitest + jsdom），harness 加载 index.html + js 模块；新增 js 模块需加入 `tests/helpers/aoi.js` 的 MODULES 列表。
 - **⚠️ 2026-09-06 数据事故记录**：生产站旧前端陈旧内存覆盖曾清空 cyberbutter 团 blob（orders 34→0），当日经备份还原至 32 条（**经与部署者确认为测试数据**）。取证结论：使用者真实数据 = 旧表 `leader_data` 中 `ICGPClick` 键 12 条订单（归属 2360690621@qq.com，已导出 `backups/`）；团员地址/QQ/凭证及 8/16 后录入的数据因当时保存缺陷从未落库，不可恢复。完整过程见 `docs/ITERATION_LOG.md` 第 6 轮。

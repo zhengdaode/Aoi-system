@@ -145,6 +145,7 @@ Aoi.enterApp = async function () {
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
   Aoi.orders.renderCnChanges();
+  Aoi.orders.renderBuyers();
   Aoi.img.renderSettings();
   Aoi.bot.renderSettings();
   Aoi.calc.fillForm();

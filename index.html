@@ -189,6 +189,7 @@
           <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">基础数据</p>
           <div class="space-y-0.5">
             <a data-nav="view-activities" onclick="Aoi.nav('view-activities')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">活动管理</a>
+            <a data-nav="view-buyers" onclick="Aoi.nav('view-buyers')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">买家管理</a>
             <a data-nav="view-types" onclick="Aoi.nav('view-types')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">类型管理</a>
             <a data-nav="view-warehouse" onclick="Aoi.nav('view-warehouse')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">囤货地管理</a>
           </div>
@@ -572,16 +573,24 @@
             <datalist id="shipFuzzyOptions"></datalist>
           </div>
         </div>
+      </div>
+
+      <!-- 买家管理（v3.6.0 S1 自活动管理页迁出独立 tab） -->
+      <div id="view-buyers" data-view class="hidden grid gap-4 max-w-5xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <div class="flex items-center mb-2"><h3 class="font-bold">买家（CN）管理</h3><button onclick="Aoi.exportImage(this)" data-table="buyerTable" data-name="买家列表" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="buyerTable" data-name="买家列表" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
-          <p class="text-sm text-gray-500 mb-3">列出所有买家圈名，删除后清除其订单/交费/地址/通知等记录。删除前请确认其无未处理完的订单</p>
+          <div class="flex items-center mb-2"><h3 class="font-bold">买家管理</h3><button onclick="Aoi.exportImage(this)" data-table="buyerTable" data-name="买家列表" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="buyerTable" data-name="买家列表" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
+          <p class="text-sm text-gray-500 mb-3">列出所有买家圈名；点击圈名查看其全部订单（订单按状态着色：灰=未到货、琥珀=已到货待发货、绿=已发货/已收货）。删除后清除其订单/交费/地址/通知等记录，删除前请确认其无未处理完的订单</p>
+          <input id="buyerSearch" type="text" placeholder="筛选圈名…" oninput="Aoi.orders.renderBuyers()" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3">
           <div class="overflow-x-auto">
             <table id="buyerTable" class="w-full text-sm data-table">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="px-2 py-2 text-right w-8">行号</th>
                 <th class="px-3 py-2">圈名（CN）</th>
                 <th class="px-3 py-2 text-right">订单数</th>
-                <th class="px-3 py-2 text-right">未处理完</th>
+                <th class="px-3 py-2 text-right">未到货</th>
+                <th class="px-3 py-2 text-right">待发货</th>
+                <th class="px-3 py-2 text-right">已发待收</th>
+                <th class="px-3 py-2 text-right">已完成</th>
                 <th class="px-3 py-2"></th>
               </tr></thead>
               <tbody id="buyerTbody"></tbody>

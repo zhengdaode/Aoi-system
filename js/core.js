@@ -39,6 +39,8 @@ Aoi.nav = function (viewId) {
   if (viewId === 'view-limits' && Aoi.limits) Aoi.limits.render();
   // 进入复盘统计页时按当前数据重算（v3.5.0 F6）
   if (viewId === 'view-stats' && Aoi.stats) Aoi.stats.render();
+  // 进入买家管理页时重渲染买家列表（v3.6.0 S1）
+  if (viewId === 'view-buyers' && Aoi.orders) Aoi.orders.renderBuyers();
 };
 
 // 移动端侧边栏抽屉：无参切换，true 展开 / false 收起
@@ -294,6 +296,7 @@ Aoi.refreshViews = function () {
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
   Aoi.orders.renderCnChanges();
+  Aoi.orders.renderBuyers();
   Aoi.overview.render();
   if (Aoi.limits) Aoi.limits.render();
   if (Aoi.stats) Aoi.stats.render();

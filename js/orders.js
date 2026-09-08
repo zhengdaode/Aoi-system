@@ -413,10 +413,19 @@ Aoi.orders.refillAllBatchSelects = function () {
 
 // —— 渲染 ——
 
-Aoi.orders.statusBadge = function (status) {
-  var s = status || '未到货';
-  var cls = s === '已到货' ? 'text-green-600' : 'text-gray-400';
-  return '<span class="' + cls + '">' + Aoi.escapeHtml(s) + '</span>';
+// 组合状态（v3.6.0 S1）：到货 × 发货 × 收货 → 四态徽标（未到货灰 / 待发货琥珀 / 已发货绿 / 已收货深绿）
+Aoi.orders.combinedStatus = function (o) {
+  var arrived = (o.status || '未到货') === '已到货';
+  if (!arrived) return { text: '未到货', cls: 'text-gray-400' };
+  if ((o.shipped || '未发') !== '已发') return { text: '已到货·待发货', cls: 'text-amber-500' };
+  return o.received
+    ? { text: '已收货', cls: 'text-green-700 font-semibold' }
+    : { text: '已发货', cls: 'text-green-600' };
+};
+
+Aoi.orders.statusBadge = function (o) {
+  var s = Aoi.orders.combinedStatus(o);
+  return '<span class="' + s.cls + '">' + Aoi.escapeHtml(s.text) + '</span>';
 };
 
 // 人民币价显示：未生成（null）时显示占位（v1.8.0 直输外币模式允许人民币价留空）
@@ -469,7 +478,7 @@ Aoi.orders.render = function () {
       + '<td data-label="数量" class="px-3 py-2 text-right">' + o.count + '</td>'
       + '<td data-label="购买者" class="px-3 py-2 wrap" title="' + Aoi.escapeHtml(o.buyer) + '">' + Aoi.escapeHtml(o.buyer) + '</td>'
       + '<td data-label="备注" class="px-3 py-2"><div class="remark-cell" title="点击展开/收起" onclick="Aoi.orders.toggleRemark(this)">' + Aoi.escapeHtml(o.remark || '—') + '</div></td>'
-      + '<td data-label="到货状态" class="px-3 py-2">' + Aoi.orders.statusBadge(o.status) + '</td>'
+      + '<td data-label="到货状态" class="px-3 py-2">' + Aoi.orders.statusBadge(o) + '</td>'
       + '<td data-label="到货批次" class="px-3 py-2">' + Aoi.escapeHtml(o.batchId ? Aoi.orders.batchDate(o.batchId) : '—') + '</td>'
       + '<td data-label="小计" class="px-3 py-2 text-right wrap">' + (o.price != null ? sum.toFixed(2) : '—') + '</td>'
       + '<td data-label="操作" class="px-3 py-2"><button data-edit="' + o.id + '" class="text-blue-600 hover:underline text-xs whitespace-nowrap">编辑</button></td>'
@@ -763,7 +772,6 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="12" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
-  Aoi.orders.renderBuyers();
 };
 
 Aoi.orders.addActivity = async function () {
@@ -861,23 +869,44 @@ Aoi.orders.purgeBuyer = function (d, buyer) {
   if (d.memberMeta && d.memberMeta[buyer]) delete d.memberMeta[buyer];
 };
 
-// 渲染买家（CN）列表
+// 渲染买家列表（v3.6.0 S1：状态分桶计数 + 圈名点击筛选其订单 + 圈名搜索）
 Aoi.orders.renderBuyers = function () {
   var d = Aoi.orders.ensure();
   var tbody = document.getElementById('buyerTbody');
   if (!tbody) return;
+  var kwEl = document.getElementById('buyerSearch');
+  var kw = kwEl ? kwEl.value.trim().toLowerCase() : '';
   var buyers = Aoi.orders.collectBuyers(d);
+  if (kw) buyers = buyers.filter(function (b) { return b.toLowerCase().indexOf(kw) >= 0; });
   tbody.innerHTML = buyers.length ? buyers.map(function (buyer, i) {
-    var total = (d.orders || []).filter(function (o) { return o.buyer === buyer; }).length;
-    var unfinished = Aoi.orders.buyerUnfinished(d, buyer);
+    var mine = (d.orders || []).filter(function (o) { return o.buyer === buyer; });
+    var bucket = { arrive: 0, toShip: 0, shipped: 0, done: 0 };
+    mine.forEach(function (o) {
+      var s = Aoi.orders.combinedStatus(o);
+      if (s.text === '未到货') bucket.arrive++;
+      else if (s.text === '已到货·待发货') bucket.toShip++;
+      else if (s.text === '已发货') bucket.shipped++;
+      else bucket.done++;
+    });
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2 font-medium">' + Aoi.escapeHtml(buyer) + '</td>'
-      + '<td class="px-3 py-2 text-right text-gray-400">' + total + '</td>'
-      + '<td class="px-3 py-2 text-right ' + (unfinished ? 'text-amber-500' : 'text-green-600') + '">' + unfinished + '</td>'
+      + '<td class="px-3 py-2 font-medium"><button data-buyer-jump="' + Aoi.escapeHtml(buyer) + '" class="text-blue-600 hover:underline" title="查看该买家的全部订单">' + Aoi.escapeHtml(buyer) + '</button></td>'
+      + '<td class="px-3 py-2 text-right">' + mine.length + '</td>'
+      + '<td class="px-3 py-2 text-right ' + (bucket.arrive ? 'text-gray-500' : 'text-gray-300') + '">' + bucket.arrive + '</td>'
+      + '<td class="px-3 py-2 text-right ' + (bucket.toShip ? 'text-amber-500' : 'text-gray-300') + '">' + bucket.toShip + '</td>'
+      + '<td class="px-3 py-2 text-right ' + (bucket.shipped ? 'text-green-600' : 'text-gray-300') + '">' + bucket.shipped + '</td>'
+      + '<td class="px-3 py-2 text-right ' + (bucket.done ? 'text-green-700' : 'text-gray-300') + '">' + bucket.done + '</td>'
       + '<td class="px-3 py-2 text-right"><button data-del-buyer="' + Aoi.escapeHtml(buyer) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无买家</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="px-3 py-2 text-gray-400">' + (kw ? '无匹配圈名' : '暂无买家') + '</td></tr>';
+};
+
+// 跳转订单管理并按该买家筛选（v3.6.0 S1）
+Aoi.orders.jumpToBuyer = function (buyer) {
+  Aoi.nav('view-orders');
+  var f = document.getElementById('fBuyer');
+  if (f) f.value = buyer;
+  Aoi.orders.render();
 };
 
 // 手动删除买家（CN）
@@ -1126,6 +1155,8 @@ Aoi.orders.saveActTrack = async function () {
   Aoi.toast('已保存快递单号 ' + d.activityMeta[name].trackings.length + ' 个', 'success');
 };
 document.getElementById('buyerTbody').addEventListener('click', function (e) {
+  var jump = e.target.closest('button[data-buyer-jump]');
+  if (jump) { Aoi.orders.jumpToBuyer(jump.getAttribute('data-buyer-jump')); return; }
   var btn = e.target.closest('button[data-del-buyer]');
   if (btn) Aoi.orders.removeBuyer(btn.getAttribute('data-del-buyer'));
 });

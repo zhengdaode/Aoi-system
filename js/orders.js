@@ -760,6 +760,7 @@ Aoi.orders.renderActivities = function () {
     var buyers = m.buyers || [];
     var trackings = m.trackings || [];
     var products = m.products || [];
+    var plan = (d.limitPlans && d.limitPlans[name]) || null;
     return '<tr class="border-b border-gray-100 align-top">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2 font-semibold whitespace-nowrap"><button data-jump="' + Aoi.escapeHtml(name) + '" class="text-blue-600 hover:underline text-left">' + Aoi.escapeHtml(name) + '</button></td>'
@@ -772,10 +773,11 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (buyers.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (buyers.length ? buyers.length + ' 人' : '填写') + '</button></td>'
       + '<td class="px-3 py-2"><button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? trackings.length + ' 个' : '填写') + '</button></td>'
       + '<td class="px-3 py-2"><button data-act-products="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (products.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (products.length ? products.length + ' 个' : '商品') + '</button></td>'
+      + '<td class="px-3 py-2"><button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '计划') + '</button></td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.remark || '') + '" placeholder="备注" data-activity="' + Aoi.escapeHtml(name) + '" data-field="remark" class="border border-gray-300 rounded px-2 py-1 text-sm w-32"></td>'
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="13" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+  }).join('') : '<tr><td colspan="14" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
 };
 
 Aoi.orders.addActivity = async function () {
@@ -1017,6 +1019,8 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
   var pr = e.target.closest('button[data-act-products]');
   if (pr) { Aoi.orders.openActProducts(pr.getAttribute('data-act-products')); return; }
+  var pl = e.target.closest('button[data-act-plan]');
+  if (pl) { Aoi.limits.openActPlan(pl.getAttribute('data-act-plan')); return; }
   var t = e.target.closest('button[data-act-track]');
   if (t) Aoi.orders.openActTrack(t.getAttribute('data-act-track'));
 });

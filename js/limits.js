@@ -261,7 +261,7 @@ Aoi.limits.load = function () {
       + '<td class="px-3 py-2"><input type="number" step="1" min="0" placeholder="不限" data-lim="' + key + '" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">该活动暂无订单</td></tr>';
-  document.getElementById('limResultBox').classList.add('hidden');
+  Aoi.limits.renderSaved(activity); // 已有计划则展示（双向同步入口）
 };
 
 // 批量设置限购数：应用到全部商品行
@@ -283,8 +283,8 @@ Aoi.limits.refillActivities = function () {
   Aoi.limits.load();
 };
 
-// 计算购买计划
-Aoi.limits.plan = function () {
+// 计算购买计划（v3.6.0 S3：结果入库 d.limitPlans 并与活动管理侧双向同步）
+Aoi.limits.plan = async function () {
   var activity = document.getElementById('limActivity').value;
   if (!activity) { Aoi.toast('请先选择活动', 'warning'); return; }
   var products = Aoi.limits.productsForActivity(activity);
@@ -305,7 +305,40 @@ Aoi.limits.plan = function () {
   if (isNaN(accounts) || accounts <= 0) { Aoi.toast('请填写可使用的账号数量', 'warning'); return; }
 
   var result = Aoi.limits.planCore(products, { freeShip: freeShipRmb, accounts: accounts, maxTypes: maxTypes });
-  Aoi.limits.renderResult(activity, result, freeShip, freeShipRmb, freeCur);
+
+  // 计划入库：同名 (账号,商品) 保留既有购买状态，其余重置为待购买
+  var d = Aoi.orders.ensure();
+  if (!d.limitPlans) d.limitPlans = {};
+  var prevStatus = {};
+  ((d.limitPlans[activity] || {}).items || []).forEach(function (a) {
+    (a.items || []).forEach(function (it) { prevStatus[a.index + '|' + it.type + '|' + it.model] = it.status; });
+  });
+  var stored = {
+    activity: activity,
+    freeShip: freeShip, freeShipRmb: freeShipRmb, freeCur: freeCur,
+    accountsCount: accounts, maxTypes: maxTypes, limits: limits,
+    items: result.accounts.map(function (a) {
+      return {
+        index: a.index, total: a.total, diff: a.diff, reached: a.reached,
+        items: a.items.map(function (it) {
+          return {
+            type: it.type, model: it.model, qty: it.qty,
+            price: it.qty ? Math.round(it.amount / it.qty * 100) / 100 : 0,
+            amount: it.amount,
+            status: prevStatus[a.index + '|' + it.type + '|' + it.model] || '待购买'
+          };
+        })
+      };
+    }),
+    remaining: result.remaining,
+    updatedAt: new Date().toISOString()
+  };
+  d.limitPlans[activity] = stored;
+  Aoi.limits.renderPlan(stored);
+  var box = document.getElementById('limResultBox');
+  if (box) box.classList.remove('hidden');
+  Aoi.orders.renderActivities(); // 活动行「计划」按钮同步账号数
+  await Aoi.saveTeamData(d);
 };
 
 // 币种符号（与订单表 formatOrig 同规则）
@@ -328,44 +361,268 @@ Aoi.limits.origTotals = function (items, meta) {
   });
 };
 
-// 渲染结果表（freeShip = 所选币种金额；freeShipRmb = 换算后人民币包邮线）
-Aoi.limits.renderResult = function (activity, result, freeShip, freeShipRmb, freeCur) {
-  if (freeShipRmb == null) { freeShipRmb = freeShip; freeCur = 'cny'; }
-  var tbody = document.getElementById('limResultTbody');
-  var stat = document.getElementById('limResultStat');
-  var box = document.getElementById('limResultBox');
-  var hasFree = freeShipRmb > 0;
+// —— 购买计划双向同步（v3.6.0 S3）——
+
+// 购买状态与配色
+Aoi.limits.STATUS_OPTIONS = ['待购买', '已购买', '购买失败'];
+Aoi.limits.statusCls = function (s) {
+  return s === '已购买' ? 'text-green-600' : (s === '购买失败' ? 'text-red-500' : 'text-gray-500');
+};
+
+// 在已存计划中定位 (账号 idx, 商品 key)
+Aoi.limits.findItem = function (stored, idx, key) {
+  var acc = null;
+  (stored.items || []).forEach(function (a) { if (a.index === idx) acc = a; });
+  if (!acc) return null;
+  var found = null;
+  (acc.items || []).forEach(function (it) { if (it.type + '|' + it.model === key) found = it; });
+  return found;
+};
+
+// 重算某账号的金额 / 差额 / 包邮状态（件数或内容变化后）
+Aoi.limits.recomputeAccount = function (stored, acc) {
+  var total = 0;
+  (acc.items || []).forEach(function (it) { total += it.amount || 0; });
+  acc.total = Math.round(total * 100) / 100;
+  var free = stored.freeShipRmb || 0;
+  acc.diff = Math.round(Math.max(0, free - acc.total) * 100) / 100;
+  acc.reached = free <= 0 || acc.total >= free - 1e-6;
+};
+
+// 失败重分配（纯函数）：把 (账号 idx, 商品 key) 整项移出，按「原计算器阶段一」同款贪心
+// （逐件分给金额最低的可收账号）分配给其余账号；受 plan.limits 单账号限购与
+// plan.maxTypes 种类上限约束，装不下的余量计入 plan.remaining。返回深拷贝新 plan，不改入参。
+Aoi.limits.reallocateCore = function (stored, idx, key) {
+  var plan = JSON.parse(JSON.stringify(stored));
+  var out = { plan: plan, moved: [], remaining: 0 };
+  var from = null;
+  (plan.items || []).forEach(function (a) { if (a.index === idx) from = a; });
+  if (!from) return out;
+  var fi = -1, item = null;
+  (from.items || []).forEach(function (it, i) { if (it.type + '|' + it.model === key) { item = it; fi = i; } });
+  if (!item) return out;
+  from.items.splice(fi, 1);
+  from.total = Math.round((from.total - (item.amount || 0)) * 100) / 100;
+
+  var limit = (plan.limits && plan.limits[key]) || 0;   // 0/缺失 = 不限
+  var movedMap = {};
+  var left = item.qty;
+  while (left > 0) {
+    var best = null;
+    (plan.items || []).forEach(function (a) {
+      if (a.index === idx) return;                       // 失败账号不再接收该商品
+      var held = 0, hasKey = false;
+      (a.items || []).forEach(function (it) { if (it.type + '|' + it.model === key) { held = it.qty; hasKey = true; } });
+      if (limit > 0 && held + 1 > limit) return;         // 单账号限购
+      if (plan.maxTypes > 0 && !hasKey && a.items.length >= plan.maxTypes) return; // 种类上限
+      if (!best || a.total < best.total - 1e-6) best = a;
+    });
+    if (!best) break;
+    var ex = null;
+    (best.items || []).forEach(function (it) { if (it.type + '|' + it.model === key) ex = it; });
+    if (ex) { ex.qty += 1; ex.amount = Math.round((ex.amount + (item.price || 0)) * 100) / 100; }
+    else (best.items = best.items || []).push({ type: item.type, model: item.model, qty: 1, price: item.price || 0, amount: Math.round((item.price || 0) * 100) / 100, status: '待购买' });
+    best.total = Math.round((best.total + (item.price || 0)) * 100) / 100;
+    movedMap[best.index] = (movedMap[best.index] || 0) + 1;
+    left--;
+  }
+  out.moved = Object.keys(movedMap).map(function (i) { return { index: parseInt(i, 10), qty: movedMap[i] }; });
+  out.remaining = left;
+  if (left > 0) {
+    plan.remaining = plan.remaining || [];
+    var found = null;
+    plan.remaining.forEach(function (r) { if (r.type === item.type && r.model === item.model) found = r; });
+    if (found) found.qty += left; else plan.remaining.push({ type: item.type, model: item.model, qty: left });
+  }
+  plan.items.forEach(function (a) { Aoi.limits.recomputeAccount(plan, a); });
+  return out;
+};
+
+// 渲染已存计划（限购计划结果表 / 活动管理计划弹窗共用；8 列，件数与购买状态可编辑）
+Aoi.limits.renderPlan = function (stored, tbodyId, statId) {
+  var tbody = document.getElementById(tbodyId || 'limResultTbody');
+  var stat = document.getElementById(statId || 'limResultStat');
+  if (!tbody) return;
   var meta = {};
-  Aoi.limits.productsForActivity(activity).forEach(function (p) { meta[p.type + '|' + p.model] = p; });
-  tbody.innerHTML = result.accounts.length ? result.accounts.map(function (a, i) {
-    var content = a.items.map(function (it) { return it.type + '-' + it.model + ' ×' + it.qty; }).join('，');
+  Aoi.limits.productsForActivity(stored.activity).forEach(function (p) { meta[p.type + '|' + p.model] = p; });
+  var hasFree = (stored.freeShipRmb || 0) > 0;
+  var rows = (stored.items || []).filter(function (a) { return a.items && a.items.length; });
+  tbody.innerHTML = rows.length ? rows.map(function (a, i) {
+    var content = a.items.map(function (it) {
+      return '<div class="flex items-center gap-1 flex-wrap mb-0.5">'
+        + '<span>' + Aoi.escapeHtml(it.type + '-' + it.model) + '</span>'
+        + '<input type="number" min="0" step="1" value="' + it.qty + '" data-plan-qty data-activity="' + Aoi.escapeHtml(stored.activity) + '" data-idx="' + a.index + '" data-key="' + Aoi.escapeHtml(it.type + '|' + it.model) + '" title="修改件数后自动重算并同步到另一侧" class="w-14 border border-gray-300 rounded px-1 py-0.5 text-xs">'
+        + '<span class="text-xs text-gray-400">件</span></div>';
+    }).join('');
     var pieces = a.items.reduce(function (s, it) { return s + it.qty; }, 0);
     var origs = Aoi.limits.origTotals(a.items, meta);
     var shipCell = !hasFree ? '—'
-      : (a.reached ? '<span class="text-green-600">已达包邮</span>' : '<span class="text-amber-500">差 ' + a.diff.toFixed(2) + '</span>');
+      : (a.reached ? '<span class="text-green-600">已达包邮</span>' : '<span class="text-amber-500">差 ' + (a.diff == null ? 0 : a.diff).toFixed(2) + '</span>');
+    var statusCell = a.items.map(function (it) {
+      return '<div class="mb-0.5"><select data-plan-status data-activity="' + Aoi.escapeHtml(stored.activity) + '" data-idx="' + a.index + '" data-key="' + Aoi.escapeHtml(it.type + '|' + it.model) + '" class="border border-gray-300 rounded px-1 py-0.5 text-xs ' + Aoi.limits.statusCls(it.status) + '">'
+        + Aoi.limits.STATUS_OPTIONS.map(function (s) {
+          return '<option value="' + s + '"' + (s === it.status ? ' selected' : '') + '>' + s + '</option>';
+        }).join('') + '</select></div>';
+    }).join('');
     return '<tr class="border-b border-gray-100 align-top">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2 wrap">账号 ' + a.index + '</td>'
-      + '<td class="px-3 py-2 wrap">' + Aoi.escapeHtml(content) + '</td>'
+      + '<td class="px-3 py-2 wrap">' + content + '</td>'
       + '<td class="px-3 py-2 text-right">' + pieces + '</td>'
-      + '<td class="px-3 py-2 text-right">' + a.total.toFixed(2) + '</td>'
+      + '<td class="px-3 py-2 text-right">' + (a.total == null ? 0 : a.total).toFixed(2) + '</td>'
       + '<td class="px-3 py-2 text-right">' + (origs.length ? Aoi.escapeHtml(origs.join(' + ')) : '—') + '</td>'
       + '<td class="px-3 py-2 text-right">' + shipCell + '</td>'
+      + '<td class="px-3 py-2">' + statusCell + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">无可分配内容</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="px-3 py-2 text-gray-400">无可分配内容</td></tr>';
 
-  var remainText = result.remaining.length
-    ? '⚠️ 剩余未分配（限购/种类数装不下，需加账号或放宽限购）：' + result.remaining.map(function (r) { return r.type + '-' + r.model + ' ×' + r.qty; }).join('，')
-    : '全部排单数量已分配完毕';
-  var reachedCnt = result.accounts.filter(function (a) { return a.reached; }).length;
-  var reachText = hasFree ? '，' + reachedCnt + ' 个达标包邮' : '';
-  var curSym = Aoi.limits.currencySymbol(freeCur);
-  var freeShipText = freeCur === 'cny'
-    ? '包邮线 ¥' + freeShipRmb.toFixed(2)
-    : '包邮线 ' + curSym + freeShip + '（≈ ¥' + freeShipRmb.toFixed(2) + '）';
-  stat.textContent = '活动「' + activity + '」· ' + freeShipText + ' · 分配 ' + result.accounts.length + ' 个账号' + reachText + ' · ' + remainText;
-  box.classList.remove('hidden');
+  if (stat) {
+    var remainText = (stored.remaining || []).length
+      ? '⚠️ 剩余未分配（限购/种类数装不下，需加账号或放宽限购）：' + stored.remaining.map(function (r) { return r.type + '-' + r.model + ' ×' + r.qty; }).join('，')
+      : '全部排单数量已分配完毕';
+    var reachedCnt = rows.filter(function (a) { return a.reached; }).length;
+    var reachText = hasFree ? '，' + reachedCnt + ' 个达标包邮' : '';
+    var curSym = Aoi.limits.currencySymbol(stored.freeCur || 'cny');
+    var freeShipText = (stored.freeCur || 'cny') === 'cny'
+      ? '包邮线 ¥' + (stored.freeShipRmb || 0).toFixed(2)
+      : '包邮线 ' + curSym + stored.freeShip + '（≈ ¥' + (stored.freeShipRmb || 0).toFixed(2) + '）';
+    stat.textContent = '活动「' + stored.activity + '」· ' + freeShipText + ' · 分配 ' + rows.length + ' 个账号' + reachText + ' · ' + remainText;
+  }
 };
+
+// 限购计划页：按已存计划渲染结果区（无计划时收起）
+Aoi.limits.renderSaved = function (activity) {
+  var d = Aoi.orders.ensure();
+  var stored = (d.limitPlans || {})[activity];
+  var box = document.getElementById('limResultBox');
+  if (!stored) { if (box) box.classList.add('hidden'); return; }
+  Aoi.limits.renderPlan(stored);
+  if (box) box.classList.remove('hidden');
+};
+
+// 活动管理侧：购买计划弹窗
+Aoi.limits.actTarget = null;
+
+Aoi.limits.openActPlan = function (name) {
+  Aoi.limits.actTarget = name;
+  var t = document.getElementById('actPlanTitle');
+  if (t) t.textContent = '活动：' + name;
+  Aoi.limits.renderActPlan();
+  document.getElementById('actPlanModal').classList.remove('hidden');
+};
+
+Aoi.limits.closeActPlan = function () {
+  document.getElementById('actPlanModal').classList.add('hidden');
+  Aoi.limits.actTarget = null;
+};
+
+Aoi.limits.renderActPlan = function () {
+  var body = document.getElementById('actPlanBody');
+  if (!body) return;
+  var d = Aoi.orders.ensure();
+  var stored = Aoi.limits.actTarget && d.limitPlans && d.limitPlans[Aoi.limits.actTarget];
+  if (!stored) {
+    body.innerHTML = '<p class="text-sm text-gray-400 py-3">该活动还没有购买计划——到「工具 → 限购计划」选择本活动、设置限购与账号数后点「计算购买计划」，结果会自动同步到这里</p>';
+    return;
+  }
+  body.innerHTML = '<p id="actPlanStat" class="text-xs text-gray-500 mb-2"></p>'
+    + '<table class="w-full text-sm data-table"><thead><tr class="text-left text-gray-500 border-b border-gray-200">'
+    + '<th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">账号</th><th class="px-3 py-2">购买内容</th>'
+    + '<th class="px-3 py-2 text-right">件数</th><th class="px-3 py-2 text-right">金额(¥)</th><th class="px-3 py-2 text-right">外币原价</th>'
+    + '<th class="px-3 py-2 text-right">包邮状态</th><th class="px-3 py-2">购买状态</th>'
+    + '</tr></thead><tbody id="actPlanTbody"></tbody></table>';
+  Aoi.limits.renderPlan(stored, 'actPlanTbody', 'actPlanStat');
+};
+
+// 双侧重渲染：限购计划结果表（若正选着该活动）+ 活动计划弹窗（若开着）+ 活动行按钮文案
+Aoi.limits.rerenderAll = function (activity) {
+  var d = Aoi.orders.ensure();
+  var stored = (d.limitPlans || {})[activity];
+  if (!stored) return;
+  var limSel = document.getElementById('limActivity');
+  if (limSel && limSel.value === activity) {
+    Aoi.limits.renderPlan(stored, 'limResultTbody', 'limResultStat');
+    var box = document.getElementById('limResultBox');
+    if (box) box.classList.remove('hidden');
+  }
+  var modal = document.getElementById('actPlanModal');
+  if (Aoi.limits.actTarget === activity && modal && !modal.classList.contains('hidden')) Aoi.limits.renderActPlan();
+  var activeCount = stored.items.filter(function (a) { return a.items.length; }).length;
+  document.querySelectorAll('button[data-act-plan]').forEach(function (b) {
+    if (b.getAttribute('data-act-plan') === activity) b.textContent = activeCount ? '计划·' + activeCount + '账号' : '计划';
+  });
+};
+
+// 件数编辑：重算金额与包邮状态后保存并双侧同步
+Aoi.limits.setItemQty = async function (activity, idx, key, qty) {
+  var d = Aoi.orders.ensure();
+  if (!d.limitPlans || !d.limitPlans[activity]) return;
+  var stored = d.limitPlans[activity];
+  var item = Aoi.limits.findItem(stored, idx, key);
+  if (!item) return;
+  qty = Math.max(0, isNaN(qty) ? 0 : qty);
+  item.qty = qty;
+  item.amount = Math.round(qty * (item.price || 0) * 100) / 100;
+  var acc = null;
+  (stored.items || []).forEach(function (a) { if (a.index === idx) acc = a; });
+  if (acc) Aoi.limits.recomputeAccount(stored, acc);
+  await Aoi.saveTeamData(d);
+  Aoi.limits.rerenderAll(activity);
+};
+
+// 购买状态确认；切到「购买失败」时二次确认并自动重分配给剩余账号
+Aoi.limits.setItemStatus = async function (activity, idx, key, status) {
+  var d = Aoi.orders.ensure();
+  if (!d.limitPlans || !d.limitPlans[activity]) return;
+  var stored = d.limitPlans[activity];
+  var item = Aoi.limits.findItem(stored, idx, key);
+  if (!item) return;
+  if (status === '购买失败' && item.status !== '购买失败') {
+    var ok = await Aoi.confirm(
+      '确认账号 ' + idx + ' 的「' + key.replace('|', '-') + '」购买失败？将把 ' + item.qty + ' 件按原计算器规则重新分配给其余账号（受限购/种类上限约束，30 秒内可撤销）',
+      { title: '购买失败 · 自动重分配', okText: '确认失败并重分配', danger: true });
+    if (!ok) return 'cancel';
+    Aoi.undo.arm('购买失败重分配', d);
+    var r = Aoi.limits.reallocateCore(stored, idx, key);
+    d.limitPlans[activity] = r.plan;
+    await Aoi.saveTeamData(d);
+    Aoi.limits.rerenderAll(activity);
+    Aoi.toast(r.remaining
+      ? ('已重分配 ' + (item.qty - r.remaining) + ' 件；' + r.remaining + ' 件受限购/种类上限无处安放，计入剩余未分配')
+      : ('已把 ' + item.qty + ' 件重新分配给其余账号'), r.remaining ? 'warning' : 'success');
+    return;
+  }
+  item.status = status;
+  await Aoi.saveTeamData(d);
+  Aoi.limits.rerenderAll(activity);
+};
+
+// 计划表格内控件的事件委托（限购结果表与活动计划弹窗共用）
+Aoi.limits.onPlanStatus = function (sel) {
+  var p = Aoi.limits.setItemStatus(
+    sel.getAttribute('data-activity'),
+    parseInt(sel.getAttribute('data-idx'), 10),
+    sel.getAttribute('data-key'),
+    sel.value
+  );
+  p.then(function (r) { if (r === 'cancel') Aoi.limits.rerenderAll(sel.getAttribute('data-activity')); });
+};
+
+Aoi.limits.onPlanQty = function (input) {
+  Aoi.limits.setItemQty(
+    input.getAttribute('data-activity'),
+    parseInt(input.getAttribute('data-idx'), 10),
+    input.getAttribute('data-key'),
+    parseInt(input.value, 10)
+  );
+};
+
+document.addEventListener('change', function (e) {
+  var sel = e.target.closest ? e.target.closest('select[data-plan-status]') : null;
+  if (sel) { Aoi.limits.onPlanStatus(sel); return; }
+  var qty = e.target.closest ? e.target.closest('input[data-plan-qty]') : null;
+  if (qty) Aoi.limits.onPlanQty(qty);
+});
 
 // 刷新（视图切换 / 数据变化后）
 Aoi.limits.render = function () {

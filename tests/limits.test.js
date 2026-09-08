@@ -140,6 +140,7 @@ describe('Aoi.tableExport（v2.0.0 问题 9）', () => {
 
 describe('Aoi.limits 限购计算器（v3.2.0 T2：活动刷新 + 包邮金额币种 + 外币原价）', () => {
   beforeEach(() => {
+    aoi.saveTeamData = vi.fn().mockResolvedValue(undefined); // v3.6.0 S3：plan 结果入库
     aoi.state.data = {
       activities: ['2026春团'],
       orders: [
@@ -196,6 +197,7 @@ describe('Aoi.limits 限购计算器（v3.2.0 T2：活动刷新 + 包邮金额�
 
 describe('Aoi.limits 结果表件数与外币原价列（v3.5.4）', () => {
   beforeEach(() => {
+    aoi.saveTeamData = vi.fn().mockResolvedValue(undefined); // v3.6.0 S3：plan 结果入库
     aoi.state.data = {
       activities: ['2026春团'],
       orders: [
@@ -221,16 +223,20 @@ describe('Aoi.limits 结果表件数与外币原价列（v3.5.4）', () => {
     expect(aoi.limits.origTotals([{ type: '立牌', model: 'M3', qty: 1 }], meta)).toEqual([]);
   });
 
-  it('结果表 7 列：件数为账号合计，外币原价逐件累加按币种分组', () => {
+  it('结果表 8 列（v3.6.0 增购买状态列）：件数为账号合计，外币原价逐件累加按币种分组', async () => {
     doc.getElementById('limActivity').innerHTML = '<option value="2026春团" selected>2026春团</option>';
     doc.getElementById('limActivity').value = '2026春团';
     aoi.limits.load();
     doc.getElementById('limFreeShip').value = '0';
     doc.getElementById('limAccounts').value = '2';
-    aoi.limits.plan();
-    expect(doc.querySelectorAll('#limResultTable thead th')).toHaveLength(7);
+    await aoi.limits.plan();
+    expect(doc.querySelectorAll('#limResultTable thead th')).toHaveLength(8);
+    // v3.6.0 S3：计划入库
+    expect(aoi.state.data.limitPlans['2026春团']).toBeTruthy();
     const rows = [...doc.querySelectorAll('#limResultTbody tr')];
     expect(rows).toHaveLength(2);
+    // 每行带可编辑的购买状态下拉
+    expect(doc.querySelectorAll('#limResultTbody select[data-plan-status]').length).toBeGreaterThan(0);
     const cells = rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent));
     // 均衡分配：账号1 = M1×2（件数 2、日元原价 2×1250）；账号2 = M1×1+M2×1（件数 2、原价 1250；人民币单无原价不计）
     expect(cells[0][3]).toBe('2');

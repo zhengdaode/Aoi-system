@@ -173,11 +173,24 @@ Aoi.exportFilterRows = function (clone, ids) {
   return clone;
 };
 
-// 导出表格为 PNG 图片（html2canvas）。按钮需带 data-table（表 id）+ data-name（文件名）
+// 导出文件基础名（v3.6.0 S5）：data-name = 表格类型；按钮可带 data-activity-from="<下拉id>"，
+// 该下拉当前选中活动非空时文件名变为「活动名-表格类型」（非法文件名字符替换为 -，空则维持原名）
+Aoi.exportBaseName = function (btn) {
+  var name = btn.getAttribute('data-name') || '表格';
+  var fromId = btn.getAttribute('data-activity-from');
+  if (!fromId) return name;
+  var el = document.getElementById(fromId);
+  var act = el ? (el.value || '').trim() : '';
+  if (!act) return name;
+  return act.replace(/[\\/:*?"<>|]/g, '-') + '-' + name;
+};
+
+// 导出表格为 PNG 图片（html2canvas）。按钮需带 data-table（表 id）+ data-name（文件名），
+// 可选 data-activity-from（活动下拉 id，文件名自动加活动名前缀）
 // 表内有勾选行时询问：仅导出选中行（确定）/ 导出整表（取消）
 Aoi.exportImage = function (btn) {
   var id = btn.getAttribute('data-table');
-  var name = btn.getAttribute('data-name') || '表格';
+  var name = Aoi.exportBaseName(btn);
   var table = document.getElementById(id);
   if (!table) return;
   if (typeof html2canvas !== 'function') { Aoi.toast('图片导出组件未加载', 'error'); return; }
@@ -205,9 +218,10 @@ Aoi.exportImage = function (btn) {
 
 // 导出表格为文件（v2.0.0）：优先 SheetJS .xlsx，CDN 未加载时回退 CSV。
 // 按钮属性与 exportImage 一致：data-table（表 id）+ data-name（文件名）
+// + 可选 data-activity-from（活动下拉 id，v3.6.0 文件名加活动名前缀）
 Aoi.tableExport = function (btn) {
   var id = btn.getAttribute('data-table');
-  var name = btn.getAttribute('data-name') || '表格';
+  var name = Aoi.exportBaseName(btn);
   var table = document.getElementById(id);
   if (!table) return;
   if (typeof XLSX === 'object' && XLSX.utils) {

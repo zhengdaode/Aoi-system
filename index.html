@@ -444,7 +444,7 @@
           <select id="fActivity" onchange="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
           <select id="fBatch" onchange="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
           <span id="orderStat" class="text-sm text-gray-500"></span>
-          <button onclick="Aoi.exportImage(this)" data-table="orderTable" data-name="订单管理" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="orderTable" data-name="订单管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
+          <button onclick="Aoi.exportImage(this)" data-table="orderTable" data-name="订单管理" data-activity-from="fActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="orderTable" data-name="订单管理" data-activity-from="fActivity" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
         </div>
         <div class="flex flex-wrap items-center gap-3 mb-4">
           <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.orders.toggleAll(this)"> 全选</label>
@@ -928,7 +928,7 @@
         <div id="limResultBox" class="bg-white rounded-lg border border-gray-200 p-6 hidden">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">购买计划结果</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button>
+            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button>
           </div>
           <p id="limResultStat" class="text-sm text-gray-500 mb-2"></p>
           <div class="overflow-x-auto">

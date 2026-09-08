@@ -18,17 +18,17 @@
 **v3.2.0 第二批实测反馈迭代已实施完成**（2026-09-06，见 `docs/archive/PLAN-v3.2.0.md`）；
 **v3.3.0 冗余清理与重构已实施完成**（2026-09-07：死代码删除 / 重复实现合并 / 隐私快照清理 / 测试 134 用例 / 文档一致性）；
 **v3.4.0 数据安全兜底 + 团员感知已实施完成**（2026-09-08：B1 历史快照与备份卡 / B2 P1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / 测试 170 用例；线上库已应用并探针验证；F5 独立项目设计待审核、F6 demo 待管理层审核、F7/F8 取消）；
-**v3.5.0 从链接导入已实施完成**（2026-09-08：信息录入页粘贴排谷表/汇总表分享直链一键导入，直链无 CORS 头，经 netlify.toml `/media-proxy` 同源代理拉取、直连回退；测试 179 用例）；
+**v3.5.0 已实施完成**（2026-09-08 双特性：①从链接导入——信息录入页粘贴排谷表/汇总表分享直链一键导入，直链无 CORS 头，经 netlify.toml `/media-proxy` 同源代理拉取、直连回退；②F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js）+ `orders.shippedAt` 发货时间戳埋点，demo 路线取消、`demo/stats-demo/` 保留为历史产物（见 `docs/PLAN-F6-STATS.md`））；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
 ## 技术栈与架构速览
 
-- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 16 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
+- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 17 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
   核心模块：`core.js`（路由/通用）、`data.js`（Supabase 读写）、`auth.js`、`team.js`、`member.js`（团员端）、
   `orders.js`（订单/活动/批次/类型）、`calc.js`（汇率换算）、`intl.js`（国际运费分摊）、`approval.js`（交费审批）、
   `shipping.js`、`warehouse.js`、`notify.js`（通知 + QQ 推送入口）、`bot.js`（OneBot v11 客户端）、`import.js`、
-  `limits.js`（限购计算器）、`image-upload.js`。
+  `limits.js`（限购计算器）、`stats.js`（复盘统计）、`image-upload.js`。
 - 存储：Supabase 三表（`teams` / `team_members` / `team_data`）；**全部业务数据存在 `team_data.data` 一个 JSONB blob 里**，
   schema 与 RPC 见 `supabase-schema.sql`（手工在 SQL Editor 执行，无版本化迁移）。
 - QQ 机器人链路：前端 `js/bot.js` → `relay/relay.js`（ECS，校验登录态+owner/admin）→ NapCat（OneBot v11）。
@@ -49,6 +49,7 @@
 | `docs/ROADMAP.md` | **当前唯一有效路线图**：10 项问题 → v1.7.0–v2.0.0 任务分解 + P0 团员侧故障分析（基线已更新至 v3.3.0） |
 | `docs/PLAN-NEXT.md` | **下一轮计划（待批准）**：新功能（F1–F8）× 后端（B1–B7）双路线 + 版本切分 |
 | `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` | F5 QQ 机器人双向（独立项目）：详细功能设计，**待用户审核** |
+| `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
 | `docs/STATUS.md` | 权威状态：已完成阶段、数据模型（blob 结构）、已知限制、**遗留项与线上操作清单** |
 | `CLAUDE.md` | QQ 机器人接入专项（NapCat / relay / 安全红线） |
 | `README.md` | 功能、部署、安全、项目结构 |

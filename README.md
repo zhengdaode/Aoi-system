@@ -29,6 +29,7 @@
 | 买家（CN）管理 | 买家清单、未完成订单数、删除级联清理、改圈名审批全局迁移 |
 | 工具·计算器 | 中日韩汇率 + 加价公式（0.5 圆整），单笔/批量换算 |
 | 工具·限购计划 | **限购购买计划计算器**：选活动→设限购→填包邮金额/账号数/每账号种类上限，贪心装箱输出每账号购买清单与包邮状态，结果可导出 |
+| 工具·复盘统计 | **团期复盘统计（F6）**：按团期（月份）+ IP 筛选，9 项 KPI、按活动聚合（可导出）、IP/买家排行（口径切换、买家交费金额下钻）、币种分布、金额口径交费回收、按批次发货时效（`orders.shippedAt`）；只读统计不改数据 |
 | 团员端 | 凭**团员密钥 + 圈名**免登录：查订单/国际费/公告、**订单进度时间线**、提交凭证、确认收货、地址与 QQ 绑定（**掩码回执**） |
 | 导出 | 12 张数据表统一「**导出图片 / 下载表格**」双按钮（PNG / XLSX，CSV 回退） |
 | 数据安全 | **服务端历史快照**（每次保存自动存档，保留 30 天/100 份）+ 设置页一键备份/恢复；团员读写按 CN 白名单隔离（他人地址/QQ 不再随密钥下发） |
@@ -38,7 +39,7 @@
 
 ## 技术架构
 
-- **前端**：`index.html` + 16 个原生 JS 模块（全局 `window.Aoi` 命名空间），Tailwind CSS CDN。无框架、无构建。
+- **前端**：`index.html` + 17 个原生 JS 模块（全局 `window.Aoi` 命名空间），Tailwind CSS CDN。无框架、无构建。
 - **管理员体系（v3）**：部署时初始化超级管理员，应用内添加管理员（用户名/密码，bcrypt + token 会话）；不依赖 Supabase Auth，无自助注册。
 - **存储**：Supabase（PostgreSQL）三表 `teams` / `team_members` / `team_data`——全部业务数据存于 `team_data.data` 一个 JSONB blob；schema 与 RPC 见 [`supabase-schema.sql`](supabase-schema.sql)。
 - **QQ 机器人**：前端 `js/bot.js` → ECS 上的 [`relay/relay.js`](relay/relay.js)（校验登录态与 owner/admin 角色，NapCat 转发 ≥1s 节流）→ NapCat（OneBot v11）。token 只存服务端。
@@ -104,6 +105,7 @@
 │   ├── bot.js              # OneBot v11 客户端（群发/私聊）
 │   ├── limits.js           # 限购购买计划计算器
 │   ├── warehouse.js        # 囤货地
+│   ├── stats.js            # 复盘统计（F6：团期聚合 KPI/排行/交费回收/发货时效）
 │   └── image-upload.js     # 图床适配
 ├── relay/relay.js          # QQ 机器人 relay（ECS，零依赖 Node 18+）
 ├── supabase-schema.sql     # 数据库 schema（可重复执行，含排查 SQL）

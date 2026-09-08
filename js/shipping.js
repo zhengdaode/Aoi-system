@@ -94,6 +94,7 @@ Aoi.ship.setShipped = async function () {
   var ids = Aoi.ship.selectedIds();
   if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
   var status = document.getElementById('shipStatus').value;
+  var batchId = document.getElementById('shipBatch').value;
   var idSet = {}; ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
   d.orders.forEach(function (o) {
@@ -105,7 +106,18 @@ Aoi.ship.setShipped = async function () {
   await Aoi.saveTeamData(d);
   Aoi.ship.render();
   Aoi.toast('已设 ' + ids.length + ' 条为' + status, 'success');
-  if (status === '已发') Aoi.notify.sync();
+  if (status === '已发') {
+    Aoi.notify.sync();
+    // F5-H①：批量设为已发后排发表 xlsx 自动私发管理员；
+    // 异步执行且失败只提示，不影响「设为已发」本身
+    if (Aoi.bot.config.enabled && Aoi.bot.config.relay && Aoi.bot.config.adminQq) {
+      Aoi.bot.exportShipping(batchId).then(function () {
+        Aoi.toast('排发表已私发管理员 QQ', 'success');
+      }).catch(function (e) {
+        Aoi.toast('排发表私发失败：' + (e && e.message ? e.message : e), 'error');
+      });
+    }
+  }
   Aoi.overview.render();
 };
 

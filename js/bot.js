@@ -149,3 +149,40 @@ Aoi.bot.saveSettings = async function () {
   Aoi.bot.load();
   Aoi.toast('机器人设置已保存', 'success');
 };
+
+// F5-H①（v3.5.0）：排发表 xlsx 经 relay 生成并私发管理员。
+// 行数据字段与 Aoi.ship.export 完全一致（购买者/制品/发货线路/数量/囤货地/快递单号/合照/状态）；
+// relay 生成 xlsx 后经 NapCat upload_private_file 发到 botConfig.adminQq，临时文件用后即删。
+Aoi.bot.exportShipping = async function (batchId) {
+  if (!Aoi.bot.config.enabled || !Aoi.bot.config.relay) throw new Error('QQ 机器人未接入');
+  if (!Aoi.bot.config.adminQq) throw new Error('未配置管理员转发 QQ：请在设置页「QQ 机器人」卡填写并保存');
+  var d = Aoi.orders.ensure();
+  var rows = d.orders.filter(function (o) { return o.batchId === batchId; });
+  if (!rows.length) throw new Error('该批次暂无订单');
+  var payloadRows = rows.map(function (o) {
+    return {
+      '购买者': o.buyer,
+      '制品': o.type + ' - ' + o.model,
+      '发货线路': Aoi.orders.typeRoute(o.type),
+      '数量': o.count,
+      '囤货地': Aoi.warehouse.name(o.warehouseId) || '',
+      '快递单号': o.tracking || '',
+      '合照': o.photo || '',
+      '状态': o.shipped || '未发'
+    };
+  });
+  var token = await Aoi.bot.sessionToken();
+  if (!token) throw new Error('管理员登录态缺失，请退出后重新登录再试');
+  var r = await fetch(Aoi.bot.config.relay.replace(/\/+$/, '') + '/onebot/export-shipping', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ batchId: batchId, batchDate: Aoi.orders.batchDate(batchId), rows: payloadRows, targetQq: Aoi.bot.config.adminQq })
+  });
+  if (!r.ok) {
+    var text = '';
+    try { text = await r.text(); } catch (e) { /* ignore */ }
+    if (r.status === 401) throw new Error('排发表推送失败（401）：管理员会话已失效，请重新登录');
+    throw new Error('排发表推送失败（' + r.status + '）：' + text);
+  }
+  return r.json();
+};

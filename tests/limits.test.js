@@ -193,3 +193,51 @@ describe('Aoi.limits 限购计算器（v3.2.0 T2：活动刷新 + 包邮金额�
     expect(doc.getElementById('limResultStat').textContent).toContain('包邮线 ¥60.00');
   });
 });
+
+describe('Aoi.limits 结果表件数与外币原价列（v3.5.4）', () => {
+  beforeEach(() => {
+    aoi.state.data = {
+      activities: ['2026春团'],
+      orders: [
+        { id: 'o1', activity: '2026春团', type: '吧唧', model: 'M1', price: 60, priceOrig: 1200, currency: 'jpy', count: 2, buyer: '小明' },
+        { id: 'o2', activity: '2026春团', type: '吧唧', model: 'M1', price: 63, priceOrig: 1300, currency: 'jpy', count: 1, buyer: '小红' },
+        { id: 'o3', activity: '2026春团', type: '立牌', model: 'M2', price: 50, priceOrig: null, currency: 'cny', count: 1, buyer: '小刚' }
+      ]
+    };
+  });
+
+  it('origTotals 按币种分组求和，缺原价的商品不计入', () => {
+    const meta = {
+      '吧唧|M1': { origCurrency: 'jpy', origAvg: 1250 },
+      '吧唧|M2': { origCurrency: 'krw', origAvg: 8000 },
+      '立牌|M3': {}
+    };
+    const items = [
+      { type: '吧唧', model: 'M1', qty: 2 },
+      { type: '吧唧', model: 'M2', qty: 1 },
+      { type: '立牌', model: 'M3', qty: 3 }
+    ];
+    expect(aoi.limits.origTotals(items, meta)).toEqual(['JP¥2,500', '₩8,000']);
+    expect(aoi.limits.origTotals([{ type: '立牌', model: 'M3', qty: 1 }], meta)).toEqual([]);
+  });
+
+  it('结果表 7 列：件数为账号合计，外币原价逐件累加按币种分组', () => {
+    doc.getElementById('limActivity').innerHTML = '<option value="2026春团" selected>2026春团</option>';
+    doc.getElementById('limActivity').value = '2026春团';
+    aoi.limits.load();
+    doc.getElementById('limFreeShip').value = '0';
+    doc.getElementById('limAccounts').value = '2';
+    aoi.limits.plan();
+    expect(doc.querySelectorAll('#limResultTable thead th')).toHaveLength(7);
+    const rows = [...doc.querySelectorAll('#limResultTbody tr')];
+    expect(rows).toHaveLength(2);
+    const cells = rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent));
+    // 均衡分配：账号1 = M1×2（件数 2、日元原价 2×1250）；账号2 = M1×1+M2×1（件数 2、原价 1250；人民币单无原价不计）
+    expect(cells[0][3]).toBe('2');
+    expect(cells[0][5]).toBe('JP¥2,500');
+    expect(cells[1][3]).toBe('2');
+    expect(cells[1][5]).toBe('JP¥1,250');
+    // 包邮线未填 → 包邮状态列显示「—」
+    expect(cells[0][6]).toBe('—');
+  });
+});

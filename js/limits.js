@@ -313,6 +313,21 @@ Aoi.limits.currencySymbol = function (currency) {
   return Aoi.currencySymbol(currency);
 };
 
+// 每账号外币原价合计：与商品表同源（priceOrig 均价口径），逐件累加后按币种分组；
+// 缺原价数据的商品不计入，无任何原价时返回空数组（渲染为「—」）
+Aoi.limits.origTotals = function (items, meta) {
+  var groups = {};
+  items.forEach(function (it) {
+    var m = meta[it.type + '|' + it.model];
+    if (!m || m.origAvg == null) return;
+    var cur = m.origCurrency;
+    groups[cur] = Math.round(((groups[cur] || 0) + it.qty * m.origAvg) * 100) / 100;
+  });
+  return Object.keys(groups).map(function (cur) {
+    return Aoi.limits.currencySymbol(cur) + groups[cur].toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  });
+};
+
 // 渲染结果表（freeShip = 所选币种金额；freeShipRmb = 换算后人民币包邮线）
 Aoi.limits.renderResult = function (activity, result, freeShip, freeShipRmb, freeCur) {
   if (freeShipRmb == null) { freeShipRmb = freeShip; freeCur = 'cny'; }
@@ -320,18 +335,24 @@ Aoi.limits.renderResult = function (activity, result, freeShip, freeShipRmb, fre
   var stat = document.getElementById('limResultStat');
   var box = document.getElementById('limResultBox');
   var hasFree = freeShipRmb > 0;
+  var meta = {};
+  Aoi.limits.productsForActivity(activity).forEach(function (p) { meta[p.type + '|' + p.model] = p; });
   tbody.innerHTML = result.accounts.length ? result.accounts.map(function (a, i) {
     var content = a.items.map(function (it) { return it.type + '-' + it.model + ' ×' + it.qty; }).join('，');
+    var pieces = a.items.reduce(function (s, it) { return s + it.qty; }, 0);
+    var origs = Aoi.limits.origTotals(a.items, meta);
     var shipCell = !hasFree ? '—'
       : (a.reached ? '<span class="text-green-600">已达包邮</span>' : '<span class="text-amber-500">差 ' + a.diff.toFixed(2) + '</span>');
     return '<tr class="border-b border-gray-100 align-top">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2 wrap">账号 ' + a.index + '</td>'
       + '<td class="px-3 py-2 wrap">' + Aoi.escapeHtml(content) + '</td>'
+      + '<td class="px-3 py-2 text-right">' + pieces + '</td>'
       + '<td class="px-3 py-2 text-right">' + a.total.toFixed(2) + '</td>'
+      + '<td class="px-3 py-2 text-right">' + (origs.length ? Aoi.escapeHtml(origs.join(' + ')) : '—') + '</td>'
       + '<td class="px-3 py-2 text-right">' + shipCell + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">无可分配内容</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="px-3 py-2 text-gray-400">无可分配内容</td></tr>';
 
   var remainText = result.remaining.length
     ? '⚠️ 剩余未分配（限购/种类数装不下，需加账号或放宽限购）：' + result.remaining.map(function (r) { return r.type + '-' + r.model + ' ×' + r.qty; }).join('，')

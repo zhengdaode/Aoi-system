@@ -20,6 +20,7 @@
 **v3.4.0 数据安全兜底 + 团员感知已实施完成**（2026-09-08：B1 历史快照与备份卡 / B2 P1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / 测试 170 用例；线上库已应用并探针验证；F5 独立项目设计待审核、F6 demo 待管理层审核、F7/F8 取消）；
 **v3.5.0 已实施完成**（2026-09-08 双特性：①从链接导入——信息录入页粘贴排谷表/汇总表分享直链一键导入，直链无 CORS 头，经 netlify.toml `/media-proxy` 同源代理拉取、直连回退；②F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js）+ `orders.shippedAt` 发货时间戳埋点，demo 路线取消、`demo/stats-demo/` 保留为历史产物（见 `docs/PLAN-F6-STATS.md`））；
 **v3.5.2 已实施完成**（2026-09-09 链接导入三通道加固：`/media-proxy` → `/media-relay`（ECS relay `/fetch` 国内中转，需部署 relay/relay.js 点亮）→ 直连；报错分级区分「链接 404 失效」与「通道不可用」）；
+**v3.6.0 管理端体验升级已实施完成**（2026-09-09，见 `docs/PLAN-v3.6.0.md`：S1 买家管理独立 tab（状态分桶 + 点击圈名筛单）/ S2 活动商品按型号管理（参考图 + 跳转链接，空链接回落平台链接，团员端参考列）/ S3 购买计划入库 `d.limitPlans` 双向同步 + 购买失败自动重分配 / S4 图片粘贴上传 `data-img-paste` / S5 导出文件名带活动名 / S6 复盘统计布局修复（view-stats 曾在 `</main>` 外）；测试 254 用例）；
 **F5 QQ 机器人双向已实施完成**（2026-09-09，独立仓库 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7：relay v4 双向/绑定/查单/团况/自动催缴/排发 xlsx/非文本兜底 + 54 测试；主仓库接入 = 3 个 Supabase RPC（`member_lookup_by_qq` / `team_summary_for_group` / `unpaid_members_by_group`）+ 设置页 `botConfig.adminQq/qrUrl` + 排发「设为已发」自动私发管理员；**部署动作待真机执行**：NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 部署新 relay，见 aoi-qqbot README）；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。

@@ -144,7 +144,15 @@
   notifications: [{ id, type, buyer, batchId, title, body, date, sent }],
   calc:      { jpyRate, jpyMarkup, krwRate, krwMarkup },
   imgHost:   { api, field, token, tokenIn, respPath },
-  activityMeta: { [活动名]: { ip, buyDate, shipDate, link, status } },
+  activityMeta: { [活动名]: { ip, buyDate, shipDate, shipDateFuzzy, link, status, remark,
+                              buyers: [{ buyer, account, address }],
+                              trackings: [string],
+                              products: [{ id, type, model, refImage, refUrl }] } },
+  limitPlans: { [活动名]: { activity, freeShip, freeShipRmb, freeCur, accountsCount, maxTypes,
+                            limits: { 'type|model': n },
+                            items: [{ index, total, diff, reached,
+                                      items: [{ type, model, qty, price, amount, status }] }],
+                            remaining: [{ type, model, qty }], updatedAt } },
   typeMeta:  { [类型名]: { route } },
   ipTypes:   { [IP]: [类型名...] },
   addresses: { [buyer]: string },
@@ -156,6 +164,8 @@
 - `orders.status`：到货状态（未到货 / 已到货）；`orders.batchId`：所属到货批次。
 - `orders.shipped`：发货状态（未发 / 已发）；`orders.shippedAt`：发货时间戳（v3.5.0 F6 起首标已发时写入 ISO 时间，复盘统计发货时效数据源；旧数据缺失时统计自动排除）；`orders.tracking` / `orders.photo`：快递单号 / 合照 URL；`orders.received`：团员收货确认。
 - `payments.status`：交费状态（待交 / 待审核 / 已交 / 已驳回），按「批次 × 购买者」唯一；`receipt` 为团员上传的付款凭证 URL。
+- `activityMeta.products`（v3.6.0）：活动商品登记，按「类型+型号」对应订单；`refUrl` 为空时团员端回落展示活动平台链接 `link`。
+- `limitPlans`（v3.6.0）：限购购买计划入库，「工具 → 限购计划」与活动管理计划弹窗双侧共读共写（双向同步）；`item.status` ∈ 待购买 / 已购买 / 购买失败，切「购买失败」时按原计算器贪心把该商品整项重分配给其余账号（受 `limits` 限购与 `maxTypes` 约束，装不下的余量入 `remaining`）。
 - 命名约定：`type`（制品类型）+ `model`（型号）在订单、周边、Excel 导入三处统一。
 
 ## 调试账户

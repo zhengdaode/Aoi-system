@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aoi } from './helpers/aoi.js';
+import { aoi, win } from './helpers/aoi.js';
 
 // 本站「下载表格」导出的 orderTable 表头（一行一订单，见 index.html:448-455 / orders.js:433-452）
 const SITE_HEADER = [
@@ -90,5 +90,113 @@ describe('Aoi.import 矩阵式旧格式回归（v3.2.0 不回退）', () => {
     const m = aoi.import.parseMatrix(rows, 'x');
     expect(m).toHaveLength(1);
     expect(m[0]).toMatchObject({ model: '吧唧', price: 45, buyer: '小明', activity: '2026夏团' });
+  });
+});
+
+// —— 链接导入（v3.5.0）：zwlhome 分享直链的真实结构 + 拉取通道回退 ——
+
+// 取样自 2026-09-08 static.zwlhome.com 排谷表（明细型矩阵：分类/谷子/单价 行，买家名填格）
+const PAIGU_ROWS = [
+  ['【宝可梦万圣节】排表详情，制表时间：2026-09-08 23:22:46'],
+  ['分类', '默认分类'],
+  ['谷子', '阿罗拉雷丘松软煎饼风收纳包', '亚克力钥匙扣（盲抽）【共7款】', '索罗亚挂件玩偶', '霜奶仙挂件玩偶'],
+  ['单价', '107.00', '42.50', '96.00', '96.00'],
+  ['1.0', 'sunshine', '', 'yu🐳', 'Fq1An'],
+  ['2.0', 'pupu', '', '一枚小混子', ''],
+  ['3.0', '', '', '拿拿', '']
+];
+
+// 取样自同日汇总表（汇总型矩阵：昵称/总数 买家列 + 总金额 汇总行，数量格为数字）
+const HUIZONG_ROWS = [
+  ['【宝可梦万圣节】汇总详情，制表时间：2026-09-08 23:27:56'],
+  ['', '分类', '默认分类'],
+  ['', '种类', '阿罗拉雷丘松软煎饼风收纳包', '亚克力钥匙扣（盲抽）【共7款】', '索罗亚挂件玩偶'],
+  ['', '单价', '107.00', '42.50', '96.00'],
+  ['总金额', '昵称/总数', '2.0', '0.0', '1.0'],
+  ['822.0', '冬藏', '', '', '1.0'],
+  ['672.5', 'pupu', '1.0', '', '1.0'],
+  ['459.0', 'sunshine', '1.0', '', '']
+];
+
+describe('Aoi.import.parseMatrix zwlhome 直链格式（v3.5.0）', () => {
+  it('排谷表（明细型）：逐格买家出单，团期/分类/单价正确，序号列不误收', () => {
+    const m = aoi.import.parseMatrix(PAIGU_ROWS, 'paigubiao_257478');
+    expect(m).toHaveLength(6);
+    expect(m[0]).toMatchObject({
+      activity: '宝可梦万圣节', type: '默认分类',
+      model: '阿罗拉雷丘松软煎饼风收纳包', price: 107, count: 1, buyer: 'sunshine'
+    });
+    expect(m.map((r) => r.buyer)).toEqual(['sunshine', 'yu🐳', 'Fq1An', 'pupu', '一枚小混子', '拿拿']);
+    // 首列序号（1.0/2.0…）既不是制品也不是买家
+    expect(m.every((r) => r.model !== '1.0' && r.buyer !== '1.0')).toBe(true);
+  });
+
+  it('汇总表（汇总型）：买家列 + 数量出单，昵称/总数与总金额行不污染', () => {
+    const m = aoi.import.parseMatrix(HUIZONG_ROWS, 'huizongbiao_257478');
+    expect(m).toHaveLength(4);
+    expect(m[0]).toMatchObject({ activity: '宝可梦万圣节', type: '默认分类', buyer: '冬藏', model: '索罗亚挂件玩偶', price: 96 });
+    expect(m[1]).toMatchObject({ buyer: 'pupu', model: '阿罗拉雷丘松软煎饼风收纳包', price: 107 });
+    expect(m[2]).toMatchObject({ buyer: 'pupu', model: '索罗亚挂件玩偶' });
+    expect(m.every((r) => !/昵称|总数|总金额/.test(r.buyer))).toBe(true);
+    // 0.0 格不出单：pupu 只解析出 2 条（收纳包 + 挂件），亚克力钥匙扣=0.0 跳过
+    expect(m.filter((r) => r.buyer === 'pupu')).toHaveLength(2);
+  });
+});
+
+describe('Aoi.import 链接拉取（v3.5.0）', () => {
+  const LINK = 'https://static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx';
+  const PROXIED = '/media-proxy/static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx';
+
+  it('mapProxyUrl：白名单主机映射同源代理，其余主机/非法串返回 null', () => {
+    expect(aoi.import.mapProxyUrl(LINK)).toBe(PROXIED);
+    expect(aoi.import.mapProxyUrl('http://static.zwlhome.com/appMedia/a.xlsx')).toBe('/media-proxy/static.zwlhome.com/appMedia/a.xlsx');
+    expect(aoi.import.mapProxyUrl('https://evil.example.com/appMedia/a.xlsx')).toBeNull();
+    expect(aoi.import.mapProxyUrl('不是链接')).toBeNull();
+  });
+
+  it('fileNameFromUrl：取末段、去查询串、空段兜底', () => {
+    expect(aoi.import.fileNameFromUrl(LINK + '?t=1')).toBe('paigubiao_257478_20260908232246087969.xlsx');
+    expect(aoi.import.fileNameFromUrl('https://static.zwlhome.com/appMedia/')).toBe('链接导入.xlsx');
+  });
+
+  it('fetchFromUrl：白名单主机先走同源代理通道', async () => {
+    const calls = [];
+    win.fetch = async (u) => {
+      calls.push(String(u));
+      return { ok: true, headers: { get: () => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }, arrayBuffer: async () => new ArrayBuffer(8) };
+    };
+    try {
+      const got = await aoi.import.fetchFromUrl(LINK);
+      expect(got.via).toBe('proxy');
+      expect(calls).toEqual([PROXIED]);
+      expect(got.fileName).toBe('paigubiao_257478_20260908232246087969.xlsx');
+      expect(got.buffer.byteLength).toBe(8);
+    } finally { delete win.fetch; }
+  });
+
+  it('fetchFromUrl：代理返回 HTML 回退页（未部署）→ 直连兜底', async () => {
+    const calls = [];
+    win.fetch = async (u) => {
+      calls.push(String(u));
+      const html = String(u).indexOf('/media-proxy/') === 0;
+      return { ok: true, headers: { get: () => (html ? 'text/html' : 'application/octet-stream') }, arrayBuffer: async () => new ArrayBuffer(8) };
+    };
+    try {
+      const got = await aoi.import.fetchFromUrl(LINK);
+      expect(got.via).toBe('direct');
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toBe(PROXIED);
+      expect(calls[1]).toBe(LINK);
+    } finally { delete win.fetch; }
+  });
+
+  it('fetchFromUrl：全部通道失败 → error 引导手动导入；非 http(s) 链接直接拒绝', async () => {
+    win.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    try {
+      const got = await aoi.import.fetchFromUrl(LINK);
+      expect(got.error).toMatch(/无法从该链接拉取/);
+    } finally { delete win.fetch; }
+    const bad = await aoi.import.fetchFromUrl('ftp://x');
+    expect(bad.error).toMatch(/http/);
   });
 });

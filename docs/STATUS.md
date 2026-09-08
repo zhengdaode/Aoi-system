@@ -2,12 +2,12 @@
 
 > 更新日期：2026-09-08 · 版本 **v3.4.0**（v3.4：数据安全兜底 + 团员感知增强——服务端 blob 历史快照与「数据备份与恢复」卡（B1/F4）、团员读接口按 CN 裁剪 PII + 写接口白名单合并 + 团员密钥升 128bit（B2 Phase 1）、审批/到货自动通知（F1）、团员端订单进度时间线（F2）；F5 QQ 机器人双向移出为独立项目（设计待审核）；F6 统计页产出独立本地 demo 待管理层审核；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
 
-## 当前状态速览（2026-09-08 v3.4.0 后）
+## 当前状态速览（2026-09-08 v3.5.0 后）
 
-- **代码层**：v3.4.0 实施完成（B1 备份兜底 / B2 Phase 1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / F4 备份卡）；vitest 170 用例全绿（`npm test`）。
+- **代码层**：v3.4.0 实施完成（B1 备份兜底 / B2 Phase 1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / F4 备份卡）；**v3.5.0 从链接导入实施完成**（2026-09-08：信息录入页粘贴排谷表/汇总表分享直链一键导入，`/media-proxy` 同源代理 → 直连回退，白名单 `static.zwlhome.com`）；vitest 179 用例全绿（`npm test`）。
 - **✅ 线上库已升级并验证（2026-09-08）**：先建快照表（`team_data_bak_20260908` / `teams_bak_20260908`）→ 经 `scripts/sb.js` 重跑 `supabase-schema.sql` → 探针全过：①团员读回 blob 已无 addresses（PII 裁剪生效）；②写链路端到端可用（同数据回写返回新版本号，`team_data_history` 自动存档）；③业务 blob 完好（orders 完整）。
 - **⚠️ 待用户操作**：
-  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。
+  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。注意：v3.5.0「从链接导入」的 `/media-proxy` 直链代理仅 Netlify 通道生效（GitHub Pages 无服务端配置，该通道自动回退直连/手动导入）。
   2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
   3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
 - **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目（详细设计**待审核**：`docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md`，含六项待拍板问题）；F6 统计页产出独立本地 demo（`demo/stats-demo/`，压缩包 `demo/F6-团期复盘统计-demo.zip` 供外发，待管理层审核后再定并入版本）；F7/F8 取消，v4.0.0 商用化路线不再排期。

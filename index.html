@@ -198,6 +198,7 @@
           <div class="space-y-0.5">
             <a data-nav="view-calc" onclick="Aoi.nav('view-calc')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">计算器</a>
             <a data-nav="view-limits" onclick="Aoi.nav('view-limits')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">限购计划</a>
+            <a data-nav="view-stats" onclick="Aoi.nav('view-stats')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">复盘统计</a>
           </div>
         </div>
         <div>
@@ -342,8 +343,13 @@
       <div id="view-entry" data-view class="hidden grid gap-4 max-w-4xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">Excel 导入</h3>
-          <p class="text-sm text-gray-500 mb-3">支持排谷表 / 拼谷表 / 闲鱼（.xlsx / .xls），以及本站「下载表格」导出的 .xlsx / .csv，自动识别表格结构</p>
-          <input type="file" accept=".xlsx,.xls,.csv" onchange="Aoi.orders.importFile(this.files[0]); this.value='';" class="block w-full text-sm text-gray-600 border border-gray-300 rounded px-3 py-2">
+          <p class="text-sm text-gray-500 mb-3">支持排谷表 / 拼谷表 / 闲鱼（.xlsx / .xls）、本站「下载表格」导出的 .xlsx / .csv，以及排谷表 / 汇总表的分享直链，自动识别表格结构</p>
+          <input type="file" accept=".xlsx,.xls,.csv" onchange="Aoi.orders.importFile(this.files[0]); this.value='';" class="block w-full text-sm text-gray-600 border border-gray-300 rounded px-3 py-2 mb-3">
+          <div class="flex gap-3">
+            <input id="importUrl" type="url" placeholder="或粘贴表格直链（如 https://static.zwlhome.com/appMedia/….xlsx）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
+            <button onclick="Aoi.orders.importFromUrl()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600 whitespace-nowrap">从链接导入</button>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">直链由本站服务端代理拉取（规避浏览器跨域限制）；代理不可用时自动尝试直连，仍失败请点开链接下载文件后从上方选择文件导入。</p>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -930,6 +936,74 @@
         </div>
       </div>
     </main>
+
+      <!-- 复盘统计（v3.5.0 F6） -->
+      <div id="view-stats" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">复盘统计</h3>
+          <p class="text-sm text-gray-500 mb-3">按团期复盘订单、金额、币种、买家、交费回收与发货时效（只读统计，不修改数据）</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="statsTermSel" onchange="Aoi.stats.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+            <select id="statsIpSel" onchange="Aoi.stats.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+          </div>
+          <p class="mt-2 text-xs text-gray-400">口径：货款维度（活动 / IP / 买家 / 币种）按「活动购买时间」归月并受 IP 筛选；交费回收与发货时效按「到货批次日期」归月、不受 IP 筛选。外币金额优先取已生成的人民币价，缺失时按当前计算器汇率估算（KPI 会标注）。发货时效仅统计已发且有发货时间戳的订单（v3.5.0 起在发货管理标记已发时记录）。</p>
+        </div>
+
+        <div id="statsKpis" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="flex items-center mb-2"><h3 class="font-bold">按活动聚合</h3><button onclick="Aoi.exportImage(this)" data-table="statsActTable" data-name="复盘-按活动聚合" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="statsActTable" data-name="复盘-按活动聚合" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
+          <div class="overflow-x-auto">
+            <table id="statsActTable" class="w-full text-sm data-table">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">活动</th><th class="px-3 py-2">IP</th>
+                <th class="px-3 py-2">进度</th><th class="px-3 py-2 text-right">订单数</th><th class="px-3 py-2 text-right">件数</th>
+                <th class="px-3 py-2 text-right">折合金额(¥)</th><th class="px-3 py-2">币种</th><th class="px-3 py-2 text-right">到货比例</th>
+              </tr></thead>
+              <tbody id="statsActTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 class="font-bold mb-2">IP 排行</h3>
+            <div id="statsIpSw" class="flex flex-wrap gap-2 mb-3"></div>
+            <div id="statsIpBars"></div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 class="font-bold mb-2">买家排行（Top 10）</h3>
+            <div id="statsBuyerSw" class="flex flex-wrap gap-2 mb-3"></div>
+            <div id="statsBuyerBars"></div>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 class="font-bold mb-2">币种分布</h3>
+            <div id="statsCurBars"></div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 class="font-bold mb-2">交费回收（金额口径 · 按到货批次）</h3>
+            <div id="statsPayBars"></div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="flex items-center mb-2"><h3 class="font-bold">发货时效（到货 → 发货）</h3><button onclick="Aoi.exportImage(this)" data-table="statsAgingTable" data-name="复盘-发货时效" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="statsAgingTable" data-name="复盘-发货时效" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
+          <div class="overflow-x-auto">
+            <table id="statsAgingTable" class="w-full text-sm data-table">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">到货批次</th>
+                <th class="px-3 py-2 text-right">订单数</th><th class="px-3 py-2 text-right">已发数</th>
+                <th class="px-3 py-2 text-right">平均时效(天)</th>
+              </tr></thead>
+              <tbody id="statsAgingTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
   </section>
 
   <!-- 导入确认弹窗 -->
@@ -993,6 +1067,7 @@
   <script src="js/bot.js"></script>
   <script src="js/limits.js"></script>
   <script src="js/warehouse.js"></script>
+  <script src="js/stats.js"></script>
   <script src="js/image-upload.js"></script>
 </body>
 </html>

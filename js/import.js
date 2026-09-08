@@ -226,3 +226,53 @@ Aoi.import.detectIp = function (records) {
   }
   return '';
 };
+
+// —— 链接导入：排谷表/汇总表分享直链（如 https://static.zwlhome.com/appMedia/*.xlsx）——
+// 实测该类直链响应无 CORS 头（预检 405、无 Access-Control-Allow-Origin），浏览器无法直接
+// fetch；主通道走同源代理（Netlify /media-proxy/ 服务端转发，见 netlify.toml），直连备用。
+Aoi.import.PROXY_HOSTS = ['static.zwlhome.com'];
+
+// 直链 → 同源代理相对路径；非白名单主机 / file:// 页面返回 null（跳过代理通道）
+Aoi.import.mapProxyUrl = function (url) {
+  if (typeof location !== 'undefined' && location.protocol === 'file:') return null;
+  var m = String(url || '').trim().match(/^https?:\/\/([^\/?#]+)\/(.+)$/);
+  if (!m) return null;
+  var host = m[1].toLowerCase();
+  if (Aoi.import.PROXY_HOSTS.indexOf(host) < 0) return null;
+  return '/media-proxy/' + host + '/' + m[2];
+};
+
+// 从链接取文件名（仅作批次名兜底，矩阵表实际以内容中的【团期】为准）
+Aoi.import.fileNameFromUrl = function (url) {
+  var segs = String(url || '').split(/[?#]/)[0].split('/');
+  var name = segs.pop() || '';
+  try { name = decodeURIComponent(name); } catch (e) { /* 保留原样 */ }
+  return name || '链接导入.xlsx';
+};
+
+// 拉取链接文件：同源代理 → 直连逐通道尝试；全部失败返回 { error }，
+// 成功返回 { buffer, fileName, via: 'proxy'|'direct' }。返回 200 的 HTML
+// （未部署代理时 SPA catch-all 的回退页）视为通道不可用，继续下一通道。
+Aoi.import.fetchFromUrl = async function (url) {
+  var u = String(url || '').trim();
+  if (!/^https?:\/\//i.test(u)) return { error: '链接需以 http(s):// 开头' };
+  var candidates = [];
+  var proxied = Aoi.import.mapProxyUrl(u);
+  if (proxied) candidates.push(proxied);
+  candidates.push(u);
+  var buf = null, via = null;
+  for (var i = 0; i < candidates.length && !buf; i++) {
+    try {
+      var res = await fetch(candidates[i], { redirect: 'follow' });
+      if (!res.ok) continue;
+      var ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (ct.indexOf('text/html') >= 0) continue;
+      var ab = await res.arrayBuffer();
+      if (ab.byteLength >= 4) { buf = ab; via = candidates[i] === u ? 'direct' : 'proxy'; }
+    } catch (e) { continue; } // 跨域 / 网络失败 → 尝试下一通道
+  }
+  if (!buf) {
+    return { error: '无法从该链接拉取表格（跨域限制或链接不可达）。请点开链接下载文件后，用上方「选择文件」导入。' };
+  }
+  return { buffer: buf, fileName: Aoi.import.fileNameFromUrl(u), via: via };
+};

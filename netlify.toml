@@ -10,6 +10,15 @@
   status = 200
   force = true
 
+# 表格直链代理：排谷表/汇总表分享链接（static.zwlhome.com）响应无 CORS 头，
+# 浏览器直接 fetch 会被跨域拦截，由 Netlify 服务端同源转发（与 /qqbot 同模式）。
+# 白名单仅此主机，避免开放代理。必须放在 SPA catch-all 之前。
+[[redirects]]
+  from = "/media-proxy/static.zwlhome.com/*"
+  to = "https://static.zwlhome.com/*"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

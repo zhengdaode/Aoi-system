@@ -60,6 +60,25 @@ Aoi.orders.importFile = async function (file) {
   var buf = await file.arrayBuffer();
   var records = Aoi.import.parse(buf, file.name);
   if (!records.length) { Aoi.toast('未识别到订单数据', 'warning'); return; }
+  Aoi.orders.openImportModal(records);
+};
+
+// 从链接导入：排谷表/汇总表分享直链 → 拉取 → 复用文件导入的确认弹窗
+Aoi.orders.importFromUrl = async function () {
+  var url = (document.getElementById('importUrl').value || '').trim();
+  if (!url) { Aoi.toast('请先粘贴表格链接', 'warning'); return; }
+  Aoi.toast('正在拉取表格…', 'info');
+  var got = await Aoi.import.fetchFromUrl(url);
+  if (got.error) { Aoi.toast(got.error, 'error'); return; }
+  var records;
+  try { records = Aoi.import.parse(got.buffer, got.fileName); }
+  catch (e) { Aoi.toast('表格解析失败，请确认链接指向的是排谷表/汇总表文件', 'error'); return; }
+  if (!records.length) { Aoi.toast('未识别到订单数据', 'warning'); return; }
+  Aoi.orders.openImportModal(records);
+};
+
+// 填充并打开导入确认弹窗（文件导入 / 链接导入共用）
+Aoi.orders.openImportModal = function (records) {
   Aoi.import.pending = records;
   document.getElementById('importActivity').value = Aoi.import.detectActivity(records);
   document.getElementById('importIp').value = Aoi.import.detectIp(records);

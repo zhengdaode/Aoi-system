@@ -271,9 +271,10 @@ Aoi.import.fileNameFromUrl = function (url) {
   return name || '链接导入.xlsx';
 };
 
-// 拉取链接文件：同源代理 → 直连逐通道尝试；全部失败返回 { error }，
-// 成功返回 { buffer, fileName, via: 'proxy'|'direct' }。返回 200 的 HTML
-// （未部署代理时 SPA catch-all 的回退页）视为通道不可用，继续下一通道。
+// 拉取链接文件：同源代理 → ECS relay → 设置页 Edge 通道 → 直连逐通道尝试；
+// 全部失败返回 { error }，成功返回 { buffer, fileName, via: 'proxy'|'direct' }。
+// 返回 200 的 HTML（SPA catch-all 回退页）视为通道不可用，继续下一通道；
+// 每通道 20s 超时（Edge 出口偶发网关挂起，实测 ~1/6），Edge 重复入列即自动重试一次。
 Aoi.import.fetchFromUrl = async function (url) {
   var u = String(url || '').trim();
   if (!/^https?:\/\//i.test(u)) return { error: '链接需以 http(s):// 开头' };
@@ -281,22 +282,30 @@ Aoi.import.fetchFromUrl = async function (url) {
   var proxied = Aoi.import.mapProxyUrl(u);
   if (proxied) candidates.push(proxied, proxied.replace('/media-proxy/', '/media-relay/'));
   var edge = Aoi.import.mapEdgeUrl(u);
-  if (edge) candidates.push(edge);
+  if (edge) candidates.push(edge, edge);
   candidates.push(u);
   var buf = null, via = null, gone404 = 0;
   for (var i = 0; i < candidates.length && !buf; i++) {
+    var timer = null;
     try {
-      var res = await fetch(candidates[i], { redirect: 'follow' });
+      var opts = { redirect: 'follow' };
+      if (typeof AbortController !== 'undefined') {
+        var ctrl = new AbortController();
+        timer = setTimeout(function () { ctrl.abort(); }, 20000);
+        opts.signal = ctrl.signal;
+      }
+      var res = await fetch(candidates[i], opts);
       if (!res.ok) {
         // 直连通道拿到明确的 404/410 → 链接本身已失效（代理 404 只说明该通道不可用）
         if (candidates[i] === u && (res.status === 404 || res.status === 410)) gone404 = res.status;
         continue;
       }
       var ct = (res.headers.get('content-type') || '').toLowerCase();
-      if (ct.indexOf('text/html') >= 0) continue; // SPA 回退页 = 该通道未部署
+      if (ct.indexOf('text/html') >= 0) continue;
       var ab = await res.arrayBuffer();
       if (ab.byteLength >= 4) { buf = ab; via = candidates[i] === u ? 'direct' : 'proxy'; }
-    } catch (e) { continue; } // 跨域 / 网络失败 → 尝试下一通道
+    } catch (e) { continue; } // 跨域 / 网络失败 / 超时 → 尝试下一通道
+    finally { if (timer !== null) clearTimeout(timer); }
   }
   if (!buf) {
     if (gone404) return { error: '链接已失效（HTTP ' + gone404 + '）：该分享链接可能已被源站清理，请在源 App 重新获取，或下载文件后用上方「选择文件」导入' };

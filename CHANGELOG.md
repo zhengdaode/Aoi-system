@@ -55,11 +55,16 @@
 - import.test.js 13 → 15 用例（mapRelayUrl 白名单、直连 404 失效文案）；全套 197 全绿。
   relay `/fetch` 本地起服实测：白名单内 200 且 content-type/字节数与源一致，白名单外 403，POST 鉴权不受影响
 
-### 部署
-- Netlify 侧随 origin 推送自动生效；ECS 侧需更新部署 `relay/relay.js`（拉取后 `pm2 restart qq-relay`）
-  点亮 `/media-relay` 通道——未部署时该通道返回 404/405 被前端自动跳过，不影响其余通道
-- GitHub Pages 测试链接导入还需两步：`supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt`
-  （含 /fetch 透传的新版），并在设置页把 relay 地址配置为该 Edge Function 地址（此配置机器人推送本就要求）
+### 部署（2026-09-09 已全部线上执行完毕，链接导入无需任何人工动作）
+- qq-relay Edge Function 已部署 v5（经 Management API，verify_jwt=false 与原一致）：
+  `GET /fetch` 最终采用 **Edge 直连源站**方案（实测 ~350ms 成功拉取两份真实链接；偶发网关挂起
+  ~1/6 由前端每通道 20s 超时 + Edge 自动重试兜底，502 快速失败可重试）；原「透传 ECS relay」
+  路线弃用——部署者本机 SSH 密钥仅授权 NapCat 所在机（106.14.28.206），relay 机（47.101.194.103）
+  无法登录。POST 机器人链路零改动并回归验证（401 鉴权 ~0.5s）
+- GitHub Pages 已部署含导入 UI 的新版（Actions 测试→部署），生产库 botConfig.relay 已指向本函数
+  —— Pages / Netlify / 本地三通道链接导入即刻可用
+- ECS relay 更新（git pull + pm2 restart qq-relay）降级为可选：仅影响 `/media-relay` 备用通道
+  与 bot 链路 v4 功能，与链接导入无关
 
 
 ## v3.5.1 (2026-09-08)

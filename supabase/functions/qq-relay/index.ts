@@ -4,11 +4,12 @@
 //   解决 https 页面无法直接 fetch http 地址的混合内容拦截，替代 trycloudflare 临时隧道。
 // 部署：supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt
 //   （verify_jwt 必须关：前端携带的是 Aoi 管理员 token，不是 Supabase JWT）
-// v3.5.2：新增 GET /fetch/<host>/<path…> 透传 —— 链接导入在 GitHub Pages 通道的代理路径
+// v3.5.2：新增 GET /fetch/<host>/<path…> —— 链接导入在 GitHub Pages 通道的代理路径
 //   （Pages 无服务端重写，https 页面也无法直连 http relay，只能经本函数桥接）。
-//   host 白名单须与 relay/relay.js FETCH_HOSTS 一致（双层校验，防开放代理）。
-//   注意：上游响应必须内存缓冲后再返回——运行时对透传流式 body 不稳（实测 500）。
+//   host 白名单防开放代理；响应内存缓冲（运行时对透传流式 body 不稳，实测 500）；
+//   直连源站 + 15s 超时（实测 Edge→境内源站 ~350ms，偶发网关挂起由前端 20s 超时+重试兜底）。
 const UPSTREAM = 'http://47.101.194.103:8080/';
+const FETCH_ORIGIN = 'https://static.zwlhome.com/';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -26,7 +27,14 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } });
     }
     try {
-      const r = await fetch(UPSTREAM + 'fetch/' + fm[1] + '/' + fm[2] + u.search, { redirect: 'follow' });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      let r;
+      try {
+        r = await fetch(FETCH_ORIGIN + fm[2] + u.search, { redirect: 'follow', signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       return new Response(await r.arrayBuffer(), {
         status: r.status,
         headers: { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'application/octet-stream' },

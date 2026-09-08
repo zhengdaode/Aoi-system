@@ -10,7 +10,7 @@
   1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。注意：v3.5.0「从链接导入」的 `/media-proxy` 直链代理仅 Netlify 通道生效（GitHub Pages 无服务端配置，该通道自动回退直连/手动导入）；v3.5.2 增加备用 `/media-relay`（ECS relay 国内中转），需在 ECS 更新部署 `relay/relay.js` 后点亮。
   2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
   3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
-  4. （GitHub Pages 测试链接导入时）`supabase functions deploy qq-relay --no-verify-jwt` 更新 Edge Function（v3.5.2 /fetch 透传），并确认设置页 relay 地址已是该函数地址——Pages 无服务端重写，Edge 通道是链接导入在 Pages 上的唯一代理路径。
+  4. ~~GitHub Pages 测试链接导入~~ **已完成（2026-09-09）**：qq-relay Edge Function v5 已部署（`GET /fetch` 直连源站 + 白名单，实测 200/~350ms），Pages 通道链接导入可用，无需 ECS 操作；ECS relay v4 更新（git pull + pm2 restart）仍建议但可选（/media-relay 备用通道与 bot v4 功能）。
 - **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目并**已实施（2026-09-09，[aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7）**：relay v4 双向 + 54 测试；主仓库接入见 CHANGELOG v3.5.3；**待真机部署**（NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 新 relay）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
 - **已知限制（v3.4.0 后）**：
   - member_key 仍为团队级凭证（一个团一把），但读已按 CN 裁剪 PII、写已白名单合并（防整份覆盖与自批「已交」）、密钥已升 128bit；设置页重新生成即作废旧密钥。

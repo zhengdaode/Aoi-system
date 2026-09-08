@@ -10,6 +10,10 @@
   原有 `POST /` 管理员鉴权链路不变）。前端拉取链升级：`/media-proxy` → `/media-relay` → 直连逐通道尝试。
   报错分级：直连通道拿到明确 404/410 → 「链接已失效（HTTP xxx）」；否则提示通道不可用 + 环境指引
   （本地打开 / GitHub Pages 通道 / Netlify 构建未完成时会出现，附手动导入兜底）
+- **GitHub Pages 通道可用性（本轮补充）** — Pages 无服务端重写，前两个同源通道必然 404、直连被跨域拦截，
+  链接导入在 Pages 上此前无法成功。qq-relay Edge Function 新增 `GET /fetch/<host>/<path>` 白名单透传
+  （host 与 relay.js FETCH_HOSTS 双层校验），前端按设置页配置的 https relay 地址（即 Edge Function 地址）
+  拼出第三代理通道；通道链升级为：同源 `/media-proxy` → 同源 `/media-relay` → 设置页 relay（Edge）→ 直连
 
 ### Tests
 - import.test.js 13 → 15 用例（mapRelayUrl 白名单、直连 404 失效文案）；全套 197 全绿。
@@ -18,6 +22,8 @@
 ### 部署
 - Netlify 侧随 origin 推送自动生效；ECS 侧需更新部署 `relay/relay.js`（拉取后 `pm2 restart qq-relay`）
   点亮 `/media-relay` 通道——未部署时该通道返回 404/405 被前端自动跳过，不影响其余通道
+- GitHub Pages 测试链接导入还需两步：`supabase functions deploy qq-relay --project-ref blfzbrivtxjxlbhgabqi --no-verify-jwt`
+  （含 /fetch 透传的新版），并在设置页把 relay 地址配置为该 Edge Function 地址（此配置机器人推送本就要求）
 
 
 ## v3.5.1 (2026-09-08)

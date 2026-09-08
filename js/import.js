@@ -251,6 +251,18 @@ Aoi.import.mapRelayUrl = function (url) {
   return proxied ? proxied.replace('/media-proxy/', '/media-relay/') : null;
 };
 
+// 直链 → 设置页 relay 地址（https，如 Supabase Edge Function qq-relay）的 /fetch 通道。
+// GitHub Pages 无服务端重写，前两个同源通道必然 404，此通道是 Pages / 本地环境的
+// 唯一代理路径；未配置 relay 或地址非 https 时返回 null。
+Aoi.import.mapEdgeUrl = function (url) {
+  var relay = '';
+  try { relay = (Aoi.bot && Aoi.bot.config && Aoi.bot.config.relay) || ''; } catch (e) {}
+  if (!/^https:\/\//i.test(relay)) return null;
+  var proxied = Aoi.import.mapProxyUrl(url);
+  if (!proxied) return null;
+  return relay.replace(/\/+$/, '') + proxied.replace('/media-proxy/', '/fetch/');
+};
+
 // 从链接取文件名（仅作批次名兜底，矩阵表实际以内容中的【团期】为准）
 Aoi.import.fileNameFromUrl = function (url) {
   var segs = String(url || '').split(/[?#]/)[0].split('/');
@@ -268,6 +280,8 @@ Aoi.import.fetchFromUrl = async function (url) {
   var candidates = [];
   var proxied = Aoi.import.mapProxyUrl(u);
   if (proxied) candidates.push(proxied, proxied.replace('/media-proxy/', '/media-relay/'));
+  var edge = Aoi.import.mapEdgeUrl(u);
+  if (edge) candidates.push(edge);
   candidates.push(u);
   var buf = null, via = null, gone404 = 0;
   for (var i = 0; i < candidates.length && !buf; i++) {

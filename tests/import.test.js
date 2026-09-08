@@ -160,6 +160,35 @@ describe('Aoi.import 链接拉取（v3.5.0）', () => {
     expect(aoi.import.mapRelayUrl('https://evil.example.com/a.xlsx')).toBeNull();
   });
 
+  it('mapEdgeUrl：https relay 地址拼 /fetch 通道；未配置或 http relay 返回 null', () => {
+    // 未配置 relay（默认 ''）→ 不产出候选，也不影响其余通道
+    expect(aoi.import.mapEdgeUrl(LINK)).toBeNull();
+    aoi.bot.config.relay = 'http://47.101.194.103:8080';   // http：https 页面混合内容拦截 → 跳过
+    expect(aoi.import.mapEdgeUrl(LINK)).toBeNull();
+    aoi.bot.config.relay = 'https://x.supabase.co/functions/v1/qq-relay';
+    expect(aoi.import.mapEdgeUrl(LINK))
+      .toBe('https://x.supabase.co/functions/v1/qq-relay/fetch/static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx');
+    aoi.bot.config.relay = '';
+  });
+
+  it('fetchFromUrl：配置 https relay 后通道顺序为 代理 → relay → Edge（前两者 404 时 Edge 兜住）', async () => {
+    const calls = [];
+    win.fetch = async (u) => {
+      calls.push(String(u));
+      const sameOriginProxy = /\/media-(proxy|relay)\//.test(String(u));
+      return sameOriginProxy
+        ? { ok: false, status: 404 }
+        : { ok: true, headers: { get: () => 'application/octet-stream' }, arrayBuffer: async () => new ArrayBuffer(8) };
+    };
+    aoi.bot.config.relay = 'https://x.supabase.co/functions/v1/qq-relay';
+    try {
+      const got = await aoi.import.fetchFromUrl(LINK);
+      expect(got.via).toBe('proxy');
+      expect(calls).toEqual([PROXIED, RELAYED,
+        'https://x.supabase.co/functions/v1/qq-relay/fetch/static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx']);
+    } finally { delete win.fetch; aoi.bot.config.relay = ''; }
+  });
+
   it('fileNameFromUrl：取末段、去查询串、空段兜底', () => {
     expect(aoi.import.fileNameFromUrl(LINK + '?t=1')).toBe('paigubiao_257478_20260908232246087969.xlsx');
     expect(aoi.import.fileNameFromUrl('https://static.zwlhome.com/appMedia/')).toBe('链接导入.xlsx');

@@ -11,6 +11,9 @@
 // 接口：POST <relay>/  header: Authorization: Bearer <supabase_access_token>
 //   body: { user_id, message }  → 私聊 /send_private_msg
 //   body: { group_id, message } → 群发 /send_group_msg
+// 接口：GET  <relay>/fetch/<host>/<path…>  免鉴权（Netlify 重写代理无法附加 header）
+//   仅放行 FETCH_HOSTS 白名单主机（排谷表/汇总表直链），10MB 上限 + 20s 超时，
+//   防开放代理/SSRF；配合 netlify.toml 的 /media-relay 重写作为链接导入的国内中转通道。
 'use strict';
 
 const http = require('http');
@@ -84,6 +87,33 @@ function throttledNapcat(payload) {
   return task;
 }
 
+// 表格直链拉取：内存中转（文件仅几 KB～MB 级），白名单外的 host 一律 403
+const FETCH_HOSTS = ['static.zwlhome.com'];
+const FETCH_MAX = 10 * 1024 * 1024;
+async function proxyFetch(res, target) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+  try {
+    const r = await fetch(target, { signal: ctrl.signal, redirect: 'follow' });
+    if (!r.ok) {
+      res.writeHead(r.status, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('upstream ' + r.status);
+    }
+    const ab = await r.arrayBuffer();
+    if (ab.byteLength > FETCH_MAX) { res.writeHead(413); return res.end(); }
+    res.writeHead(200, {
+      'Content-Type': r.headers.get('content-type') || 'application/octet-stream',
+      'Content-Length': String(ab.byteLength)
+    });
+    res.end(Buffer.from(ab));
+  } catch (e) {
+    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('fetch failed');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function send(res, status, obj) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(obj));
@@ -92,8 +122,14 @@ function send(res, status, obj) {
 http.createServer(async function (req, res) {
   res.setHeader('Access-Control-Allow-Origin', FRONTEND_ORIGIN);
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  const fm = req.method === 'GET' && req.url.match(/^\/fetch\/([^\/]+)\/(.+)$/);
+  if (fm) {
+    const host = decodeURIComponent(fm[1]).toLowerCase();
+    if (FETCH_HOSTS.indexOf(host) < 0) return send(res, 403, { error: 'host not allowed' });
+    return proxyFetch(res, 'https://' + host + '/' + fm[2]);
+  }
   if (req.method !== 'POST') return send(res, 405, { error: 'method not allowed' });
 
   const token = (req.headers.authorization || '').replace('Bearer ', '');

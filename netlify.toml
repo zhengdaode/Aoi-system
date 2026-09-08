@@ -19,6 +19,15 @@
   status = 200
   force = true
 
+# 备用二级通道：同上，改走 ECS relay 的 /fetch（国内机中转）。当 Netlify 出海
+# 访问境内源站超时/被拒时（公共代理实测 522 同因），此通道仍可达。relay 端需
+# 部署含 /fetch 的 relay/relay.js 版本，未部署时本通道返回 404/405 由前端跳过。
+[[redirects]]
+  from = "/media-relay/static.zwlhome.com/*"
+  to = "http://47.101.194.103:8080/fetch/static.zwlhome.com/*"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

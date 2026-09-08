@@ -7,7 +7,7 @@
 - **代码层**：v3.4.0 实施完成（B1 备份兜底 / B2 Phase 1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / F4 备份卡）；**v3.5.0 实施完成**（F6 团期复盘统计并入主系统 + `orders.shippedAt` 发货时间戳埋点 + 从链接导入）；vitest 全套用例全绿（`npm test`；F6 新增 stats.test.js 13 例、shipping 增 2 例）。
 - **✅ 线上库已升级并验证（2026-09-08）**：先建快照表（`team_data_bak_20260908` / `teams_bak_20260908`）→ 经 `scripts/sb.js` 重跑 `supabase-schema.sql` → 探针全过：①团员读回 blob 已无 addresses（PII 裁剪生效）；②写链路端到端可用（同数据回写返回新版本号，`team_data_history` 自动存档）；③业务 blob 完好（orders 完整）。
 - **⚠️ 待用户操作**：
-  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。注意：v3.5.0「从链接导入」的 `/media-proxy` 直链代理仅 Netlify 通道生效（GitHub Pages 无服务端配置，该通道自动回退直连/手动导入）。
+  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。注意：v3.5.0「从链接导入」的 `/media-proxy` 直链代理仅 Netlify 通道生效（GitHub Pages 无服务端配置，该通道自动回退直连/手动导入）；v3.5.2 增加备用 `/media-relay`（ECS relay 国内中转），需在 ECS 更新部署 `relay/relay.js` 后点亮。
   2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
   3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
 - **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目（详细设计**待审核**：`docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md`，含六项待拍板问题）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。

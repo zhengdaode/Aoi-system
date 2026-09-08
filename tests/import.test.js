@@ -146,12 +146,18 @@ describe('Aoi.import.parseMatrix zwlhome 直链格式（v3.5.0）', () => {
 describe('Aoi.import 链接拉取（v3.5.0）', () => {
   const LINK = 'https://static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx';
   const PROXIED = '/media-proxy/static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx';
+  const RELAYED = '/media-relay/static.zwlhome.com/appMedia/paigubiao_257478_20260908232246087969.xlsx';
 
   it('mapProxyUrl：白名单主机映射同源代理，其余主机/非法串返回 null', () => {
     expect(aoi.import.mapProxyUrl(LINK)).toBe(PROXIED);
     expect(aoi.import.mapProxyUrl('http://static.zwlhome.com/appMedia/a.xlsx')).toBe('/media-proxy/static.zwlhome.com/appMedia/a.xlsx');
     expect(aoi.import.mapProxyUrl('https://evil.example.com/appMedia/a.xlsx')).toBeNull();
     expect(aoi.import.mapProxyUrl('不是链接')).toBeNull();
+  });
+
+  it('mapRelayUrl：与 mapProxyUrl 同白名单，仅替换通道前缀', () => {
+    expect(aoi.import.mapRelayUrl(LINK)).toBe(RELAYED);
+    expect(aoi.import.mapRelayUrl('https://evil.example.com/a.xlsx')).toBeNull();
   });
 
   it('fileNameFromUrl：取末段、去查询串、空段兜底', () => {
@@ -174,19 +180,27 @@ describe('Aoi.import 链接拉取（v3.5.0）', () => {
     } finally { delete win.fetch; }
   });
 
-  it('fetchFromUrl：代理返回 HTML 回退页（未部署）→ 直连兜底', async () => {
+  it('fetchFromUrl：代理/relay 均返回 HTML 回退页（未部署）→ 直连兜底', async () => {
     const calls = [];
     win.fetch = async (u) => {
       calls.push(String(u));
-      const html = String(u).indexOf('/media-proxy/') === 0;
+      const u2 = String(u);
+      const html = u2.indexOf('/media-proxy/') === 0 || u2.indexOf('/media-relay/') === 0;
       return { ok: true, headers: { get: () => (html ? 'text/html' : 'application/octet-stream') }, arrayBuffer: async () => new ArrayBuffer(8) };
     };
     try {
       const got = await aoi.import.fetchFromUrl(LINK);
       expect(got.via).toBe('direct');
-      expect(calls).toHaveLength(2);
-      expect(calls[0]).toBe(PROXIED);
-      expect(calls[1]).toBe(LINK);
+      expect(calls).toEqual([PROXIED, RELAYED, LINK]);
+    } finally { delete win.fetch; }
+  });
+
+  it('fetchFromUrl：直连通道明确 404 → 提示链接已失效（区别于通道不可用）', async () => {
+    const notFound = { ok: false, status: 404 };
+    win.fetch = async () => notFound;
+    try {
+      const got = await aoi.import.fetchFromUrl(LINK);
+      expect(got.error).toMatch(/链接已失效（HTTP 404）/);
     } finally { delete win.fetch; }
   });
 

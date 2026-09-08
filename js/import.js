@@ -229,7 +229,10 @@ Aoi.import.detectIp = function (records) {
 
 // —— 链接导入：排谷表/汇总表分享直链（如 https://static.zwlhome.com/appMedia/*.xlsx）——
 // 实测该类直链响应无 CORS 头（预检 405、无 Access-Control-Allow-Origin），浏览器无法直接
-// fetch；主通道走同源代理（Netlify /media-proxy/ 服务端转发，见 netlify.toml），直连备用。
+// fetch。候选通道依次尝试（见 netlify.toml /media-proxy /media-relay）：
+//   ① /media-proxy —— Netlify 服务端转发（出海→境内，可能超时，公共代理 522 同因）
+//   ② /media-relay —— ECS relay /fetch 国内中转（需 ECS 部署含 /fetch 的 relay.js）
+//   ③ 直连 fetch  —— 仅当源站补 CORS 头或特殊容器环境时可用
 Aoi.import.PROXY_HOSTS = ['static.zwlhome.com'];
 
 // 直链 → 同源代理相对路径；非白名单主机 / file:// 页面返回 null（跳过代理通道）
@@ -240,6 +243,12 @@ Aoi.import.mapProxyUrl = function (url) {
   var host = m[1].toLowerCase();
   if (Aoi.import.PROXY_HOSTS.indexOf(host) < 0) return null;
   return '/media-proxy/' + host + '/' + m[2];
+};
+
+// 直链 → ECS relay 中转相对路径（白名单同 mapProxyUrl；通道未部署时由回退页/404/405 跳过）
+Aoi.import.mapRelayUrl = function (url) {
+  var proxied = Aoi.import.mapProxyUrl(url);
+  return proxied ? proxied.replace('/media-proxy/', '/media-relay/') : null;
 };
 
 // 从链接取文件名（仅作批次名兜底，矩阵表实际以内容中的【团期】为准）
@@ -258,21 +267,26 @@ Aoi.import.fetchFromUrl = async function (url) {
   if (!/^https?:\/\//i.test(u)) return { error: '链接需以 http(s):// 开头' };
   var candidates = [];
   var proxied = Aoi.import.mapProxyUrl(u);
-  if (proxied) candidates.push(proxied);
+  if (proxied) candidates.push(proxied, proxied.replace('/media-proxy/', '/media-relay/'));
   candidates.push(u);
-  var buf = null, via = null;
+  var buf = null, via = null, gone404 = 0;
   for (var i = 0; i < candidates.length && !buf; i++) {
     try {
       var res = await fetch(candidates[i], { redirect: 'follow' });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        // 直连通道拿到明确的 404/410 → 链接本身已失效（代理 404 只说明该通道不可用）
+        if (candidates[i] === u && (res.status === 404 || res.status === 410)) gone404 = res.status;
+        continue;
+      }
       var ct = (res.headers.get('content-type') || '').toLowerCase();
-      if (ct.indexOf('text/html') >= 0) continue;
+      if (ct.indexOf('text/html') >= 0) continue; // SPA 回退页 = 该通道未部署
       var ab = await res.arrayBuffer();
       if (ab.byteLength >= 4) { buf = ab; via = candidates[i] === u ? 'direct' : 'proxy'; }
     } catch (e) { continue; } // 跨域 / 网络失败 → 尝试下一通道
   }
   if (!buf) {
-    return { error: '无法从该链接拉取表格（跨域限制或链接不可达）。请点开链接下载文件后，用上方「选择文件」导入。' };
+    if (gone404) return { error: '链接已失效（HTTP ' + gone404 + '）：该分享链接可能已被源站清理，请在源 App 重新获取，或下载文件后用上方「选择文件」导入' };
+    return { error: '无法从该链接拉取表格：浏览器跨域受限，且直链代理不可用（本地打开、GitHub Pages 通道或代理构建未完成时会出现）。请从 Netlify 站点使用，或点开链接下载文件后选择文件导入' };
   }
   return { buffer: buf, fileName: Aoi.import.fileNameFromUrl(u), via: via };
 };

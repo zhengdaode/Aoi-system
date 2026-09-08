@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.5.2 (2026-09-09)
+
+### Fixed
+- **链接导入拉取通道加固（三通道回退）** — 用户实测两份直链「不可用」：复核链接本身仍 200（curl 字节一致），
+  问题定位为访问通道——Netlify 出海访问境内源站可能超时/被拒（公共 CORS 代理 522 同因）。
+  新增第二代理通道：netlify.toml `/media-relay/static.zwlhome.com/*` → ECS relay `/fetch/...`（国内中转）；
+  `relay/relay.js` 新增免鉴权 `GET /fetch/<host>/<path>`（仅放行白名单主机 + 10MB 上限 + 20s 超时，防开放代理/SSRF；
+  原有 `POST /` 管理员鉴权链路不变）。前端拉取链升级：`/media-proxy` → `/media-relay` → 直连逐通道尝试。
+  报错分级：直连通道拿到明确 404/410 → 「链接已失效（HTTP xxx）」；否则提示通道不可用 + 环境指引
+  （本地打开 / GitHub Pages 通道 / Netlify 构建未完成时会出现，附手动导入兜底）
+
+### Tests
+- import.test.js 13 → 15 用例（mapRelayUrl 白名单、直连 404 失效文案）；全套 197 全绿。
+  relay `/fetch` 本地起服实测：白名单内 200 且 content-type/字节数与源一致，白名单外 403，POST 鉴权不受影响
+
+### 部署
+- Netlify 侧随 origin 推送自动生效；ECS 侧需更新部署 `relay/relay.js`（拉取后 `pm2 restart qq-relay`）
+  点亮 `/media-relay` 通道——未部署时该通道返回 404/405 被前端自动跳过，不影响其余通道
+
+
 ## v3.5.1 (2026-09-08)
 
 ### Fixed

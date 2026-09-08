@@ -4,10 +4,13 @@ window.Aoi = window.Aoi || {};
 Aoi.bot = {};
 
 // 机器人配置（默认关；团长在「账号与设置」填 relay 地址 + 群号）
+// v3.5.0 F5 扩展：adminQq（排发 xlsx 私发目标）+ qrUrl（催缴缴费二维码，网页换图下次催缴自动生效）
 Aoi.bot.config = {
   enabled: false,
-  relay: '',     // relay 服务地址，如 http://1.2.3.4:8080
-  groupId: ''    // 群发兜底目标群号
+  relay: '',     // relay 服务地址，如 https://relay.example.com
+  groupId: '',   // 群发兜底目标群号
+  adminQq: '',   // 排发表 xlsx 私发目标（管理员 QQ）
+  qrUrl: ''      // 缴费二维码图片 URL（relay 每次催缴实时读取）
 };
 
 // 从团队数据回填配置（持久化在 team_data blob 的 botConfig）
@@ -17,6 +20,8 @@ Aoi.bot.load = function () {
   Aoi.bot.config.enabled = !!d.botConfig.enabled;
   Aoi.bot.config.relay = d.botConfig.relay || '';
   Aoi.bot.config.groupId = d.botConfig.groupId || '';
+  Aoi.bot.config.adminQq = d.botConfig.adminQq || '';
+  Aoi.bot.config.qrUrl = d.botConfig.qrUrl || '';
 };
 
 // 推送鉴权令牌（v3：admin token；relay 端经 admin_verify_session 校验）
@@ -117,6 +122,8 @@ Aoi.bot.renderSettings = function () {
   if (chk) chk.checked = Aoi.bot.config.enabled;
   set('botRelay', Aoi.bot.config.relay);
   set('botGroupId', Aoi.bot.config.groupId);
+  set('botAdminQq', Aoi.bot.config.adminQq);
+  set('botQrUrl', Aoi.bot.config.qrUrl);
 };
 
 // 保存设置页机器人配置
@@ -134,7 +141,9 @@ Aoi.bot.saveSettings = async function () {
   d.botConfig = {
     enabled: enabled,
     relay: relay,
-    groupId: get('botGroupId')
+    groupId: get('botGroupId'),
+    adminQq: get('botAdminQq'),
+    qrUrl: get('botQrUrl')
   };
   await Aoi.saveTeamData(d);
   Aoi.bot.load();

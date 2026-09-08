@@ -326,6 +326,14 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div><label class="block text-xs text-gray-500 mb-1">relay 地址（必须 https）</label><input id="botRelay" type="text" placeholder="https://relay.example.com" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
             <div><label class="block text-xs text-gray-500 mb-1">群号（群发兜底）</label><input id="botGroupId" type="text" placeholder="群号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">管理员转发 QQ（排发表 xlsx 私发目标）</label><input id="botAdminQq" type="text" placeholder="管理员 QQ 号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">缴费二维码（催缴私聊附带；换图保存后下次催缴自动生效）</label>
+              <div class="flex gap-2">
+                <input id="botQrUrl" type="text" placeholder="二维码图片 URL（上传后自动填充，也可手填）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
+                <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded cursor-pointer hover:bg-gray-300 whitespace-nowrap">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'botQrUrl')"></label>
+              </div>
+            </div>
           </div>
           <button onclick="Aoi.bot.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
         </div>

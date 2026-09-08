@@ -452,6 +452,263 @@ $$;
 --   select count(*) from team_data_history;  -- security definer 外直查应报权限错误（RLS 无策略）
 
 -- =====================================================================
+-- F5 · QQ 机器人双向（独立项目 aoi-qqbot 消费的 3 个只读 RPC）
+-- 设计文档：docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md（三·新增 RPC / 附录 / 附录 B）
+-- 纪律与团员端 RPC 相同：drop if exists 再 create（可重复执行）；
+-- security definer；返回字段白名单——不含整 blob、地址、凭证 URL、他人数据。
+-- ① member_lookup_by_qq(p_qq)      查单/进度：QQ→CN 解析后返回本人摘要
+-- ② team_summary_for_group()       群内团况：团级聚合（无个人字段）
+-- ③ unpaid_members_by_group()      自动催缴：待缴费名单 + botConfig 白名单出参
+-- =====================================================================
+
+drop function if exists public.member_lookup_by_qq(text);
+create function public.member_lookup_by_qq(p_qq text)
+returns json
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+#variable_conflict use_variable
+declare
+  v_team text;
+  v_data jsonb;
+  v_cn text;
+  v_batch_dates jsonb;
+begin
+  select t.name, coalesce(d.data, '{}'::jsonb)
+    into v_team, v_data
+    from teams t
+    left join team_data d on d.team_id = t.id
+    limit 1;
+  if v_team is null or v_data->'memberMeta' is null then
+    return null;
+  end if;
+
+  -- QQ → CN（jsonb_each 列名为 key/value，勿用缩写别名——v3.4.0 曾因 k 别名报 42703）
+  select key into v_cn
+  from jsonb_each(v_data->'memberMeta')
+  where value->>'qq' = p_qq
+  limit 1;
+  if v_cn is null then
+    return null;
+  end if;
+
+  select coalesce(jsonb_object_agg(b->>'id', b->>'date'), '{}'::jsonb)
+    into v_batch_dates
+  from jsonb_array_elements(coalesce(v_data->'batches', '[]'::jsonb)) b;
+
+  return json_build_object(
+    'cn', v_cn,
+    'teamName', v_team,
+    'orders', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'activity', o->>'activity',
+          'typeModel', concat_ws(' - ', o->>'type', o->>'model'),
+          'count', o->'count',
+          'status', coalesce(o->>'status', '排单中'),
+          'shipped', coalesce(o->>'shipped', '未发'),
+          'received', coalesce(o->'received', 'false'::jsonb),
+          'tracking', o->>'tracking',
+          'batchDate', v_batch_dates ->> coalesce(o->>'batchId', '')
+        ) order by o->>'id')
+      from jsonb_array_elements(coalesce(v_data->'orders', '[]'::jsonb)) o
+      where o->>'buyer' = v_cn
+    ), '[]'::jsonb),
+    'fees', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'batchId', p->>'batchId',
+          'batchDate', v_batch_dates ->> coalesce(p->>'batchId', ''),
+          'intlFee', p->'intlFee',
+          'payStatus', coalesce(p->>'status', '待交')
+        ) order by p->>'batchId')
+      from jsonb_array_elements(coalesce(v_data->'payments', '[]'::jsonb)) p
+      where p->>'buyer' = v_cn
+    ), '[]'::jsonb),
+    'generatedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  );
+end;
+$$;
+
+drop function if exists public.team_summary_for_group();
+create function public.team_summary_for_group()
+returns json
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+#variable_conflict use_variable
+declare
+  v_team text;
+  v_data jsonb;
+  v_orders jsonb;
+  v_payments jsonb;
+  v_total int;
+  v_paid int;
+  v_stage text;
+begin
+  select t.name, coalesce(d.data, '{}'::jsonb)
+    into v_team, v_data
+    from teams t
+    left join team_data d on d.team_id = t.id
+    limit 1;
+  if v_team is null then
+    return null;
+  end if;
+
+  select coalesce(v_data->'orders', '[]'::jsonb), coalesce(v_data->'payments', '[]'::jsonb)
+    into v_orders, v_payments;
+
+  select count(*) into v_total
+  from jsonb_object_keys(coalesce(v_data->'memberMeta', '{}'::jsonb));
+
+  -- 已缴费：有已到货订单，且其所有到货批次均有「已交」记录
+  select count(*) into v_paid
+  from jsonb_object_keys(coalesce(v_data->'memberMeta', '{}'::jsonb)) k
+  where exists (
+        select 1 from jsonb_array_elements(v_orders) o
+        where o->>'buyer' = k and o->>'batchId' is not null)
+    and not exists (
+        select 1 from jsonb_array_elements(v_orders) o
+        where o->>'buyer' = k and o->>'batchId' is not null
+          and not exists (
+            select 1 from jsonb_array_elements(v_payments) p
+            where p->>'buyer' = k and p->>'batchId' = o->>'batchId' and p->>'status' = '已交'));
+
+  -- 团阶段：排单 → 到货 → 交费 → 排发 → 收尾
+  if not exists (select 1 from jsonb_array_elements(v_orders) o) then
+    v_stage := '排单';
+  elsif exists (
+        select 1 from jsonb_array_elements(v_orders) o
+        where coalesce(o->>'status', '') <> '已到货' or o->>'batchId' is null) then
+    v_stage := case when exists (
+                select 1 from jsonb_array_elements(v_orders) o
+                where o->>'status' = '已到货' and o->>'batchId' is not null)
+              then '到货' else '排单' end;
+  elsif exists (
+        select 1 from jsonb_array_elements(v_orders) o
+        where o->>'batchId' is not null
+          and not exists (
+            select 1 from jsonb_array_elements(v_payments) p
+            where p->>'buyer' = o->>'buyer' and p->>'batchId' = o->>'batchId'
+              and p->>'status' = '已交')) then
+    v_stage := '交费';
+  elsif exists (
+        select 1 from jsonb_array_elements(v_orders) o
+        where coalesce(o->>'shipped', '未发') <> '已发') then
+    v_stage := '排发';
+  else
+    v_stage := '收尾';
+  end if;
+
+  return json_build_object(
+    'teamName', v_team,
+    'stage', v_stage,
+    'totalMembers', v_total,
+    'paidCount', v_paid,
+    'unpaidCount', greatest(v_total - v_paid, 0),
+    -- blob 无 DDL 字段：恒 null，relay 侧据此省略该行
+    'deadline', null,
+    'generatedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  );
+end;
+$$;
+
+drop function if exists public.unpaid_members_by_group();
+create function public.unpaid_members_by_group()
+returns json
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+#variable_conflict use_variable
+declare
+  v_team text;
+  v_data jsonb;
+  v_orders jsonb;
+  v_payments jsonb;
+  v_batch_dates jsonb;
+  v_unpaid jsonb;
+begin
+  select t.name, coalesce(d.data, '{}'::jsonb)
+    into v_team, v_data
+    from teams t
+    left join team_data d on d.team_id = t.id
+    limit 1;
+  if v_team is null then
+    return null;
+  end if;
+
+  select coalesce(v_data->'orders', '[]'::jsonb), coalesce(v_data->'payments', '[]'::jsonb)
+    into v_orders, v_payments;
+
+  select coalesce(jsonb_object_agg(b->>'id', b->>'date'), '{}'::jsonb)
+    into v_batch_dates
+  from jsonb_array_elements(coalesce(v_data->'batches', '[]'::jsonb)) b;
+
+  -- 未清批次：成员有该批次的已到货订单，且该批次无「已交」记录
+  with unpaid_batches as (
+    select e.key as cn, e.value->>'qq' as qq, o->>'batchId' as batch_id
+    from jsonb_each(coalesce(v_data->'memberMeta', '{}'::jsonb)) e
+    join jsonb_array_elements(v_orders) o
+      on o->>'buyer' = e.key and o->>'batchId' is not null
+    where not exists (
+      select 1 from jsonb_array_elements(v_payments) p
+      where p->>'buyer' = e.key and p->>'batchId' = o->>'batchId' and p->>'status' = '已交')
+    group by e.key, e.value->>'qq', o->>'batchId'
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'cn', g.cn,
+           'qq', g.qq,
+           'amount', coalesce(amt.total, 0),
+           'batchDates', bd.dates,
+           'deadline', null::text
+         ) order by g.cn), '[]'::jsonb)
+    into v_unpaid
+  from (
+    select cn, max(qq) as qq
+    from unpaid_batches
+    group by cn
+  ) g
+  left join lateral (
+    select sum((p->>'intlFee')::numeric) as total
+    from jsonb_array_elements(v_payments) p
+    where p->>'buyer' = g.cn
+      and coalesce(p->>'status', '待交') <> '已交'
+      and p->>'batchId' in (select u.batch_id from unpaid_batches u where u.cn = g.cn)
+  ) amt on true
+  left join lateral (
+    select jsonb_agg(distinct v_batch_dates ->> u.batch_id) as dates
+    from unpaid_batches u
+    where u.cn = g.cn
+  ) bd on true;
+
+  return json_build_object(
+    'teamName', v_team,
+    'unpaid', v_unpaid,
+    -- botConfig 白名单出参：只暴露二维码 URL 与管理员转发 QQ
+    'settings', jsonb_build_object(
+      'qrUrl', v_data#>>'{botConfig,qrUrl}',
+      'adminQq', v_data#>>'{botConfig,adminQq}'
+    ),
+    'generatedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  );
+end;
+$$;
+
+-- —— F5 RPC 排查 SQL（线上排障时在 SQL Editor 执行）——
+-- ① 三个 RPC 存在且 anon 可执行（均应 true）：
+--   select has_function_privilege('anon','public.member_lookup_by_qq(text)','EXECUTE'),
+--          has_function_privilege('anon','public.team_summary_for_group()','EXECUTE'),
+--          has_function_privilege('anon','public.unpaid_members_by_group()','EXECUTE');
+-- ② 行为抽查：
+--   select public.member_lookup_by_qq('<某已绑定 QQ>');   -- 只含本人 orders/fees
+--   select public.team_summary_for_group();               -- 只含聚合字段
+--   select public.unpaid_members_by_group();              -- unpaid + settings(qrUrl/adminQq)
+
+-- =====================================================================
 -- 行级安全策略（RLS）
 -- =====================================================================
 alter table teams enable row level security;

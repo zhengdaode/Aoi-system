@@ -85,6 +85,33 @@ describe('Aoi.ship 发货管理', () => {
     expect(aoi.notify.sync).not.toHaveBeenCalled();
   });
 
+  it('setShipped：设为未发时不写 shippedAt、已有值保留', async () => {
+    setup(ORDERS);
+    aoi.state.data.orders.find(o => o.id === 'o1').shippedAt = '2026-09-01T00:00:00.000Z';
+    doc.getElementById('shipBatch').value = 'b1';
+    aoi.ship.render();
+    doc.querySelector('.ship-check[data-id="o2"]').checked = true;
+    doc.getElementById('shipStatus').value = '未发';
+    await aoi.ship.setShipped();
+    expect(aoi.state.data.orders.find(o => o.id === 'o2').shippedAt).toBeUndefined();
+    expect(aoi.state.data.orders.find(o => o.id === 'o1').shippedAt).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('setShipped：标记已发时写入 shippedAt 时间戳，重复标记不覆盖', async () => {
+    setup(ORDERS);
+    doc.getElementById('shipBatch').value = 'b1';
+    aoi.ship.render();
+    doc.querySelector('.ship-check[data-id="o2"]').checked = true;
+    doc.getElementById('shipStatus').value = '已发';
+    await aoi.ship.setShipped();
+    const first = aoi.state.data.orders.find(o => o.id === 'o2').shippedAt;
+    expect(typeof first).toBe('string');
+    expect(isNaN(new Date(first).getTime())).toBe(false);
+    doc.querySelector('.ship-check[data-id="o2"]').checked = true; // render 后勾选重置，重新勾选
+    await aoi.ship.setShipped();
+    expect(aoi.state.data.orders.find(o => o.id === 'o2').shippedAt).toBe(first);
+  });
+
   it('setTracking：保存快递单号', async () => {
     setup(ORDERS);
     await aoi.ship.setTracking('o1', 'SF999');

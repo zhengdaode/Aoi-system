@@ -96,7 +96,12 @@ Aoi.ship.setShipped = async function () {
   var status = document.getElementById('shipStatus').value;
   var idSet = {}; ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
-  d.orders.forEach(function (o) { if (idSet[o.id]) o.shipped = status; });
+  d.orders.forEach(function (o) {
+    if (!idSet[o.id]) return;
+    o.shipped = status;
+    // v3.5.0 F6：首标已发时记录发货时间戳（复盘统计的发货时效数据源；切回未发不删除，避免反复切换失真）
+    if (status === '已发' && !o.shippedAt) o.shippedAt = new Date().toISOString();
+  });
   await Aoi.saveTeamData(d);
   Aoi.ship.render();
   Aoi.toast('已设 ' + ids.length + ' 条为' + status, 'success');

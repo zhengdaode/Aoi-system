@@ -221,8 +221,9 @@ begin
   v_cn := p_cn;
 
   -- 输入可能是 QQ 号：memberMeta 命中则换算为对应 CN
+  -- （jsonb_each 返回列名为 key/value，勿用缩写别名——v3.4.0 曾因 k 别名在线上报 42703）
   if v_cn is not null and v_data->'memberMeta' is not null then
-    select k into v_qq_cn
+    select key into v_qq_cn
     from jsonb_each(v_data->'memberMeta')
     where value->>'qq' = v_cn
     limit 1;
@@ -233,9 +234,9 @@ begin
     v_data := v_data - 'addresses' - 'memberMeta' - 'cnChanges';
   else
     v_data := jsonb_set(v_data, '{addresses}',
-      coalesce((select jsonb_object_agg(k, v) from jsonb_each(coalesce(v_data->'addresses', '{}'::jsonb)) where k = v_cn), '{}'::jsonb), true);
+      coalesce((select jsonb_object_agg(key, value) from jsonb_each(coalesce(v_data->'addresses', '{}'::jsonb)) where key = v_cn), '{}'::jsonb), true);
     v_data := jsonb_set(v_data, '{memberMeta}',
-      coalesce((select jsonb_object_agg(k, v) from jsonb_each(coalesce(v_data->'memberMeta', '{}'::jsonb)) where k = v_cn), '{}'::jsonb), true);
+      coalesce((select jsonb_object_agg(key, value) from jsonb_each(coalesce(v_data->'memberMeta', '{}'::jsonb)) where key = v_cn), '{}'::jsonb), true);
     v_data := jsonb_set(v_data, '{cnChanges}',
       coalesce((select jsonb_agg(e) from jsonb_array_elements(coalesce(v_data->'cnChanges', '[]'::jsonb)) e
                 where e->>'oldCn' = v_cn or e->>'newCn' = v_cn), '[]'::jsonb), true);

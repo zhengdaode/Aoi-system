@@ -87,7 +87,11 @@ describe('supabase-schema.sql B2 守护（读裁剪 / 写白名单 / 密钥强�
   it('读 RPC：两参数签名 + 三类 PII 裁剪 + cn 回传', () => {
     expect(schema).toMatch(/create function public\.get_team_by_member_key\(member_key text, p_cn text default null\)/);
     expect(schema).toMatch(/v_data := v_data - 'addresses' - 'memberMeta' - 'cnChanges'/);
-    expect(schema.match(/jsonb_object_agg\(k, v\) from jsonb_each/g) || []).toHaveLength(2);
+    // jsonb_each 的列名是 key/value——守护禁止缩写别名（v3.4.0 曾因 k 别名线上 42703）
+    expect(schema.match(/jsonb_object_agg\(key, value\) from jsonb_each/g) || []).toHaveLength(2);
+    expect(schema).not.toMatch(/jsonb_object_agg\(k, v\)/);
+    expect(schema).not.toMatch(/select k into/);
+    expect(schema).toMatch(/select key into v_qq_cn/);
     expect(schema).toMatch(/'cn', v_cn/);
   });
 

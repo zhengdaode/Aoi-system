@@ -139,3 +139,34 @@ fs.writeFileSync(path.join(OUT_DIR, 'index.html'), `<!DOCTYPE html>
 </div></body></html>`);
 
 console.log('OK: demo/review/index.html + demo/review/f5-plan.html');
+
+// —— 单文件合并版（F5 计划 + F6 demo），供直接发送到手机离线打开 ——
+const demoPath = path.join(ROOT, 'demo', 'stats-demo', 'index.html');
+const demoHtml = fs.readFileSync(demoPath, 'utf8');
+const demoStyle = (demoHtml.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+const demoBody = (demoHtml.match(/<body>([\s\S]*?)<script>/) || [])[1] || '';
+const demoScript = (demoHtml.match(/<script>([\s\S]*?)<\/script>/) || [])[1] || '';
+
+fs.writeFileSync(path.join(OUT_DIR, 'Aoi-F5F6-review.html'), `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aoi v3.4.0 审阅 · F5 计划 + F6 Demo（离线单文件）</title>
+<style>${CSS}</style>
+<style>${demoStyle}</style>
+</head>
+<body>
+<div class="wrap">
+  <p><span style="font-size:.75rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:999px;padding:2px 10px">待用户审核 · 全部数据为合成示例，非真实订单</span></p>
+  ${mdToHtml(md)}
+</div>
+<hr>
+<div id="f6">
+${demoBody}
+</div>
+<script>${demoScript}</script>
+</body>
+</html>`);
+
+console.log('OK: demo/review/Aoi-F5F6-review.html（单文件离线版）');

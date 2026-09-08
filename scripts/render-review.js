@@ -109,7 +109,6 @@ const PAGE = (title, badge, body) => `<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <div class="topbar"><a href="index.html">← 审阅目录</a></div>
   <p><span style="font-size:.75rem;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:999px;padding:2px 10px">${badge}</span></p>
   ${body}
 </div>

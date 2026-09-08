@@ -4,6 +4,10 @@
 > 待管理层审核）。本轮按用户指示：**先自行以审核者视角对 F6 功能做一轮迭代**（代替管理层审核产出结论），
 > 再制定并入主系统的具体实现方案并实装。实装版本定号 **v3.5.0**。
 >
+> **2026-09-08 用户决策（追加）**：demo 已不需要，跳过 demo v2 迭代与管理层审核环节，
+> 直接按本方案实装主系统。`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物
+> （其「审核要点」已由本文第一节回答），后续如需清理另行删除。
+>
 > 约束：遵守「无框架、无构建、纯前端 + Supabase blob」架构；不动 schema（纯前端读侧统计）；
 > 每步独立 commit、测试全绿才交付。
 
@@ -97,10 +101,9 @@
 - 渲染冒烟：`render()` 填充 KPI / 表格 / 条形图 DOM；口径切换按钮生效。
 - 基线不回退：`npm test` 全绿（v3.4.0 基线 170 例 + 新增约 20 例）。
 
-### 3.5 demo 同步与文档
+### 3.5 demo 处置（2026-09-08 用户决策更新）
 
-- `demo/stats-demo/index.html` 升级为 v2 功能集（同口径合成数据）、`说明.md` 更新模块表与审核要点状态；
-  重打包 `demo/F6-团期复盘统计-demo.zip`；`demo/review/Aoi-F5F6-review.html` 的 F6 节同步替换。
+- demo 不再迭代、不再要求管理层审核；`demo/stats-demo/` 与 zip 保留为历史产物，文档标注已被 v3.5.0 正式版取代。
 - 文档同步：CHANGELOG（v3.5.0）、STATUS（版本 / 速览 / 数据模型 `shippedAt`）、README（功能全景 + 模块数 16→17）、
   AGENTS（计划入口状态）、PLAN-NEXT（F6 节 + 版本表重切：v3.5.0 = F6 并入；原 v3.5.0 链路加固顺延为 v3.6.0；
   原 v3.6.0 治理与复盘顺延为 v3.7.0）。
@@ -108,7 +111,6 @@
 ### 3.6 实施顺序（每步一 commit）
 
 1. 本方案文档（docs）
-2. demo v2 迭代 + zip + review 页同步
-3. `shippedAt` 埋点 + 测试
-4. `js/stats.js` + `view-stats` + 导航/接线 + 测试
-5. 文档收尾（CHANGELOG / STATUS / README / AGENTS / PLAN-NEXT）
+2. `shippedAt` 埋点 + 测试
+3. `js/stats.js` + `view-stats` + 导航/接线 + 测试
+4. 文档收尾（CHANGELOG / STATUS / README / AGENTS / PLAN-NEXT）

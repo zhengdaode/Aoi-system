@@ -1247,7 +1247,7 @@ Aoi.orders.actProductRowHtml = function (activity, p) {
     + thumb
     + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm">'
     + '<input id="' + imgId + '" data-img-paste value="' + Aoi.escapeHtml(p.refImage || '') + '" placeholder="参考图 URL" class="w-44 border border-gray-300 rounded px-2 py-1 text-sm">'
-    + '<label class="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded cursor-pointer hover:bg-gray-300 whitespace-nowrap">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, \'' + imgId + '\')"></label>'
+    + '<button type="button" onclick="Aoi.img.openPicker(\'' + imgId + '\')" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>'
     + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="w-44 border border-gray-300 rounded px-2 py-1 text-sm">'
     + '<button data-psave="' + p.id + '" class="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 whitespace-nowrap">保存</button>'
     + '<button data-pdel="' + p.id + '" class="px-2 py-1 text-red-500 text-xs hover:underline whitespace-nowrap">删</button>'

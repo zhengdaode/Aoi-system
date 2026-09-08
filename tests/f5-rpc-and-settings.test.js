@@ -54,10 +54,10 @@ describe('Aoi.bot 设置页扩展：botConfig.adminQq / botConfig.qrUrl 读写�
     expect(doc.getElementById('botQrUrl').value).toBe('https://img.example.com/qr2.png');
   });
 
-  it('设置页存在新控件：botAdminQq 输入框 + 二维码上传控件（Aoi.img.fill 目标 botQrUrl）', () => {
+  it('设置页存在新控件：botAdminQq 输入框 + 二维码「图片…」弹窗按钮（v3.6.1 openPicker 目标 botQrUrl）', () => {
     expect(doc.getElementById('botAdminQq')).toBeTruthy();
     expect(doc.getElementById('botQrUrl')).toBeTruthy();
-    expect(doc.querySelector('input[onchange="Aoi.img.fill(this, \'botQrUrl\')"]')).toBeTruthy();
+    expect(doc.querySelector('button[onclick="Aoi.img.openPicker(\'botQrUrl\')"]')).toBeTruthy();
   });
 });
 

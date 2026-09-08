@@ -333,7 +333,7 @@
               <label class="block text-xs text-gray-500 mb-1">缴费二维码（催缴私聊附带；换图保存后下次催缴自动生效）</label>
               <div class="flex gap-2">
                 <input id="botQrUrl" type="text" data-img-paste placeholder="二维码图片 URL（上传/粘贴后自动填充，也可手填）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
-                <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded cursor-pointer hover:bg-gray-300 whitespace-nowrap">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'botQrUrl')"></label>
+                <button type="button" onclick="Aoi.img.openPicker('botQrUrl')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>
               </div>
             </div>
           </div>
@@ -531,7 +531,7 @@
             <input id="apNewUrl" placeholder="跳转链接（空=平台链接）" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
           </div>
           <div class="flex flex-wrap items-center gap-2 mb-3">
-            <label class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded cursor-pointer hover:bg-gray-300">上传参考图<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'apNewImage')"></label>
+            <button type="button" onclick="Aoi.img.openPicker('apNewImage')" class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>
             <button onclick="Aoi.orders.addActProduct()" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700">添加商品</button>
             <p class="text-xs text-gray-400">跳转链接留空时，团员端默认展示活动平台链接</p>
           </div>
@@ -675,7 +675,7 @@
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <input id="whQr" type="text" data-img-paste placeholder="收款码 URL（选填，可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'whQr')"></label>
+            <button type="button" onclick="Aoi.img.openPicker('whQr')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">图片…</button>
             <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
           </div>
           <ul id="whList"></ul>
@@ -842,7 +842,7 @@
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.ship.toggleAll(this)"> 全选</label>
             <input id="shipPhoto" type="text" data-img-paste placeholder="合照 URL（可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'shipPhoto')"></label>
+            <button type="button" onclick="Aoi.img.openPicker('shipPhoto')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">图片…</button>
             <button onclick="Aoi.ship.setPhoto()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量设合照</button>
             <select id="shipStatus" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="已发">设为已发</option>
@@ -1084,6 +1084,33 @@
     <div class="bg-white rounded-lg px-6 py-4 flex items-center gap-3">
       <div class="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
       <span id="loadingText" class="text-sm">处理中...</span>
+    </div>
+  </div>
+
+  <!-- 图片选择弹窗（v3.6.1：粘贴图片 / 上传图片 / 粘贴图床链接 三合一） -->
+  <div id="imgPickerModal" class="hidden fixed inset-0 z-[10001] bg-black bg-opacity-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+      <h3 class="font-bold text-lg mb-1">添加图片</h3>
+      <p id="imgPickerTitle" class="text-xs text-gray-400 mb-3"></p>
+      <div id="imgPasteZone" class="border-2 border-dashed border-gray-300 rounded-lg px-4 py-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 mb-3 select-none" onclick="Aoi.img.focusPickerUrl()">
+        <p class="text-sm font-bold text-gray-700">① 粘贴图片</p>
+        <p class="text-xs text-gray-400 mt-1">截图后直接按 Ctrl+V（无需点击任何输入框）</p>
+      </div>
+      <div class="flex items-center gap-2 mb-2">
+        <label class="px-3 py-2 bg-blue-500 text-white text-sm font-bold rounded cursor-pointer hover:bg-blue-600 whitespace-nowrap">② 上传图片<input id="imgPickerFile" type="file" accept="image/*" class="hidden" onchange="Aoi.img.pickerFileInput(this)"></label>
+        <input id="imgUrlInput" data-img-paste placeholder="③ 或粘贴图床链接（https://…）" class="flex-1 min-w-0 border border-gray-300 rounded px-2 py-2 text-sm" oninput="Aoi.img.applyPickedUrl(this.value)">
+      </div>
+      <p id="imgPickerStatus" class="text-xs text-gray-500 mb-2"></p>
+      <div id="imgPickerPreview" class="hidden mb-3">
+        <div class="flex items-center gap-2">
+          <img id="imgPickerPreviewImg" class="w-16 h-16 object-cover rounded border border-gray-200 shrink-0" alt="预览">
+          <span id="imgPickerPreviewUrl" class="text-xs text-gray-400 break-all flex-1"></span>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button onclick="Aoi.img.closePicker()" class="px-4 py-2 rounded font-bold text-gray-600 border border-gray-300 hover:bg-gray-100">取消</button>
+        <button id="imgPickerConfirm" onclick="Aoi.img.confirmPicker()" class="px-4 py-2 rounded font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed" disabled>确认填入</button>
+      </div>
     </div>
   </div>
 

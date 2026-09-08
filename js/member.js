@@ -130,7 +130,7 @@ Aoi.member.renderFees = function (cn) {
     var action;
     if (status !== '已交') {
       action = '<input id="receipt_' + batchId + '" type="text" data-img-paste placeholder="付款凭证 URL（可上传/粘贴）" class="w-40 border border-gray-300 rounded px-2 py-1 text-xs">'
-        + '<label class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, \'receipt_' + batchId + '\')"></label>'
+        + '<button type="button" data-imgpicker="receipt_' + batchId + '" class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>'
         + '<button data-batch="' + batchId + '" class="ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">提交凭证</button>';
     } else if (receipt) {
       action = '<a href="' + Aoi.escapeHtml(receipt) + '" target="_blank" class="text-blue-500 hover:underline text-xs">查看凭证</a>';
@@ -405,8 +405,10 @@ Aoi.member.submitTransfer = async function () {
   }
 };
 
-// 事件委托：我的国际费「提交凭证」
+// 事件委托：我的国际费「提交凭证」+「图片…」选择弹窗
 document.getElementById('memberFeeTbody').addEventListener('click', function (e) {
+  var pick = e.target.closest('button[data-imgpicker]');
+  if (pick) { Aoi.img.openPicker(pick.getAttribute('data-imgpicker')); return; }
   var btn = e.target.closest('button[data-batch]');
   if (!btn) return;
   var batchId = btn.getAttribute('data-batch');

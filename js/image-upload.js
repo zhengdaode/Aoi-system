@@ -133,12 +133,91 @@ Aoi.img.fill = async function (inputEl, targetId) {
   inputEl.value = '';
 };
 
-// v3.6.0 S4：粘贴上传——焦点在带 data-img-paste 属性的输入框内 Ctrl+V 粘贴图片时，
-// 自动走压缩 + 图床上传并把 URL 回填该输入框（与文件上传同链路，保存后生效）
+// v3.6.1：统一「添加图片」弹窗——粘贴图片 / 上传图片 / 粘贴图床链接 三合一，
+// 确认后写回调用方的目标输入框（桌面端推荐入口，修复旧直粘路径焦点依赖的"无法粘贴"）
+Aoi.img.pickerTarget = null;
+
+Aoi.img.openPicker = function (targetId) {
+  var target = document.getElementById(targetId);
+  if (!target) { Aoi.toast('未找到目标输入框', 'error'); return; }
+  Aoi.img.pickerTarget = targetId;
+  var t = document.getElementById('imgPickerTitle');
+  if (t) t.textContent = '填入：' + (target.placeholder || targetId);
+  var urlInput = document.getElementById('imgUrlInput');
+  if (urlInput) urlInput.value = '';
+  Aoi.img.pickerStatus('截图后直接按 Ctrl+V 即可（无需点击任何输入框）');
+  Aoi.img.applyPickedUrl('');
+  document.getElementById('imgPickerModal').classList.remove('hidden');
+};
+
+Aoi.img.closePicker = function () {
+  document.getElementById('imgPickerModal').classList.add('hidden');
+  Aoi.img.pickerTarget = null;
+};
+
+Aoi.img.pickerStatus = function (text) {
+  var el = document.getElementById('imgPickerStatus');
+  if (el) el.textContent = text || '';
+};
+
+// 点击粘贴区 = 聚焦链接输入框（图片粘贴本就不依赖焦点，此处便于继续手打链接）
+Aoi.img.focusPickerUrl = function () {
+  var el = document.getElementById('imgUrlInput');
+  if (el) el.focus();
+};
+
+// 填入候选 URL：校验 + 预览 + 确认按钮状态；仅 http(s) 链接可确认
+Aoi.img.applyPickedUrl = function (url) {
+  url = (url || '').trim();
+  var urlInput = document.getElementById('imgUrlInput');
+  if (urlInput && urlInput.value !== url) urlInput.value = url;
+  var ok = /^https?:\/\/\S+/.test(url);
+  var box = document.getElementById('imgPickerPreview');
+  var img = document.getElementById('imgPickerPreviewImg');
+  var label = document.getElementById('imgPickerPreviewUrl');
+  if (box) box.classList.toggle('hidden', !url);
+  if (img && url) img.src = url;
+  if (label) label.textContent = url;
+  var btn = document.getElementById('imgPickerConfirm');
+  if (btn) btn.disabled = !ok;
+  return ok;
+};
+
+Aoi.img.confirmPicker = function () {
+  var url = ((document.getElementById('imgUrlInput') || {}).value || '').trim();
+  if (!/^https?:\/\/\S+/.test(url)) { Aoi.toast('请先粘贴图片 / 上传图片，或填写 http(s) 图床链接', 'warning'); return; }
+  var target = document.getElementById(Aoi.img.pickerTarget);
+  Aoi.img.closePicker();
+  if (target) {
+    target.value = url;
+    Aoi.toast('图片链接已填入，保存后生效', 'success');
+  }
+};
+
+// 弹窗内上传（文件选择 / 粘贴图片共用）
+Aoi.img.pickerUpload = function (file) {
+  if (!file) return;
+  Aoi.img.pickerStatus('正在压缩并上传图片…');
+  Aoi.img.upload(file).then(function (url) {
+    Aoi.img.applyPickedUrl(url);
+    Aoi.img.pickerStatus('上传成功，点「确认填入」写入目标输入框');
+  }, function (err) {
+    Aoi.img.pickerStatus('上传失败：' + (err && err.message ? err.message : '未知错误'));
+    Aoi.toast('图片上传失败：' + (err && err.message ? err.message : '未知错误'), 'error');
+  });
+};
+
+Aoi.img.pickerFileInput = function (inputEl) {
+  var file = inputEl && inputEl.files && inputEl.files[0];
+  if (file) Aoi.img.pickerUpload(file);
+  if (inputEl) inputEl.value = '';
+};
+
+// paste 全局监听（v3.6.1 修复）：「添加图片」弹窗打开时，页面任意位置 Ctrl+V 均可捕获图片——
+// 不再要求焦点恰好落在输入框（旧实现焦点稍偏即"无法粘贴"）；弹窗未开时保留原快捷路径：
+// 焦点在 data-img-paste 输入框内粘贴图片 → 直接上传回填
 Aoi.img.bindPaste = function () {
   document.addEventListener('paste', function (e) {
-    var t = e.target;
-    if (!t || !t.hasAttribute || !t.hasAttribute('data-img-paste')) return;
     var cd = e.clipboardData;
     if (!cd || !cd.items) return;
     var file = null;
@@ -146,7 +225,16 @@ Aoi.img.bindPaste = function () {
       if (cd.items[i].type && cd.items[i].type.indexOf('image/') === 0) { file = cd.items[i].getAsFile(); break; }
     }
     if (!file) return;
+    var modal = document.getElementById('imgPickerModal');
+    var pickerOpen = !!(Aoi.img.pickerTarget && modal && !modal.classList.contains('hidden'));
+    var t = e.target;
+    var inMarked = !!(t && t.hasAttribute && t.hasAttribute('data-img-paste'));
+    if (!pickerOpen && !inMarked) return;
     e.preventDefault();
+    if (pickerOpen) {
+      Aoi.img.pickerUpload(file);
+      return;
+    }
     Aoi.showLoading('正在压缩并上传粘贴的图片...');
     Aoi.img.upload(file).then(function (url) {
       Aoi.hideLoading();

@@ -123,3 +123,95 @@ describe('Aoi.img.bindPaste 粘贴上传（v3.6.0 S4）', () => {
     });
   });
 });
+
+// v3.6.1：统一「添加图片」弹窗——粘贴/上传/链接三合一；弹窗打开时任意位置粘贴均可捕获
+describe('Aoi.img 图片选择弹窗（v3.6.1）', () => {
+  function ensureTarget() {
+    let el = doc.getElementById('pickTargetTest');
+    if (!el) {
+      el = doc.createElement('input');
+      el.id = 'pickTargetTest';
+      doc.body.appendChild(el);
+    }
+    el.value = '';
+    return el;
+  }
+  function pasteEvent(items) {
+    const ev = new win.Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'clipboardData', { value: { items } });
+    return ev;
+  }
+
+  it('openPicker 打开弹窗：确认禁用、目标记录；closePicker 复位', () => {
+    ensureTarget();
+    aoi.img.openPicker('pickTargetTest');
+    expect(doc.getElementById('imgPickerModal').classList.contains('hidden')).toBe(false);
+    expect(aoi.img.pickerTarget).toBe('pickTargetTest');
+    expect(doc.getElementById('imgPickerConfirm').disabled).toBe(true);
+    aoi.img.closePicker();
+    expect(doc.getElementById('imgPickerModal').classList.contains('hidden')).toBe(true);
+    expect(aoi.img.pickerTarget).toBeNull();
+  });
+
+  it('链接方式：合法 https 链接启用确认，confirmPicker 回填目标输入框', () => {
+    ensureTarget();
+    aoi.img.openPicker('pickTargetTest');
+    aoi.img.applyPickedUrl('https://img.example/x.jpg');
+    expect(doc.getElementById('imgPickerConfirm').disabled).toBe(false);
+    expect(doc.getElementById('imgPickerPreview').classList.contains('hidden')).toBe(false);
+    aoi.img.confirmPicker();
+    expect(doc.getElementById('pickTargetTest').value).toBe('https://img.example/x.jpg');
+    expect(doc.getElementById('imgPickerModal').classList.contains('hidden')).toBe(true);
+  });
+
+  it('非法链接（非 http/s）确认保持禁用且 confirm 不回填', () => {
+    ensureTarget();
+    aoi.img.openPicker('pickTargetTest');
+    expect(aoi.img.applyPickedUrl('javascript:alert(1)')).toBe(false);
+    expect(doc.getElementById('imgPickerConfirm').disabled).toBe(true);
+    aoi.img.confirmPicker();
+    expect(doc.getElementById('pickTargetTest').value).toBe('');
+    aoi.img.closePicker();
+  });
+
+  it('弹窗打开时页面任意位置粘贴图片均可捕获（无需焦点在输入框）——核心 bug 修复', async () => {
+    ensureTarget();
+    aoi.img.openPicker('pickTargetTest');
+    aoi.img.upload = vi.fn().mockResolvedValue('https://img.example/pasted.jpg');
+    doc.body.dispatchEvent(pasteEvent([{ type: 'image/png', getAsFile: () => ({ name: 'clip.png' }) }]));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(aoi.img.upload).toHaveBeenCalled();
+    expect(doc.getElementById('imgUrlInput').value).toBe('https://img.example/pasted.jpg');
+    expect(doc.getElementById('imgPickerConfirm').disabled).toBe(false);
+    aoi.img.confirmPicker();
+    expect(doc.getElementById('pickTargetTest').value).toBe('https://img.example/pasted.jpg');
+  });
+
+  it('pickerUpload 直接上传路径：成功后回填弹窗输入框并启用确认', async () => {
+    ensureTarget();
+    aoi.img.openPicker('pickTargetTest');
+    aoi.img.upload = vi.fn().mockResolvedValue('https://img.example/file.jpg');
+    aoi.img.pickerUpload({ name: 'f.jpg' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(doc.getElementById('imgUrlInput').value).toBe('https://img.example/file.jpg');
+    expect(doc.getElementById('imgPickerConfirm').disabled).toBe(false);
+    aoi.img.closePicker();
+  });
+
+  it('活动商品弹窗与团员凭证行的图片入口已换成「图片…」按钮', () => {
+    // 活动商品新增行
+    const apBtn = [...doc.querySelectorAll('#actProductsModal button')].find((b) => b.getAttribute('onclick') === "Aoi.img.openPicker('apNewImage')");
+    expect(apBtn).not.toBeUndefined();
+    // 团员端渲染凭证行后出现 data-imgpicker 按钮
+    aoi.state.data = {
+      activities: [], batches: [{ id: 'b1', date: '2026-09-01' }], orders: [
+        { id: 'o1', activity: 'A', type: '吧唧', model: 'M', price: 10, currency: 'cny', count: 1, buyer: '小樱', status: '已到货', batchId: 'b1' }
+      ],
+      payments: []
+    };
+    aoi.member.state.cn = '小樱';
+    aoi.member.state.teamName = '测试团';
+    aoi.member.renderFees('小樱');
+    expect(doc.querySelector('#memberFeeTbody button[data-imgpicker="receipt_b1"]')).not.toBeNull();
+  });
+});

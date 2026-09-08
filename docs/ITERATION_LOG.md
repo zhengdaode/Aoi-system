@@ -78,3 +78,20 @@ git reset --hard <tag|commit> # 整体回退到某状态（谨慎，会丢弃其
 - **tag**：`v3.0.0`。
 - **状态**：代码与 schema 均已上线；等待部署者首次打开网站初始化超管，并重启 ECS relay（`pm2 restart qq-relay`）。
 - **测试**：75 用例全绿（新增 admin-auth 13 例，harness 补载 auth.js/team.js）。
+
+## 第 8 轮 · v3.4.0 团员读 RPC 42703 线上事故（当夜引入，次日修复）
+
+- **现象**：团员端进入报「读取团队数据失败：column "k" does not exist」。触发面 = **新前端**（携带 p_cn 调用
+  `get_team_by_member_key`）——origin 推送后 CI 自动部署了 zhengdaode 仓库 Pages，访问即踩中；
+  旧生产前端（p_cn 为空，走剔除分支）不受影响。
+- **根因**：B2 Phase 1 重写该 RPC 时，QQ 映射分支 `select k ... from jsonb_each(...)` 与两处
+  `jsonb_object_agg(k, v)` 用了缩写别名——`jsonb_each` 返回列名为 `key`/`value`，`k` 在计划期即报 42703。
+- **为何两道防线都失守**：
+  ① 昨夜线上探针只覆盖 p_cn 空路径与写路径，**带 p_cn 的读取分支零覆盖**；
+  ② schema 守护测试把带 bug 的文本 `jsonb_object_agg(k, v)` 断言成了「正确答案」——测试锁死了错误。
+- **修复**：`fcb7512`（k→key 三处 + 守护改锁 key/value 写法并禁止缩写别名）→ sb.js 重跑 schema →
+  **逐分支**线上验证：CN 路径（解析「阿狸」，addr/meta 键集合空=零泄露）、QQ 映射（qq→「道德」）、
+  p_cn 空回归（无泄露）、写路径回归（版本号更新 + history 自动存档）。
+- **教训（固化为流程）**：① RPC 新增/修改的**每个执行分支**都必须有线上探针（本轮事故分支恰好是唯一没探的）；
+  ② 守护测试不得从实现文本「抄答案」——应断言语义不变量（列名、白名单、上限），写完后先人为反证一次
+  （把断言反转，确认测试真能抓坏实现）。

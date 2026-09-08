@@ -7,12 +7,13 @@
 // v3.5.2：新增 GET /fetch/<host>/<path…> 透传 —— 链接导入在 GitHub Pages 通道的代理路径
 //   （Pages 无服务端重写，https 页面也无法直连 http relay，只能经本函数桥接）。
 //   host 白名单须与 relay/relay.js FETCH_HOSTS 一致（双层校验，防开放代理）。
+//   注意：上游响应必须内存缓冲后再返回——运行时对透传流式 body 不稳（实测 500）。
 const UPSTREAM = 'http://47.101.194.103:8080/';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 Deno.serve(async (req) => {
@@ -24,11 +25,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'host not allowed' }),
         { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } });
     }
-    const r = await fetch(UPSTREAM + 'fetch/' + fm[1] + '/' + fm[2] + u.search, { redirect: 'follow' });
-    return new Response(r.body, {
-      status: r.status,
-      headers: { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'application/octet-stream' },
-    });
+    try {
+      const r = await fetch(UPSTREAM + 'fetch/' + fm[1] + '/' + fm[2] + u.search, { redirect: 'follow' });
+      return new Response(await r.arrayBuffer(), {
+        status: r.status,
+        headers: { ...CORS, 'Content-Type': r.headers.get('content-type') ?? 'application/octet-stream' },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'upstream fetch failed' }),
+        { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
   }
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'method not allowed' }),

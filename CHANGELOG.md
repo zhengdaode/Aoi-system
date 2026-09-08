@@ -1,5 +1,33 @@
 # Changelog
 
+## v3.5.3 (2026-09-09)
+
+> **F5 · QQ 机器人双向实施完成**——主体在独立仓库 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot)
+> （relay v4 双向，M1–M7 每里程碑独立 commit + node:test 54 用例；设计文档
+> `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` v3 定稿）。本仓库仅两处接入改动 + 审阅材料清理，
+> 全部可独立回退；**待真机部署**：SQL Editor 重跑 `supabase-schema.sql`（3 个新 RPC）、
+> ECS 部署 aoi-qqbot relay + NapCat 开 HTTP POST 上报 + Caddy TLS 反代（解除 GitHub Pages mixed content）。
+
+### Added（主仓库接入，commit df8a45f / 3f3db01）
+- **3 个只读 Supabase RPC**（security definer，drop 重建、可重复执行；返回字段白名单，不含地址/凭证/他人数据）：
+  ① `member_lookup_by_qq(p_qq)`——QQ→CN 解析后只返回本人订单/交费摘要（查单/进度数据源，附录 A 字段）；
+  ② `team_summary_for_group()`——团级聚合（阶段/匿名计数/DDL 恒 null，附录 B 白名单，群内团况数据源）；
+  ③ `unpaid_members_by_group()`——待缴费名单（cn/qq 可空/amount/batchDates）+ botConfig 白名单出参（qrUrl/adminQq）
+- **设置页「QQ 机器人」卡扩展**：管理员转发 QQ（`botConfig.adminQq`，排发表私发目标）+
+  缴费二维码（`botConfig.qrUrl`，复用 `Aoi.img` 图床上传；网页换图保存后下次催缴自动生效，relay 实时读取）
+- **排发表私发管理员**：`Aoi.bot.exportShipping(batchId)` 按 `Aoi.ship.export` 同款 8 字段组包
+  （购买者/制品/发货线路/数量/囤货地/快递单号/合照/状态），带 admin token POST relay
+  `/onebot/export-shipping`；`shipping.js` 批量「设为已发」后自动触发（异步、失败仅 toast 不影响本操作）
+
+### Removed
+- `demo/review/`（F5/F6 手机审阅页）——审阅使命完成（F5 已定稿实施、F6 已并入主系统），按用户指示删除
+
+### Tests
+- 203 → 211 用例：`f5-rpc-and-settings.test.js`（新字段持久化/回填/控件存在/schema 守护 + 42703 k 别名纪律）
+  + `f5-shipping-export.test.js`（exportShipping 组包/配置缺失/非 2xx/钩子触发/跳过/失败隔离）；全套全绿
+- 独立仓库侧：relay v4 全功能 node:test 54 用例（管线/绑定/查单/团况/催缴/xlsx/安全过滤），`npm test` 零依赖运行
+
+
 ## v3.5.2 (2026-09-09)
 
 ### Fixed

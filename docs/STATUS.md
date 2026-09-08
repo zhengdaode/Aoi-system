@@ -1,6 +1,6 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-09-08 · 版本 **v3.5.0**（v3.5：①F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js，只读统计）+ 发货时间戳埋点 `orders.shippedAt`，demo 路线按用户决策取消（迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`）；②从链接导入订单——排谷表/汇总表分享直链经 `/media-proxy` 同源代理一键导入。v3.4：数据安全兜底 + 团员感知增强（B1/F4、B2 Phase 1、F1、F2）；F5 QQ 机器人双向移出为独立项目（设计待审核）；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
+> 更新日期：2026-09-08 · 版本 **v3.5.0**（v3.5：①F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js，只读统计）+ 发货时间戳埋点 `orders.shippedAt`，demo 路线按用户决策取消（迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`）；②从链接导入订单——排谷表/汇总表分享直链经 `/media-proxy` 同源代理一键导入。v3.4：数据安全兜底 + 团员感知增强（B1/F4、B2 Phase 1、F1、F2）；F5 QQ 机器人双向移出为独立项目并于 2026-09-09 实施（aoi-qqbot 仓库 M1–M7，主仓库接入 3 RPC + 设置页 + 排发钩子；部署动作待真机）；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
 
 ## 当前状态速览（2026-09-08 v3.5.0 后）
 
@@ -11,7 +11,7 @@
   2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
   3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
   4. （GitHub Pages 测试链接导入时）`supabase functions deploy qq-relay --no-verify-jwt` 更新 Edge Function（v3.5.2 /fetch 透传），并确认设置页 relay 地址已是该函数地址——Pages 无服务端重写，Edge 通道是链接导入在 Pages 上的唯一代理路径。
-- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目（详细设计**待审核**：`docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md`，含六项待拍板问题）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
+- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目并**已实施（2026-09-09，[aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7）**：relay v4 双向 + 54 测试；主仓库接入见 CHANGELOG v3.5.3；**待真机部署**（NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 新 relay）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
 - **已知限制（v3.4.0 后）**：
   - member_key 仍为团队级凭证（一个团一把），但读已按 CN 裁剪 PII、写已白名单合并（防整份覆盖与自批「已交」）、密钥已升 128bit；设置页重新生成即作废旧密钥。
   - 服务端历史快照保留近 30 天 / 每团 100 份；更早的版本依赖手动「下载全量备份」文件。

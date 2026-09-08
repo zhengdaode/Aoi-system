@@ -37,6 +37,8 @@ Aoi.nav = function (viewId) {
   Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
   // 数据可能在其他视图被修改，回到限购页时刷新活动下拉与商品表
   if (viewId === 'view-limits' && Aoi.limits) Aoi.limits.render();
+  // 进入复盘统计页时按当前数据重算（v3.5.0 F6）
+  if (viewId === 'view-stats' && Aoi.stats) Aoi.stats.render();
 };
 
 // 移动端侧边栏抽屉：无参切换，true 展开 / false 收起
@@ -280,6 +282,7 @@ Aoi.refreshViews = function () {
   Aoi.orders.renderCnChanges();
   Aoi.overview.render();
   if (Aoi.limits) Aoi.limits.render();
+  if (Aoi.stats) Aoi.stats.render();
 };
 
 // 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）+ 开设 IP 一览

@@ -36,6 +36,7 @@ const MODULES = [
   'js/bot.js',
   'js/limits.js',
   'js/warehouse.js',
+  'js/stats.js',
   'js/image-upload.js'
 ];
 

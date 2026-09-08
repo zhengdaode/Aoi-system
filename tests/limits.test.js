@@ -1,54 +1,76 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, win, doc } from './helpers/aoi.js';
 
-describe('Aoi.limits.planCore 限购购买计划算法（v2.0.0 问题 8）', () => {
-  // 商品：A 单价 10 剩 5；B 单价 5 剩 10（贪心按单价降序：先 A 后 B）
+describe('Aoi.limits.planCore 限购购买计划算法（v3.4.1 两阶段：全量分配 → 包邮调剂）', () => {
+  // 商品：A 单价 10 剩 5；B 单价 5 剩 10（分配按单价降序逐件给最低额账号）
   const products = [
     { type: '徽章', model: 'A', qty: 5, price: 10 },
     { type: '色纸', model: 'B', qty: 10, price: 5 }
   ];
 
-  it('贪心装箱：每账号恰好凑满包邮线', () => {
+  it('阶段一全量分配：全部数量分完，均衡后全员包邮（旧逻辑会剩 B×2）', () => {
     const r = aoi.limits.planCore(products, { freeShip: 30, accounts: 3 });
+    expect(r.remaining).toEqual([]);            // 15 件全部硬性分配到账号
     expect(r.accounts).toHaveLength(3);
-    // 账号1：A×3 = 30 达包邮
-    expect(r.accounts[0].items).toEqual([{ type: '徽章', model: 'A', qty: 3, amount: 30 }]);
-    expect(r.accounts[0].reached).toBe(true);
-    // 账号2：A×2 + B×2 = 30
-    expect(r.accounts[1].total).toBe(30);
-    expect(r.accounts[1].reached).toBe(true);
-    // 剩余 B×2
-    expect(r.remaining).toEqual([{ type: '色纸', model: 'B', qty: 2 }]);
+    expect(r.accounts.map((a) => a.total)).toEqual([35, 35, 30]);   // 金额均衡
+    r.accounts.forEach((a) => expect(a.reached).toBe(true));        // 货值 100 ≥ 30×3 → 全员包邮
   });
 
-  it('限购数约束：单账号限购 2 时先买满限购再补其他商品', () => {
+  it('限购数约束：分配与调剂全程受单账号限购约束', () => {
     const withLimit = [{ type: '徽章', model: 'A', qty: 5, price: 10, limit: 2 }, products[1]];
     const r = aoi.limits.planCore(withLimit, { freeShip: 30, accounts: 3 });
-    // 账号1：A 限购 2 → A×2 = 20，再补 B×2 = 10 → 30
-    expect(r.accounts[0].total).toBe(30);
-    expect(r.accounts[0].items[0].qty).toBe(2);
+    expect(r.remaining).toEqual([]);
+    expect(r.accounts.map((a) => a.total)).toEqual([35, 35, 30]);
+    expect(r.accounts[0].items[0]).toEqual({ type: '徽章', model: 'A', qty: 2, amount: 20 });
   });
 
-  it('每账号最大购买种类数约束：maxTypes=1 时单账号只买一种', () => {
+  it('每账号最大种类数 maxTypes=1：装不下的进 remaining，调剂牺牲账号集中凑邮', () => {
     const r = aoi.limits.planCore(products, { freeShip: 30, accounts: 3, maxTypes: 1 });
+    // A 占满 3 个账号的种类名额后，B×10 无处安放 → remaining 提示
+    expect(r.remaining).toEqual([{ type: '色纸', model: 'B', qty: 10 }]);
     r.accounts.forEach((a) => expect(a.items).toHaveLength(1));
+    // 货值不足：牺牲账号3，把账号1 顶过包邮线
+    expect(r.accounts.map((a) => a.total)).toEqual([30, 20]);
   });
 
-  it('包邮金额为 0：不限制单账号金额，尽量集中购买', () => {
+  it('阶段2a 等价交换：普通挪动无解时 A↔B 净额互换让双账号同时达标', () => {
+    // 均衡后 24/17，达标账号盈余 4 放不出任何单品（10/7），只有 A↔B（净 +3）可补差
+    const mixed = [{ type: '徽章', model: 'A', qty: 2, price: 10 }, { type: '色纸', model: 'B', qty: 3, price: 7 }];
+    const r = aoi.limits.planCore(mixed, { freeShip: 20, accounts: 2 });
+    expect(r.remaining).toEqual([]);
+    expect(r.accounts.map((a) => a.total)).toEqual([21, 20]);
+    expect(r.accounts.every((a) => a.reached)).toBe(true);
+  });
+
+  it('阶段2b 货值不足：牺牲低额账号把最接近包邮线的顶过线', () => {
+    const scarce = [{ type: '徽章', model: 'A', qty: 3, price: 10 }, { type: '色纸', model: 'B', qty: 1, price: 5 }];
+    const r = aoi.limits.planCore(scarce, { freeShip: 25, accounts: 2 });
+    expect(r.remaining).toEqual([]);
+    expect(r.accounts.map((a) => a.total)).toEqual([25, 10]);      // 账号2 交出色纸¥5 补给账号1
+    expect(r.accounts.filter((a) => a.reached)).toHaveLength(1);   // 货值 35 < 25×2，至多 1 个达标
+  });
+
+  it('限购卡死调剂：limit=1 时无法集中凑邮，如实输出未达标', () => {
+    const r = aoi.limits.planCore([{ type: '徽章', model: 'A', qty: 2, price: 10, limit: 1 }], { freeShip: 20, accounts: 3 });
+    expect(r.remaining).toEqual([]);
+    expect(r.accounts.map((a) => a.total)).toEqual([10, 10]);      // 空账号不列行
+    expect(r.accounts.every((a) => !a.reached)).toBe(true);
+  });
+
+  it('包邮金额为 0：只做全量分配，不做包邮调剂', () => {
     const r = aoi.limits.planCore(products, { freeShip: 0, accounts: 1 });
     expect(r.accounts).toHaveLength(1);
-    const totalQty = r.accounts[0].items.reduce((s, it) => s + it.qty, 0);
-    expect(totalQty).toBe(15); // 全部塞进一个账号
+    expect(r.accounts[0].items.reduce((s, it) => s + it.qty, 0)).toBe(15); // 全部塞进一个账号
     expect(r.remaining).toHaveLength(0);
   });
 
-  it('账号不足时剩余数量进入 remaining 提示', () => {
-    // 货值 200 > 包邮线 100 × 1 账号：账号1 凑满 100 后停止，剩余进入未分配
+  it('货值远超包邮线：旧逻辑凑线即停会剩余，新逻辑全量分配（回归守护）', () => {
     const rich = [{ type: '徽章', model: 'A', qty: 15, price: 10 }, { type: '色纸', model: 'B', qty: 10, price: 5 }];
     const r = aoi.limits.planCore(rich, { freeShip: 100, accounts: 1 });
     expect(r.accounts).toHaveLength(1);
     expect(r.accounts[0].reached).toBe(true);
-    expect(r.remaining).toEqual([{ type: '徽章', model: 'A', qty: 5 }, { type: '色纸', model: 'B', qty: 10 }]);
+    expect(r.accounts[0].total).toBe(200);      // 15×10 + 10×5 全部买回（旧逻辑此处 100 即停）
+    expect(r.remaining).toEqual([]);
   });
 });
 
@@ -93,7 +115,11 @@ describe('Aoi.limits 页面逻辑（v2.0.0）', () => {
     const html = doc.getElementById('limResultTbody').innerHTML;
     expect(html).toContain('账号 1');
     expect(html).toContain('已达包邮');
-    expect(doc.getElementById('limResultStat').textContent).toContain('剩余未分配');
+    // 两阶段算法：货值 100 ≥ 30×3 → 全量分配完毕且 3 个账号全部达标（旧逻辑会提示剩余未分配）
+    const stat = doc.getElementById('limResultStat').textContent;
+    expect(stat).toContain('全部排单数量已分配完毕');
+    expect(stat).toContain('3 个达标包邮');
+    expect(stat).not.toContain('剩余未分配');
   });
 });
 

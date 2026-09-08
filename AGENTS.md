@@ -8,7 +8,7 @@
 1. **每次改动完成后，必须创建一个对应的 Git commit**，以便后续追踪和回滚。
 2. **每次改动完成后，必须编写或更新相关测试，并在交付给用户前，确保所有测试和验证全部通过。**
    （测试基建已建立：vitest + jsdom，`npm test`；harness 见 `tests/helpers/aoi.js`，新增 js 模块需加入其 MODULES 列表。）
-3. **推送规则：commit 后只推 `origin`（zhengdaode/Aoi-system），`deploy` 远端（ICGP-Click/Click_sales_system，GitHub Pages 部署通道）暂时不推送**——需要上线部署时由部署者明确指示后再推 `deploy`（推送 deploy 会直接触发线上更新，2026-09-06 起默认冻结）。
+3. **推送规则（2026-09-09 修订）：`origin`（zhengdaode/Aoi-system）可随时随意推送，无需逐次请示；`deploy` 远端（ICGP-Click/Click_sales_system，GitHub Pages 部署通道）未经部署者明确允许，禁止 push 及任何其他改动**（推送 deploy 会直接触发线上更新；确需上线时由部署者明确指示后再操作 deploy）。
 
 ## 当前项目计划
 

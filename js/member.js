@@ -193,10 +193,23 @@ Aoi.member.renderOrders = function (cn) {
       confirm = '<span class="text-gray-400 text-xs">未发货</span>';
     }
     var tracking = o.tracking || '—';
+    // v3.6.0 S2：参考列——命中商品登记显示参考图缩略图 + 商品链接（跳转链接空则回落活动平台链接）
+    var prod = Aoi.orders.activityProduct(o.activity, o.type, o.model);
+    var link = Aoi.orders.productLink(o.activity, prod);
+    var ref = '';
+    if (prod && prod.refImage) {
+      ref += '<a href="' + Aoi.escapeHtml(prod.refImage) + '" target="_blank" class="mr-1" title="查看参考图">'
+        + '<img src="' + Aoi.escapeHtml(prod.refImage) + '" alt="参考图" class="w-9 h-9 object-cover rounded border border-gray-200 align-middle inline-block"></a>';
+    }
+    if (link) {
+      ref += '<a href="' + Aoi.escapeHtml(link) + '" target="_blank" class="text-blue-500 hover:underline text-xs whitespace-nowrap">' + (prod && prod.refUrl ? '商品链接' : '平台链接') + '</a>';
+    }
+    if (!ref) ref = '<span class="text-gray-300 text-xs">—</span>';
     return '<tr class="border-b border-gray-100">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.activity) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
+      + '<td class="px-3 py-2 whitespace-nowrap">' + ref + '</td>'
       + '<td class="px-3 py-2 text-right">' + priceCell + '</td>'
       + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
       + '<td class="px-3 py-2 text-right">' + ((o.price != null) ? sum.toFixed(2) : '—') + '</td>'
@@ -205,7 +218,7 @@ Aoi.member.renderOrders = function (cn) {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(tracking) + '</td>'
       + '<td class="px-3 py-2">' + confirm + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="10" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
+  }).join('') : '<tr><td colspan="11" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
 };
 
 // —— 收件地址：只写不读（保护隐私），提交后在 QQ 通知团长 ——

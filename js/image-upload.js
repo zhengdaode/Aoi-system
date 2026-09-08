@@ -133,6 +133,33 @@ Aoi.img.fill = async function (inputEl, targetId) {
   inputEl.value = '';
 };
 
+// v3.6.0 S4：粘贴上传——焦点在带 data-img-paste 属性的输入框内 Ctrl+V 粘贴图片时，
+// 自动走压缩 + 图床上传并把 URL 回填该输入框（与文件上传同链路，保存后生效）
+Aoi.img.bindPaste = function () {
+  document.addEventListener('paste', function (e) {
+    var t = e.target;
+    if (!t || !t.hasAttribute || !t.hasAttribute('data-img-paste')) return;
+    var cd = e.clipboardData;
+    if (!cd || !cd.items) return;
+    var file = null;
+    for (var i = 0; i < cd.items.length; i++) {
+      if (cd.items[i].type && cd.items[i].type.indexOf('image/') === 0) { file = cd.items[i].getAsFile(); break; }
+    }
+    if (!file) return;
+    e.preventDefault();
+    Aoi.showLoading('正在压缩并上传粘贴的图片...');
+    Aoi.img.upload(file).then(function (url) {
+      Aoi.hideLoading();
+      t.value = url;
+      Aoi.toast('粘贴的图片已上传，保存后生效', 'success');
+    }, function (err) {
+      Aoi.hideLoading();
+      Aoi.toast('粘贴上传失败：' + (err && err.message ? err.message : '未知错误'), 'error');
+    });
+  });
+};
+Aoi.img.bindPaste();
+
 // 渲染设置页图床配置
 Aoi.img.renderSettings = function () {
   var c = Aoi.img.config();

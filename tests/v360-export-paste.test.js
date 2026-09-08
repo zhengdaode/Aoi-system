@@ -66,3 +66,60 @@ describe('Aoi.exportBaseName 导出文件名（v3.6.0 S5）', () => {
     limBtns.forEach((b) => expect(b.getAttribute('data-activity-from')).toBe('limActivity'));
   });
 });
+
+// v3.6.0 S4：焦点在 data-img-paste 输入框内 Ctrl+V 粘贴图片 → 压缩上传 → URL 回填
+describe('Aoi.img.bindPaste 粘贴上传（v3.6.0 S4）', () => {
+  function pasteEvent(items) {
+    const ev = new win.Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'clipboardData', { value: { items } });
+    return ev;
+  }
+
+  it('粘贴图片：调用 upload 并把 URL 回填输入框', async () => {
+    const input = doc.createElement('input');
+    input.setAttribute('data-img-paste', '');
+    doc.body.appendChild(input);
+    const file = { name: 'clip.png', type: 'image/png' };
+    aoi.img.upload = vi.fn().mockResolvedValue('https://img.example/abc.jpg');
+    input.dispatchEvent(pasteEvent([{ type: 'image/png', getAsFile: () => file }]));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(aoi.img.upload).toHaveBeenCalledWith(file);
+    expect(input.value).toBe('https://img.example/abc.jpg');
+    input.remove();
+  });
+
+  it('上传失败：输入框不被误填', async () => {
+    const input = doc.createElement('input');
+    input.setAttribute('data-img-paste', '');
+    doc.body.appendChild(input);
+    aoi.img.upload = vi.fn().mockRejectedValue(new Error('无法连接图床'));
+    input.dispatchEvent(pasteEvent([{ type: 'image/jpeg', getAsFile: () => ({ name: 'x.jpg' }) }]));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(input.value).toBe('');
+    input.remove();
+  });
+
+  it('无 data-img-paste 的输入框 / 剪贴板无图片：不触发上传', async () => {
+    const plain = doc.createElement('input');
+    doc.body.appendChild(plain);
+    aoi.img.upload = vi.fn();
+    plain.dispatchEvent(pasteEvent([{ type: 'image/png', getAsFile: () => ({ name: 'x.png' }) }]));
+    await new Promise((r) => setTimeout(r, 0));
+    const marked = doc.createElement('input');
+    marked.setAttribute('data-img-paste', '');
+    doc.body.appendChild(marked);
+    marked.dispatchEvent(pasteEvent([{ type: 'text/plain', getAsFile: () => null }]));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(aoi.img.upload).not.toHaveBeenCalled();
+    plain.remove();
+    marked.remove();
+  });
+
+  it('页面既有图片输入框已标记 data-img-paste（二维码/收款码/合照）', () => {
+    ['botQrUrl', 'whQr', 'shipPhoto'].forEach((id) => {
+      const el = doc.getElementById(id);
+      expect(el).not.toBeNull();
+      expect(el.hasAttribute('data-img-paste')).toBe(true);
+    });
+  });
+});

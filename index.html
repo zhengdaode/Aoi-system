@@ -330,7 +330,7 @@
             <div>
               <label class="block text-xs text-gray-500 mb-1">缴费二维码（催缴私聊附带；换图保存后下次催缴自动生效）</label>
               <div class="flex gap-2">
-                <input id="botQrUrl" type="text" placeholder="二维码图片 URL（上传后自动填充，也可手填）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
+                <input id="botQrUrl" type="text" data-img-paste placeholder="二维码图片 URL（上传/粘贴后自动填充，也可手填）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
                 <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded cursor-pointer hover:bg-gray-300 whitespace-nowrap">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'botQrUrl')"></label>
               </div>
             </div>
@@ -624,7 +624,7 @@
           <p class="text-sm text-gray-500 mb-3">维护囤货站点（名称 + 收款码），团员可申请换囤货地</p>
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <input id="whQr" type="text" placeholder="收款码 URL（选填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="whQr" type="text" data-img-paste placeholder="收款码 URL（选填，可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'whQr')"></label>
             <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
           </div>
@@ -791,7 +791,7 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex flex-wrap items-center gap-3 mb-3">
             <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.ship.toggleAll(this)"> 全选</label>
-            <input id="shipPhoto" type="text" placeholder="合照 URL" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="shipPhoto" type="text" data-img-paste placeholder="合照 URL（可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <label class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded cursor-pointer hover:bg-gray-300">上传<input type="file" accept="image/*" class="hidden" onchange="Aoi.img.fill(this, 'shipPhoto')"></label>
             <button onclick="Aoi.ship.setPhoto()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量设合照</button>
             <select id="shipStatus" class="border border-gray-300 rounded px-3 py-2 text-sm">

@@ -446,6 +446,25 @@
           <input id="fModel" placeholder="按型号筛选" oninput="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm">
           <select id="fActivity" onchange="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
           <select id="fBatch" onchange="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
+          <select id="fSort" onchange="Aoi.orders.onSortMenu(this)" title="排序（窄屏用，宽屏点击表头列）" class="sm:hidden border border-gray-300 rounded px-3 py-2 text-sm">
+            <option value="">排序：默认顺序</option>
+            <option value="activity:1">活动 ↑</option>
+            <option value="activity:-1">活动 ↓</option>
+            <option value="type:1">制品类型 ↑</option>
+            <option value="type:-1">制品类型 ↓</option>
+            <option value="model:1">型号 ↑</option>
+            <option value="model:-1">型号 ↓</option>
+            <option value="price:1">单价 低→高</option>
+            <option value="price:-1">单价 高→低</option>
+            <option value="count:1">数量 少→多</option>
+            <option value="count:-1">数量 多→少</option>
+            <option value="buyer:1">购买者 ↑</option>
+            <option value="buyer:-1">购买者 ↓</option>
+            <option value="status:1">到货状态（未到货在前）</option>
+            <option value="status:-1">到货状态（已收货在前）</option>
+            <option value="sum:1">小计 低→高</option>
+            <option value="sum:-1">小计 高→低</option>
+          </select>
           <span id="orderStat" class="text-sm text-gray-500"></span>
           <button onclick="Aoi.exportImage(this)" data-table="orderTable" data-name="订单管理" data-activity-from="fActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="orderTable" data-name="订单管理" data-activity-from="fActivity" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
         </div>
@@ -477,9 +496,9 @@
             <thead><tr class="text-left text-gray-500 border-b border-gray-200">
               <th class="px-2 py-2 text-right w-8">行号</th>
               <th class="px-2 py-2"></th>
-              <th class="px-3 py-2">活动</th><th class="px-3 py-2">制品类型</th><th class="px-3 py-2">型号</th>
-              <th class="px-3 py-2 text-right">单价(¥)</th><th class="px-3 py-2 text-right">外币原价</th><th class="px-3 py-2 text-right">数量</th>
-              <th class="px-3 py-2">购买者</th><th class="px-3 py-2">备注</th><th class="px-3 py-2">到货状态</th><th class="px-3 py-2">到货批次</th><th class="px-3 py-2 text-right">小计</th>
+              <th data-sort="activity" class="px-3 py-2 cursor-pointer select-none" title="点击排序">活动<span class="sort-arrow"></span></th><th data-sort="type" class="px-3 py-2 cursor-pointer select-none" title="点击排序">制品类型<span class="sort-arrow"></span></th><th data-sort="model" class="px-3 py-2 cursor-pointer select-none" title="点击排序">型号<span class="sort-arrow"></span></th>
+              <th data-sort="price" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">单价(¥)<span class="sort-arrow"></span></th><th class="px-3 py-2 text-right">外币原价</th><th data-sort="count" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">数量<span class="sort-arrow"></span></th>
+              <th data-sort="buyer" class="px-3 py-2 cursor-pointer select-none" title="点击排序">购买者<span class="sort-arrow"></span></th><th class="px-3 py-2">备注</th><th data-sort="status" class="px-3 py-2 cursor-pointer select-none" title="点击排序">到货状态<span class="sort-arrow"></span></th><th class="px-3 py-2">到货批次</th><th data-sort="sum" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">小计<span class="sort-arrow"></span></th>
               <th class="px-3 py-2"></th>
             </tr></thead>
             <tbody id="orderTbody"></tbody>

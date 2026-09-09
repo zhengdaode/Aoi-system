@@ -445,7 +445,119 @@ Aoi.orders.toggleRemark = function (el) {
   el.classList.toggle('expanded');
 };
 
-// 渲染订单表 + 筛选 + 勾选（v1.8.0：外币原价/备注/编辑列，长文本换行 + 折叠）
+// —— 表头排序（v3.6.2）：点击表头循环 不排→升→降；只作用于渲染副本，不写回 blob ——
+
+var ORDERS_SORT_KEY = 'aoi_orders_sort';
+
+// 中文/混合文本排序单例（zh 拼音序）；无 Intl.Collator 环境回退码点比较
+Aoi.orders.collator = (typeof Intl !== 'undefined' && Intl.Collator)
+  ? new Intl.Collator('zh-Hans-CN', { numeric: true }) : null;
+
+// 到货状态生命周期阶段序（复用 combinedStatus 四态）
+Aoi.orders.STATUS_STAGE = { '未到货': 0, '已到货·待发货': 1, '已发货': 2, '已收货': 3 };
+Aoi.orders.statusStage = function (o) {
+  return Aoi.orders.STATUS_STAGE[Aoi.orders.combinedStatus(o).text] || 0;
+};
+
+// 可排序字段：label 备用，get 取排序值（null/'' 视为空值恒排最后）
+Aoi.orders.SORT_FIELDS = {
+  activity: { label: '活动', get: function (o) { return o.activity || ''; } },
+  type:     { label: '制品类型', get: function (o) { return o.type || ''; } },
+  model:    { label: '型号', get: function (o) { return o.model || ''; } },
+  price:    { label: '单价', get: function (o) { return o.price; } },
+  count:    { label: '数量', get: function (o) { return o.count; } },
+  buyer:    { label: '购买者', get: function (o) { return o.buyer || ''; } },
+  status:   { label: '到货状态', get: Aoi.orders.statusStage },
+  sum:      { label: '小计', get: function (o) { return (o.price != null) ? o.price * o.count : null; } }
+};
+
+// 比较器（dir=±1）：空值不受方向影响恒排最后；同值交由稳定排序保持录入序
+Aoi.orders.compareBy = function (a, b, field, dir) {
+  var f = Aoi.orders.SORT_FIELDS[field];
+  if (!f) return 0;
+  var va = f.get(a), vb = f.get(b);
+  var ea = (va == null || va === ''), eb = (vb == null || vb === '');
+  if (ea && eb) return 0;
+  if (ea) return 1;
+  if (eb) return -1;
+  var r;
+  if (typeof va === 'number' && typeof vb === 'number') {
+    r = va - vb;
+  } else {
+    var sa = String(va), sb = String(vb);
+    r = Aoi.orders.collator
+      ? Aoi.orders.collator.compare(sa, sb)
+      : (sa < sb ? -1 : sa > sb ? 1 : 0);
+  }
+  return r * (dir || 1);
+};
+
+// 返回排序后的新数组（slice，保证 d.orders 原序 = blob 录入序不被改动）
+Aoi.orders.sortOrders = function (rows, sel) {
+  var s = sel || Aoi.orders.sortSel;
+  if (!s || !Aoi.orders.SORT_FIELDS[s.field]) return rows;
+  return rows.slice().sort(function (a, b) {
+    return Aoi.orders.compareBy(a, b, s.field, s.dir);
+  });
+};
+
+Aoi.orders.loadSort = function () {
+  try {
+    var s = JSON.parse(localStorage.getItem(ORDERS_SORT_KEY) || 'null');
+    if (s && Aoi.orders.SORT_FIELDS[s.field] && (s.dir === 1 || s.dir === -1)) return s;
+  } catch (e) {}
+  return null;
+};
+Aoi.orders.saveSort = function (s) {
+  try {
+    if (s) localStorage.setItem(ORDERS_SORT_KEY, JSON.stringify(s));
+    else localStorage.removeItem(ORDERS_SORT_KEY);
+  } catch (e) {}
+};
+
+// 当前排序 {field, dir} 或 null；启动时从 localStorage 恢复（跨刷新记忆）
+Aoi.orders.sortSel = Aoi.orders.loadSort();
+
+// 表头点击：同列循环 升→降→清除；异列直接升序
+Aoi.orders.setSort = function (field) {
+  if (!Aoi.orders.SORT_FIELDS[field]) return;
+  var cur = Aoi.orders.sortSel;
+  Aoi.orders.sortSel = (cur && cur.field === field)
+    ? (cur.dir === 1 ? { field: field, dir: -1 } : null)
+    : { field: field, dir: 1 };
+  Aoi.orders.saveSort(Aoi.orders.sortSel);
+  Aoi.orders.render();
+};
+
+// 移动端排序下拉（窄屏表头被卡片视图隐藏，与表头共享同一状态）
+Aoi.orders.onSortMenu = function (el) {
+  var v = el.value || '';
+  if (!v) Aoi.orders.sortSel = null;
+  else {
+    var p = v.split(':');
+    Aoi.orders.sortSel = { field: p[0], dir: parseInt(p[1], 10) === -1 ? -1 : 1 };
+  }
+  Aoi.orders.saveSort(Aoi.orders.sortSel);
+  Aoi.orders.render();
+};
+
+// 表头箭头/高亮 + 下拉选中值与当前排序状态同步
+Aoi.orders.syncSortUi = function () {
+  var sel = Aoi.orders.sortSel;
+  var ths = document.querySelectorAll('#orderTable thead th[data-sort]');
+  for (var i = 0; i < ths.length; i++) {
+    var th = ths[i];
+    var on = !!sel && sel.field === th.getAttribute('data-sort');
+    var arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = on ? (sel.dir === 1 ? '↑' : '↓') : '';
+    th.classList.toggle('text-gray-800', on);
+    th.classList.toggle('font-semibold', on);
+  }
+  var menu = document.getElementById('fSort');
+  if (menu) menu.value = sel ? sel.field + ':' + sel.dir : '';
+};
+
+// 渲染订单表 + 筛选 + 排序 + 勾选（v1.8.0：外币原价/备注/编辑列；v3.6.2：表头排序）
 Aoi.orders.render = function () {
   var d = Aoi.orders.ensure();
   Aoi.orders.refillActivities();
@@ -463,6 +575,7 @@ Aoi.orders.render = function () {
     else if (batchFilter) { if (o.batchId !== batchFilter) return false; }
     return true;
   });
+  rows = Aoi.orders.sortOrders(rows); // v3.6.2 表头排序（渲染副本，不写回）
 
   var tbody = document.getElementById('orderTbody');
   var total = 0, pending = 0;
@@ -489,6 +602,7 @@ Aoi.orders.render = function () {
 
   var stat = document.getElementById('orderStat');
   if (stat) stat.textContent = '共 ' + rows.length + ' 条，合计 ¥' + total.toFixed(2) + (pending ? '（' + pending + ' 条人民币价待生成）' : '');
+  Aoi.orders.syncSortUi();
 };
 
 // —— 批量生成人民币价（v1.8.0：替代录入时自动转换，与批量删除同排）——
@@ -1379,6 +1493,13 @@ document.getElementById('buyerTbody').addEventListener('click', function (e) {
 document.getElementById('orderTbody').addEventListener('click', function (e) {
   var btn = e.target.closest('button[data-edit]');
   if (btn) Aoi.orders.openEdit(btn.getAttribute('data-edit'));
+});
+
+// 事件委托：表头点击排序（v3.6.2）
+var orderThead = document.querySelector('#orderTable thead');
+if (orderThead) orderThead.addEventListener('click', function (e) {
+  var th = e.target.closest('th[data-sort]');
+  if (th) Aoi.orders.setSort(th.getAttribute('data-sort'));
 });
 
 // —— 分级选择：IP → 活动（按 IP 过滤）、类型（线路分组 + 搜索） ——

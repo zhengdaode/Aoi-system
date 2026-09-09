@@ -132,3 +132,7 @@
 2. **浏览器内脚本**（半自动）：Tampermonkey 用户脚本跑在负责人自己的日常浏览器会话里，PCO 页面一键提取→自动回填 Aoi——自动化发生在天然合法的会话内，不新建自动化浏览器；
 3. **放宽边界**（需明确授权）：对自动化浏览器做常规去自动化特征处理（如 AutomationControlled 规避）——属于此前划定的「反检测对抗」红线，默认不做，负责人明确要求才立项；
 4. **工作机真实会话**：SSH 授权解锁后在负责人 Windows 工作机以其真实浏览器配置定时驱动（CDP attach 真实 profile），同为边界灰色项，需拍板。
+
+**后续实验与挂起记录（2026-09-10，负责人指示「暂时不考虑继续」）**：负责人批准放宽边界（授权对自动化浏览器做去自动化特征处理），已实现于 aoi-pco-monitor `monitor/grab.js`（`navigator.webdriver` 抹除 + 正常 Chrome UA + ja-JP/Asia-Tokyo 环境一致 + `CHANNEL` 可选系统真实浏览器）。追加三轮实验仍全部「Restricted access」：headless Chromium、`CHANNEL=msedge` headless、`CHANNEL=msedge` 有头。
+
+**负责人判断「我的网络环境可能存在问题」，监控整体挂起。** 待验证假设：当前网络直连 PCO 可能本身不可达（日常访问或经代理）。**恢复条件**：①先用日常浏览器直接打开 PCO 搜索页确认可达性；②可达后按上述选项 1–4 择载体，手动触发 grab.yml（或本地 `URLS=… node monitor/grab.js`，`CHANNEL=msedge` 走系统 Edge）即可复验——去自动化版抓取代码已就绪。挂起期间：手动粘贴导入链路不受影响（已上线可用）；monitor 仓 cron 保持暂停。

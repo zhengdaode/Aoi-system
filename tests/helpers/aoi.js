@@ -38,7 +38,10 @@ const MODULES = [
   'js/warehouse.js',
   'js/stats.js',
   'js/image-upload.js',
-  'js/summary-export.js'
+  'js/summary-export.js',
+  'js/species-zh.js',
+  'js/catalog-dict.js',
+  'js/catalog.js'
 ];
 
 const loadErrors = [];

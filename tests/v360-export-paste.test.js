@@ -198,9 +198,11 @@ describe('Aoi.img 图片选择弹窗（v3.6.1）', () => {
     aoi.img.closePicker();
   });
 
-  it('活动商品弹窗与团员凭证行的图片入口已换成「图片…」按钮', () => {
-    // 活动商品新增行
-    const apBtn = [...doc.querySelectorAll('#actProductsModal button')].find((b) => b.getAttribute('onclick') === "Aoi.img.openPicker('apNewImage')");
+  it('活动商品展开区与团员凭证行的图片入口已换成「图片…」按钮', () => {
+    // 活动商品展开区新增表单（v3.7.0 S2：展开区取代弹窗，行内表单 id 带序号后缀）
+    aoi.state.data = { activities: ['CP27'], activityMeta: { CP27: { products: [] } }, orders: [], batches: [], payments: [] };
+    aoi.orders.toggleActivityExpand('CP27');
+    const apBtn = [...doc.querySelectorAll('#activityTbody button')].find((b) => (b.getAttribute('onclick') || '').indexOf("Aoi.img.openPicker('apNewImage_0')") >= 0);
     expect(apBtn).not.toBeUndefined();
     // 团员端渲染凭证行后出现 data-imgpicker 按钮
     aoi.state.data = {

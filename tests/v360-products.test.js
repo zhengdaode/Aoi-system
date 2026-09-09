@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, doc } from './helpers/aoi.js';
 
-// v3.6.0 S2：活动商品（参考图/跳转链接/型号分类）+ 团员端参考列 + 按商品筛购买者
-describe('活动商品（v3.6.0 S2）', () => {
+// 活动商品（v3.6.0 S2 引入；v3.7.0 S2 改为活动管理行内展开商品卡片区）+ 团员端参考列 + 按商品筛购买者
+describe('活动商品展开区（v3.7.0 S2）', () => {
   beforeEach(() => {
     aoi.saveTeamData = vi.fn().mockResolvedValue(undefined);
+    aoi.orders.expandedActivities = {}; // 模块级展开状态，逐用例重置
     aoi.state.data = {
       activities: ['CP27'],
       activityMeta: {
@@ -45,50 +46,67 @@ describe('活动商品（v3.6.0 S2）', () => {
     expect(aoi.orders.productBuyers('CP27', '吧唧', 'M2')).toEqual([]);
   });
 
-  it('openActProducts 弹窗按类型分组渲染商品行', () => {
-    aoi.orders.openActProducts('CP27');
-    expect(doc.getElementById('actProductsModal').classList.contains('hidden')).toBe(false);
-    const html = doc.getElementById('actProductList').innerHTML;
-    expect(html).toContain('吧唧');
-    expect(html).toContain('立牌');
-    expect(html).toContain('2 人购买'); // M1 有小樱+小狼
-    expect(html).toContain('https://img.example/m1.jpg');
-    aoi.orders.closeActProducts();
-    expect(doc.getElementById('actProductsModal').classList.contains('hidden')).toBe(true);
+  it('点击活动名展开/收起商品卡片区，卡片含图/链接/聚合信息', () => {
+    aoi.orders.renderActivities();
+    expect(doc.querySelector('[data-pcard="p1"]')).toBeNull();
+    aoi.orders.toggleActivityExpand('CP27');
+    expect(doc.querySelector('[data-pcard="p1"]')).not.toBeNull();
+    const html = doc.getElementById('activityTbody').innerHTML;
+    expect(html).toContain('https://img.example/m1.jpg');          // 参考图缩略图
+    expect(html).toContain('购买链接');                             // refUrl / 平台链接
+    expect(html).toContain('已订 <b>2</b> 件 · 2 人');              // M1 聚合（o1+o2）
+    expect(html).toContain('从订单同步商品');                        // 展开区操作
+    expect(html).toContain('data-act-addproduct="CP27"');           // 新增商品表单
+    // 再点收起
+    aoi.orders.toggleActivityExpand('CP27');
+    expect(doc.querySelector('[data-pcard="p1"]')).toBeNull();
   });
 
-  it('addActProduct 新增商品（同型号去重），写入 blob 并刷新行', async () => {
-    aoi.orders.openActProducts('CP27');
-    doc.getElementById('apNewType').value = '色纸';
-    doc.getElementById('apNewModel').value = 'S1';
-    doc.getElementById('apNewUrl').value = 'https://shop.example/s1';
-    await aoi.orders.addActProduct();
+  it('活动行「商品」按钮显示款数·件数', () => {
+    aoi.orders.renderActivities();
+    // 行内有两个 data-expand 按钮（活动名 + 商品），取第二个（商品按钮）
+    const btns = doc.querySelectorAll('button[data-expand="CP27"]');
+    expect(btns.length).toBe(2);
+    expect(btns[1].textContent).toContain('3 款·3 件');
+  });
+
+  it('addActProduct 从展开区新表单添加商品（含单价/限购），写入 blob 并清空表单', async () => {
+    aoi.orders.toggleActivityExpand('CP27');
+    doc.getElementById('apNewType_0').value = '色纸';
+    doc.getElementById('apNewModel_0').value = 'S1';
+    doc.getElementById('apNewPrice_0').value = '8.5';
+    doc.getElementById('apNewLimit_0').value = '2';
+    doc.getElementById('apNewUrl_0').value = 'https://shop.example/s1';
+    const btn = doc.querySelector('button[data-act-addproduct="CP27"]');
+    await aoi.orders.addActProduct(btn);
     const products = aoi.state.data.activityMeta.CP27.products;
     expect(products).toHaveLength(4);
-    expect(products[3]).toMatchObject({ type: '色纸', model: 'S1', refUrl: 'https://shop.example/s1' });
+    expect(products[3]).toMatchObject({ type: '色纸', model: 'S1', refUrl: 'https://shop.example/s1', price: 8.5, limit: 2 });
     expect(aoi.saveTeamData).toHaveBeenCalled();
+    // 表单已清空
+    expect(doc.getElementById('apNewType_0').value).toBe('');
     // 同型号重复被拒
-    doc.getElementById('apNewType').value = '色纸';
-    doc.getElementById('apNewModel').value = 'S1';
-    await aoi.orders.addActProduct();
+    doc.getElementById('apNewType_0').value = '色纸';
+    doc.getElementById('apNewModel_0').value = 'S1';
+    await aoi.orders.addActProduct(doc.querySelector('button[data-act-addproduct="CP27"]'));
     expect(aoi.state.data.activityMeta.CP27.products).toHaveLength(4);
   });
 
-  it('saveActProduct 行内保存型号与链接', async () => {
-    aoi.orders.openActProducts('CP27');
-    aoi.orders.renderActProducts();
-    const modelEl = doc.querySelector('[data-pmodel="p2"]');
-    const urlEl = doc.querySelector('[data-purl="p2"]');
-    modelEl.value = 'M2改';
-    urlEl.value = 'https://shop.example/p/2v2';
+  it('saveActProduct 卡内保存型号/链接/单价/限购', async () => {
+    aoi.orders.toggleActivityExpand('CP27');
+    doc.querySelector('[data-pmodel="p2"]').value = 'M2改';
+    doc.querySelector('[data-purl="p2"]').value = 'https://shop.example/p/2v2';
+    doc.querySelector('[data-pprice="p2"]').value = '15';
+    doc.querySelector('[data-plimit="p2"]').value = '3';
     await aoi.orders.saveActProduct('p2');
     const p2 = aoi.orders.activityProduct('CP27', '吧唧', 'M2改');
     expect(p2.refUrl).toBe('https://shop.example/p/2v2');
+    expect(p2.price).toBe(15);
+    expect(p2.limit).toBe(3);
   });
 
   it('removeActProduct 需确认，删除后 blob 同步', async () => {
     aoi.confirm = vi.fn().mockResolvedValue(true);
-    aoi.orders.openActProducts('CP27');
     await aoi.orders.removeActProduct('p3');
     expect(aoi.state.data.activityMeta.CP27.products).toHaveLength(2);
     expect(aoi.orders.activityProduct('CP27', '立牌', 'L1')).toBeNull();
@@ -108,13 +126,6 @@ describe('活动商品（v3.6.0 S2）', () => {
     doc.getElementById('fModel').value = 'L1';
     aoi.orders.render();
     expect(doc.querySelectorAll('#orderTbody tr')).toHaveLength(1);
-  });
-
-  it('活动管理行渲染商品按钮并显示数量', () => {
-    aoi.orders.renderActivities();
-    const btn = doc.querySelector('button[data-act-products="CP27"]');
-    expect(btn).not.toBeNull();
-    expect(btn.textContent).toContain('3 个');
   });
 });
 

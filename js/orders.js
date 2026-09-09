@@ -871,29 +871,30 @@ Aoi.orders.renderActivities = function () {
   var fuzzyList = document.getElementById('shipFuzzyOptions');
   if (fuzzyList) fuzzyList.innerHTML = Aoi.orders.shipFuzzySuggestions()
     .map(function (s) { return '<option value="' + Aoi.escapeHtml(s) + '">'; }).join('');
+  Aoi.orders.refillActProductTypes();
   tbody.innerHTML = d.activities.length ? d.activities.map(function (name, i) {
     var m = d.activityMeta[name] || {};
     var buyers = m.buyers || [];
-    var trackings = m.trackings || [];
-    var products = m.products || [];
-    var plan = (d.limitPlans && d.limitPlans[name]) || null;
-    return '<tr class="border-b border-gray-100 align-top">'
+    var sum = Aoi.orders.activityProductSummary(name);
+    var expanded = !!Aoi.orders.expandedActivities[name];
+    var row = '<tr class="border-b border-gray-100 align-top">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2 font-semibold whitespace-nowrap"><button data-jump="' + Aoi.escapeHtml(name) + '" class="text-blue-600 hover:underline text-left">' + Aoi.escapeHtml(name) + '</button></td>'
+      + '<td class="px-3 py-2 font-semibold whitespace-nowrap"><button data-expand="' + Aoi.escapeHtml(name) + '" class="text-blue-600 hover:underline text-left" title="点击展开/收起商品明细">' + (expanded ? '▾ ' : '▸ ') + Aoi.escapeHtml(name) + '</button></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="ip" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.ipOptions(m.ip) + '</select></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.buyDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="buyDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.shipDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2"><input type="text" list="shipFuzzyOptions" value="' + Aoi.escapeHtml(m.shipDateFuzzy || '') + '" placeholder="如 9月中旬" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDateFuzzy" class="border border-gray-300 rounded px-2 py-1 text-sm w-28"></td>'
-      + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="border border-gray-300 rounded px-2 py-1 text-sm w-40"></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
       + '<td class="px-3 py-2"><button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (buyers.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (buyers.length ? buyers.length + ' 人' : '填写') + '</button></td>'
-      + '<td class="px-3 py-2"><button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? trackings.length + ' 个' : '填写') + '</button></td>'
-      + '<td class="px-3 py-2"><button data-act-products="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (products.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (products.length ? products.length + ' 个' : '商品') + '</button></td>'
-      + '<td class="px-3 py-2"><button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '计划') + '</button></td>'
+      + '<td class="px-3 py-2"><button data-expand="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (sum.count ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (sum.count ? sum.count + ' 款·' + sum.qty + ' 件' : '商品') + '</button></td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.remark || '') + '" placeholder="备注" data-activity="' + Aoi.escapeHtml(name) + '" data-field="remark" class="border border-gray-300 rounded px-2 py-1 text-sm w-32"></td>'
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="14" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+    if (expanded) {
+      row += '<tr class="border-b border-gray-100"><td colspan="11" class="px-3 py-3 bg-gray-50/60 border-l-2 border-l-blue-200">' + Aoi.orders.actExpandHtml(name, i) + '</td></tr>';
+    }
+    return row;
+  }).join('') : '<tr><td colspan="11" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
 };
 
 Aoi.orders.addActivity = async function () {
@@ -922,6 +923,7 @@ Aoi.orders.removeActivity = async function (name) {
   d.orders.forEach(function (o) { if (o.activity === name && o.buyer) affected[o.buyer] = 1; });
   d.activities = d.activities.filter(function (a) { return a !== name; });
   delete d.activityMeta[name];
+  delete Aoi.orders.expandedActivities[name];
   d.orders.forEach(function (o) { if (o.activity === name) o.activity = ''; });
   // 级联清理：受影响买家若无未处理完订单，一并删除其 CN
   var purged = [];
@@ -1129,12 +1131,26 @@ document.getElementById('activityTbody').addEventListener('change', function (e)
 document.getElementById('activityTbody').addEventListener('click', function (e) {
   var btn = e.target.closest('button[data-remove]');
   if (btn) { Aoi.orders.removeActivity(btn.getAttribute('data-remove')); return; }
+  var ex = e.target.closest('button[data-expand]');
+  if (ex) { Aoi.orders.toggleActivityExpand(ex.getAttribute('data-expand')); return; }
   var jump = e.target.closest('button[data-jump]');
   if (jump) { Aoi.orders.jumpToActivity(jump.getAttribute('data-jump')); return; }
   var b = e.target.closest('button[data-act-buyers]');
   if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
-  var pr = e.target.closest('button[data-act-products]');
-  if (pr) { Aoi.orders.openActProducts(pr.getAttribute('data-act-products')); return; }
+  var syn = e.target.closest('button[data-act-sync]');
+  if (syn) { Aoi.orders.syncProductsFromOrders(syn.getAttribute('data-act-sync')); return; }
+  var ap = e.target.closest('button[data-act-addproduct]');
+  if (ap) { Aoi.orders.addActProduct(ap); return; }
+  var ps = e.target.closest('button[data-psave]');
+  if (ps) { Aoi.orders.saveActProduct(ps.getAttribute('data-psave')); return; }
+  var pd = e.target.closest('button[data-pdel]');
+  if (pd) { Aoi.orders.removeActProduct(pd.getAttribute('data-pdel')); return; }
+  var pj = e.target.closest('button[data-pjump]');
+  if (pj) {
+    var loc = Aoi.orders.findProductById(Aoi.orders.ensure(), pj.getAttribute('data-pjump'));
+    if (loc) Aoi.orders.jumpToProduct(loc.activity, loc.product.type, loc.product.model);
+    return;
+  }
   var pl = e.target.closest('button[data-act-plan]');
   if (pl) { Aoi.limits.openActPlan(pl.getAttribute('data-act-plan')); return; }
   var t = e.target.closest('button[data-act-track]');
@@ -1281,9 +1297,7 @@ Aoi.orders.saveActTrack = async function () {
   Aoi.toast('已保存快递单号 ' + d.activityMeta[name].trackings.length + ' 个', 'success');
 };
 
-// —— 活动商品管理（v3.6.0 S2）：按型号维护参考图 / 跳转链接 ——
-
-Aoi.orders.actProductsTarget = null;
+// —— 活动商品管理（v3.6.0 S2 引入；v3.7.0 S2 起展开区承载）——
 
 // 确保活动 meta 结构齐全（products/buyers/trackings 数组化）
 Aoi.orders.ensureActMeta = function (d, name) {
@@ -1330,16 +1344,18 @@ Aoi.orders.productBuyers = function (activity, type, model) {
 // plan 购买情况（有限购计划时按状态累计件数 {pending,bought,failed}；无计划为 null，展示层改用订单到货状态）
 Aoi.orders.productStats = function (activity, p) {
   var d = Aoi.orders.ensure();
-  var qty = 0, priceSum = 0, priceN = 0, buyers = {};
+  var qty = 0, arrived = 0, priceSum = 0, priceN = 0, buyers = {};
   (d.orders || []).forEach(function (o) {
     if (o.activity !== activity || o.type !== p.type || o.model !== p.model) return;
     qty += o.count || 0;
+    if ((o.status || '未到货') === '已到货') arrived += (o.count || 0);
     if (o.price != null) { priceSum += o.price * (o.count || 0); priceN += (o.count || 0); }
     if (o.buyer) buyers[o.buyer] = 1;
   });
   var reg = Aoi.orders.activityProduct(activity, p.type, p.model) || {};
   var stats = {
     qty: qty,
+    arrived: arrived,
     buyers: Object.keys(buyers).sort(),
     priceAvg: priceN ? Math.round(priceSum / priceN * 100) / 100
       : (p.price != null ? p.price : (reg.price != null ? reg.price : null)),
@@ -1411,26 +1427,130 @@ Aoi.orders.syncProductsFromOrders = async function (activity) {
   });
   await Aoi.saveTeamData(d);
   Aoi.orders.renderActivities();
-  if (Aoi.orders.actProductsTarget === activity) Aoi.orders.renderActProducts();
   Aoi.toast('已从订单补登记 ' + missing.length + ' 款商品', 'success');
   return missing.length;
 };
 
-Aoi.orders.openActProducts = function (name) {
-  Aoi.orders.actProductsTarget = name;
-  var t = document.getElementById('actProductsTitle');
-  if (t) t.textContent = '活动：' + name + '（按制品类型分组，可增改删商品、维护参考图与跳转链接）';
-  Aoi.orders.refillActProductTypes();
-  Aoi.orders.renderActProducts();
-  document.getElementById('actProductsModal').classList.remove('hidden');
+// —— 活动商品展开区（v3.7.0 S2，取代 v3.6.0 商品弹窗）：点击活动名行内展开商品卡片 ——
+
+// 展开状态（活动名 → true；重渲染后保持）
+Aoi.orders.expandedActivities = {};
+
+Aoi.orders.toggleActivityExpand = function (name) {
+  if (Aoi.orders.expandedActivities[name]) delete Aoi.orders.expandedActivities[name];
+  else Aoi.orders.expandedActivities[name] = true;
+  Aoi.orders.renderActivities();
 };
 
-Aoi.orders.closeActProducts = function () {
-  document.getElementById('actProductsModal').classList.add('hidden');
-  Aoi.orders.actProductsTarget = null;
+// 活动商品摘要：登记款数 + 订单聚合件数 + 购买人数（活动行「商品」按钮文案）
+Aoi.orders.activityProductSummary = function (name) {
+  var d = Aoi.orders.ensure();
+  var m = d.activityMeta[name] || {};
+  var qty = 0, buyers = {};
+  (d.orders || []).forEach(function (o) {
+    if (o.activity !== name) return;
+    qty += o.count || 0;
+    if (o.buyer) buyers[o.buyer] = 1;
+  });
+  return { count: (m.products || []).length, qty: qty, buyers: Object.keys(buyers).length };
 };
 
-// 商品类型候选 = 制品类型库
+// 按 id 在全站活动商品主档中定位商品
+Aoi.orders.findProductById = function (d, pid) {
+  var names = Object.keys(d.activityMeta || {});
+  for (var i = 0; i < names.length; i++) {
+    var m = d.activityMeta[names[i]];
+    var arr = (m && m.products) || [];
+    for (var j = 0; j < arr.length; j++) if (arr[j].id === pid) return { activity: names[i], meta: m, product: arr[j] };
+  }
+  return null;
+};
+
+// 购买情况徽标：有限购计划按状态件数（已购/待购/失败），否则按订单到货件数
+Aoi.orders.productStatusBadge = function (activity, p, s) {
+  if (s.plan) {
+    var parts = [];
+    if (s.plan.bought) parts.push('<span class="text-green-600">已购 ' + s.plan.bought + ' 件</span>');
+    if (s.plan.pending) parts.push('<span class="text-amber-500">待购 ' + s.plan.pending + ' 件</span>');
+    if (s.plan.failed) parts.push('<span class="text-red-500">失败 ' + s.plan.failed + ' 件</span>');
+    return parts.join(' / ') || '<span class="text-gray-400">计划待购</span>';
+  }
+  if (!s.qty) return '<span class="text-gray-400">暂无订单</span>';
+  if (s.arrived >= s.qty) return '<span class="text-green-600">已到货</span>';
+  return '<span class="text-amber-500">到货 ' + s.arrived + '/' + s.qty + ' 件</span>';
+};
+
+// 商品卡片：缩略图 + 元数据行内编辑 + 聚合信息（件数/人数/购买情况）+ 查订单/删除
+Aoi.orders.actProductCardHtml = function (activity, p) {
+  var s = Aoi.orders.productStats(activity, p);
+  var imgId = 'apImg_' + p.id;
+  var thumb = p.refImage
+    ? '<a href="' + Aoi.escapeHtml(p.refImage) + '" target="_blank" title="查看大图"><img src="' + Aoi.escapeHtml(p.refImage) + '" alt="参考图" class="w-14 h-14 object-cover rounded border border-gray-200 shrink-0"></a>'
+    : '<span class="w-14 h-14 flex items-center justify-center text-gray-300 text-xs bg-gray-100 rounded border border-gray-100 shrink-0">无图</span>';
+  var link = Aoi.orders.productLink(activity, p);
+  var chips = s.buyers.slice(0, 6).map(function (b) {
+    return '<span class="inline-block bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 text-xs">' + Aoi.escapeHtml(b) + '</span>';
+  }).join('');
+  if (s.buyers.length > 6) chips += '<span class="text-xs text-gray-400">等 ' + s.buyers.length + ' 人</span>';
+  return '<div class="border border-gray-200 rounded-lg p-3 bg-white flex flex-col gap-2" data-pcard="' + p.id + '">'
+    + '<div class="flex items-start gap-2">'
+    + thumb
+    + '<div class="flex-1 min-w-0">'
+    + '<div class="text-xs text-gray-400">' + Aoi.escapeHtml(p.type) + '</div>'
+    + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-full font-semibold text-sm bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
+    + '<div class="text-xs text-gray-500 mt-0.5">'
+    + (s.priceAvg != null ? '参考单价 ¥' + s.priceAvg : '单价未登记')
+    + (p.limit != null ? ' · 限购 ' + p.limit : '')
+    + (link ? ' · <a href="' + Aoi.escapeHtml(link) + '" target="_blank" class="text-blue-500 hover:underline">购买链接</a>' : '')
+    + '</div>'
+    + '</div></div>'
+    + '<div class="text-xs text-gray-600">已订 <b>' + s.qty + '</b> 件 · ' + s.buyers.length + ' 人 · ' + Aoi.orders.productStatusBadge(activity, p, s) + '</div>'
+    + (chips ? '<div class="flex flex-wrap gap-1">' + chips + '</div>' : '')
+    + '<div class="grid grid-cols-2 gap-1.5">'
+    + '<input data-pprice="' + p.id + '" type="number" step="0.01" value="' + (p.price != null ? p.price : '') + '" placeholder="登记单价¥" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '<input data-plimit="' + p.id + '" type="number" step="1" value="' + (p.limit != null ? p.limit : '') + '" placeholder="单账号限购" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '<input id="' + imgId + '" data-img-paste value="' + Aoi.escapeHtml(p.refImage || '') + '" placeholder="参考图 URL" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '</div>'
+    + '<div class="flex items-center gap-2">'
+    + '<button data-psave="' + p.id + '" class="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700">保存</button>'
+    + '<button type="button" onclick="Aoi.img.openPicker(\'' + imgId + '\')" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>'
+    + '<button data-pjump="' + p.id + '" class="text-blue-600 hover:underline text-xs whitespace-nowrap">查订单</button>'
+    + '<button data-pdel="' + p.id + '" class="ml-auto text-red-500 hover:underline text-xs">删</button>'
+    + '</div></div>';
+};
+
+// 展开区内容：操作行（查订单/平台链接/单号/计划/同步商品）+ 新增商品表单 + 商品卡片栅格
+Aoi.orders.actExpandHtml = function (name, idx) {
+  var d = Aoi.orders.ensure();
+  var m = Aoi.orders.ensureActMeta(d, name);
+  var plan = (d.limitPlans && d.limitPlans[name]) || null;
+  var trackings = m.trackings || [];
+  var sfx = '_' + idx;
+  var head = '<div class="flex flex-wrap items-center gap-2 mb-3">'
+    + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded hover:bg-gray-900 whitespace-nowrap">查订单</button>'
+    + '<input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="w-48 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
+    + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
+    + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
+    + '</div>';
+  var form = '<div class="flex flex-wrap items-center gap-2 mb-3">'
+    + '<input id="apNewType' + sfx + '" list="actProductTypeOptions" placeholder="制品类型" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="apNewModel' + sfx + '" placeholder="型号" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="apNewPrice' + sfx + '" type="number" step="0.01" placeholder="单价¥（选填）" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="apNewLimit' + sfx + '" type="number" step="1" placeholder="限购（选填）" class="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="apNewImage' + sfx + '" data-img-paste placeholder="参考图 URL（可上传/粘贴）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<button type="button" onclick="Aoi.img.openPicker(\'apNewImage' + sfx + '\')" class="px-2 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>'
+    + '<input id="apNewUrl' + sfx + '" placeholder="跳转链接（空=平台链接）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<button data-act-addproduct="' + Aoi.escapeHtml(name) + '" data-suffix="' + sfx + '" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 whitespace-nowrap">添加商品</button>'
+    + '</div>';
+  var cards = m.products.length
+    ? '<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">' + m.products.map(function (p) { return Aoi.orders.actProductCardHtml(name, p); }).join('') + '</div>'
+    : '<p class="text-sm text-gray-400 py-2">还没有登记商品——在上方添加，或点「从订单同步商品」把订单里已有的商品补登记进来</p>';
+  return head + form + cards;
+};
+
+// 商品类型候选 = 制品类型库（展开区新增商品表单的 datalist）
 Aoi.orders.refillActProductTypes = function () {
   var d = Aoi.orders.ensure();
   var dl = document.getElementById('actProductTypeOptions');
@@ -1439,110 +1559,69 @@ Aoi.orders.refillActProductTypes = function () {
   }).join('');
 };
 
-// 商品行：缩略图 + 型号/参考图/跳转链接行内编辑 + 保存/删除 + 购买者数
-Aoi.orders.actProductRowHtml = function (activity, p) {
-  var buyers = Aoi.orders.productBuyers(activity, p.type, p.model);
-  var imgId = 'apImg_' + p.id;
-  var thumb = p.refImage
-    ? '<a href="' + Aoi.escapeHtml(p.refImage) + '" target="_blank"><img src="' + Aoi.escapeHtml(p.refImage) + '" alt="参考图" class="w-10 h-10 object-cover rounded border border-gray-200 shrink-0"></a>'
-    : '<span class="text-gray-300 text-xs w-10 text-center shrink-0">无图</span>';
-  return '<div class="border-b border-gray-100 py-2" data-prow="' + p.id + '">'
-    + '<div class="flex items-center gap-2 mb-1">'
-    + '<span class="text-xs font-bold text-gray-400">' + Aoi.escapeHtml(p.type) + '</span>'
-    + '<button data-pbuyers="' + p.id + '" class="ml-auto text-xs ' + (buyers.length ? 'text-blue-600 hover:underline' : 'text-gray-400') + '" title="查看购买该商品的买家">' + buyers.length + ' 人购买</button>'
-    + '</div>'
-    + '<div class="flex flex-wrap items-center gap-2">'
-    + thumb
-    + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm">'
-    + '<input id="' + imgId + '" data-img-paste value="' + Aoi.escapeHtml(p.refImage || '') + '" placeholder="参考图 URL" class="w-44 border border-gray-300 rounded px-2 py-1 text-sm">'
-    + '<button type="button" onclick="Aoi.img.openPicker(\'' + imgId + '\')" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>'
-    + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="w-44 border border-gray-300 rounded px-2 py-1 text-sm">'
-    + '<button data-psave="' + p.id + '" class="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 whitespace-nowrap">保存</button>'
-    + '<button data-pdel="' + p.id + '" class="px-2 py-1 text-red-500 text-xs hover:underline whitespace-nowrap">删</button>'
-    + '</div></div>';
-};
-
-Aoi.orders.renderActProducts = function () {
-  var box = document.getElementById('actProductList');
-  if (!box) return;
-  var activity = Aoi.orders.actProductsTarget;
-  var d = Aoi.orders.ensure();
-  var products = (activity && d.activityMeta[activity] && d.activityMeta[activity].products) || [];
-  if (!products.length) {
-    box.innerHTML = '<p class="text-sm text-gray-400 py-3">还没有登记商品——在上方填写类型与型号后「添加商品」</p>';
-    return;
-  }
-  // 按制品类型分组（同型号去重在 addActProduct 保证）
-  var groups = {};
-  products.forEach(function (p) {
-    if (!groups[p.type]) groups[p.type] = [];
-    groups[p.type].push(p);
+// 展开区新增商品（按钮带 data-act-addproduct=活动名 + data-suffix=行内表单 id 后缀）
+Aoi.orders.addActProduct = async function (btn) {
+  var activity = btn.getAttribute('data-act-addproduct');
+  var sfx = btn.getAttribute('data-suffix') || '';
+  var get = function (id) { var el = document.getElementById(id + sfx); return el ? el.value.trim() : ''; };
+  var priceRaw = get('apNewPrice');
+  var limitRaw = get('apNewLimit');
+  var p = await Aoi.orders.registerProduct(activity, {
+    type: get('apNewType'), model: get('apNewModel'),
+    refImage: get('apNewImage'), refUrl: get('apNewUrl'),
+    price: priceRaw === '' ? null : parseFloat(priceRaw),
+    limit: limitRaw === '' ? null : parseInt(limitRaw, 10)
   });
-  box.innerHTML = Object.keys(groups).map(function (type) {
-    return '<div class="mb-2">'
-      + '<div class="text-xs font-bold text-gray-500 mt-2 mb-1">▾ ' + Aoi.escapeHtml(type) + ' <span class="text-gray-300">(' + groups[type].length + ')</span></div>'
-      + groups[type].map(function (p) { return Aoi.orders.actProductRowHtml(activity, p); }).join('')
-      + '</div>';
-  }).join('');
-};
-
-Aoi.orders.addActProduct = async function () {
-  var activity = Aoi.orders.actProductsTarget;
-  if (!activity) return;
-  var get = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  var type = get('apNewType'), model = get('apNewModel');
-  if (!type || !model) { Aoi.toast('请填写制品类型和型号', 'warning'); return; }
-  var d = Aoi.orders.ensure();
-  var m = Aoi.orders.ensureActMeta(d, activity);
-  if (m.products.some(function (p) { return p.type === type && p.model === model; })) {
-    Aoi.toast('该活动已存在同型号商品「' + type + '-' + model + '」', 'warning'); return;
-  }
-  m.products.push({ id: Aoi.genId(), type: type, model: model, refImage: get('apNewImage'), refUrl: get('apNewUrl') });
-  await Aoi.saveTeamData(d);
-  ['apNewType', 'apNewModel', 'apNewImage', 'apNewUrl'].forEach(function (id) {
-    var el = document.getElementById(id); if (el) el.value = '';
-  });
-  Aoi.orders.renderActProducts();
-  Aoi.orders.renderActivities();
-  Aoi.toast('已添加商品 ' + type + '-' + model, 'success');
-};
-
-// 行内保存：型号/参考图/跳转链接
-Aoi.orders.saveActProduct = async function (pid) {
-  var activity = Aoi.orders.actProductsTarget;
-  if (!activity) return;
-  var d = Aoi.orders.ensure();
-  var m = Aoi.orders.ensureActMeta(d, activity);
-  var p = null;
-  m.products.forEach(function (x) { if (x.id === pid) p = x; });
   if (!p) return;
-  var modelEl = document.querySelector('[data-pmodel="' + pid + '"]');
-  var imgEl = document.getElementById('apImg_' + pid);
-  var urlEl = document.querySelector('[data-purl="' + pid + '"]');
-  var model = modelEl ? modelEl.value.trim() : p.model;
-  if (!model) { Aoi.toast('型号不能为空', 'warning'); return; }
-  var dup = m.products.some(function (x) { return x.id !== pid && x.type === p.type && x.model === model; });
-  if (dup) { Aoi.toast('已存在同型号商品「' + p.type + '-' + model + '」', 'warning'); return; }
-  p.model = model;
-  p.refImage = imgEl ? imgEl.value.trim() : p.refImage;
-  p.refUrl = urlEl ? urlEl.value.trim() : p.refUrl;
+  ['apNewType', 'apNewModel', 'apNewPrice', 'apNewLimit', 'apNewImage', 'apNewUrl'].forEach(function (id) {
+    var el = document.getElementById(id + sfx); if (el) el.value = '';
+  });
+  Aoi.orders.renderActivities();
+  Aoi.toast('已添加商品 ' + p.type + '-' + p.model, 'success');
+};
+
+// 卡内保存：型号/单价/限购/参考图/跳转链接
+Aoi.orders.saveActProduct = async function (pid) {
+  var d = Aoi.orders.ensure();
+  var loc = Aoi.orders.findProductById(d, pid);
+  if (!loc) return;
+  var p = loc.product;
+  var card = document.querySelector('[data-pcard="' + pid + '"]');
+  var field = function (sel) { var el = card ? card.querySelector(sel) : null; return el ? el.value.trim() : null; };
+  var model = field('[data-pmodel="' + pid + '"]');
+  if (model != null) {
+    if (!model) { Aoi.toast('型号不能为空', 'warning'); return; }
+    var dup = loc.meta.products.some(function (x) { return x.id !== pid && x.type === p.type && x.model === model; });
+    if (dup) { Aoi.toast('已存在同型号商品「' + p.type + '-' + model + '」', 'warning'); return; }
+    p.model = model;
+  }
+  var img = document.getElementById('apImg_' + pid);
+  if (img) p.refImage = img.value.trim();
+  var url = field('[data-purl="' + pid + '"]');
+  if (url != null) p.refUrl = url;
+  var priceRaw = field('[data-pprice="' + pid + '"]');
+  if (priceRaw != null) {
+    if (priceRaw === '') delete p.price;
+    else { var v = parseFloat(priceRaw); if (isNaN(v)) { Aoi.toast('单价格式不正确', 'warning'); return; } p.price = v; }
+  }
+  var limitRaw = field('[data-plimit="' + pid + '"]');
+  if (limitRaw != null) {
+    if (limitRaw === '') delete p.limit;
+    else { var l = parseInt(limitRaw, 10); if (isNaN(l)) { Aoi.toast('限购格式不正确', 'warning'); return; } p.limit = l; }
+  }
   await Aoi.saveTeamData(d);
-  Aoi.orders.renderActProducts();
+  Aoi.orders.renderActivities();
   Aoi.toast('已保存商品 ' + p.type + '-' + p.model, 'success');
 };
 
 Aoi.orders.removeActProduct = async function (pid) {
-  var activity = Aoi.orders.actProductsTarget;
-  if (!activity) return;
   var d = Aoi.orders.ensure();
-  var m = Aoi.orders.ensureActMeta(d, activity);
-  var p = null;
-  m.products.forEach(function (x) { if (x.id === pid) p = x; });
-  if (!p) return;
+  var loc = Aoi.orders.findProductById(d, pid);
+  if (!loc) return;
+  var p = loc.product;
   if (!(await Aoi.confirm('确定删除商品「' + p.type + '-' + p.model + '」？其参考图与跳转链接将一并移除（订单不受影响）', { title: '删除商品', okText: '删除', danger: true }))) return;
-  m.products = m.products.filter(function (x) { return x.id !== pid; });
+  loc.meta.products = loc.meta.products.filter(function (x) { return x.id !== pid; });
   await Aoi.saveTeamData(d);
-  Aoi.orders.renderActProducts();
   Aoi.orders.renderActivities();
   Aoi.toast('已删除商品', 'success');
 };
@@ -1558,23 +1637,6 @@ Aoi.orders.jumpToProduct = function (activity, type, model) {
   Aoi.orders.render();
   Aoi.toast('已按商品「' + type + '-' + model + '」筛选购买者', 'info');
 };
-
-// 弹窗内事件委托：保存 / 删除 / 购买者跳转（data 属性传 id，避免注入）
-document.getElementById('actProductList').addEventListener('click', function (e) {
-  var save = e.target.closest('button[data-psave]');
-  if (save) { Aoi.orders.saveActProduct(save.getAttribute('data-psave')); return; }
-  var del = e.target.closest('button[data-pdel]');
-  if (del) { Aoi.orders.removeActProduct(del.getAttribute('data-pdel')); return; }
-  var pb = e.target.closest('button[data-pbuyers]');
-  if (!pb) return;
-  var pid = pb.getAttribute('data-pbuyers');
-  var activity = Aoi.orders.actProductsTarget;
-  var d = Aoi.orders.ensure();
-  var m = d.activityMeta[activity] || {};
-  var p = null;
-  (m.products || []).forEach(function (x) { if (x.id === pid) p = x; });
-  if (p) Aoi.orders.jumpToProduct(activity, p.type, p.model);
-});
 
 document.getElementById('buyerTbody').addEventListener('click', function (e) {
   var jump = e.target.closest('button[data-buyer-jump]');

@@ -538,30 +538,6 @@
         </div>
       </div>
 
-      <!-- 活动商品弹窗（v3.6.0 S2：按型号分类管理参考图/跳转链接） -->
-      <div id="actProductsModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg w-full max-w-2xl p-6" onclick="event.stopPropagation()">
-          <h3 class="font-bold mb-1">活动商品</h3>
-          <p id="actProductsTitle" class="text-xs text-gray-400 mb-3"></p>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-            <input id="apNewType" list="actProductTypeOptions" placeholder="制品类型" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            <input id="apNewModel" placeholder="型号" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            <input id="apNewImage" data-img-paste placeholder="参考图 URL（可上传/粘贴）" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
-            <input id="apNewUrl" placeholder="跳转链接（空=平台链接）" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
-          </div>
-          <div class="flex flex-wrap items-center gap-2 mb-3">
-            <button type="button" onclick="Aoi.img.openPicker('apNewImage')" class="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>
-            <button onclick="Aoi.orders.addActProduct()" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700">添加商品</button>
-            <p class="text-xs text-gray-400">跳转链接留空时，团员端默认展示活动平台链接</p>
-          </div>
-          <div id="actProductList" class="max-h-96 overflow-y-auto border-t border-gray-100 pt-1"></div>
-          <datalist id="actProductTypeOptions"></datalist>
-          <div class="flex justify-end mt-3">
-            <button onclick="Aoi.orders.closeActProducts()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">关闭</button>
-          </div>
-        </div>
-      </div>
-
       <!-- 购买计划弹窗（v3.6.0 S3：与限购计划页双向同步） -->
       <div id="actPlanModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg w-full max-w-3xl p-6" onclick="event.stopPropagation()">
@@ -614,23 +590,21 @@
             <table id="activityTable" class="w-full text-sm data-table">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="px-2 py-2 text-right w-8">行号</th>
-                <th class="px-3 py-2">活动</th>
+                <th class="px-3 py-2">活动（点击展开商品）</th>
                 <th class="px-3 py-2">所属 IP</th>
                 <th class="px-3 py-2">购买时间</th>
                 <th class="px-3 py-2">出货日期</th>
                 <th class="px-3 py-2">出货（模糊）</th>
-                <th class="px-3 py-2">平台链接</th>
                 <th class="px-3 py-2">进度</th>
                 <th class="px-3 py-2">购买人</th>
-                <th class="px-3 py-2">快递单号</th>
                 <th class="px-3 py-2">商品</th>
-                <th class="px-3 py-2">计划</th>
                 <th class="px-3 py-2">备注</th>
                 <th class="px-3 py-2"></th>
               </tr></thead>
               <tbody id="activityTbody"></tbody>
             </table>
             <datalist id="shipFuzzyOptions"></datalist>
+            <datalist id="actProductTypeOptions"></datalist>
           </div>
         </div>
       </div>

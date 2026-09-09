@@ -84,14 +84,16 @@ describe('Aoi.orders v1.9.0：活动管理购买人/快递单号/模糊出荷', 
     expect(list.length).toBe(3 * (4 + 4 + 36));
   });
 
-  it('renderActivities：购买人/快递单号/备注/模糊日期列渲染', () => {
+  it('renderActivities：购买人/快递单号/备注/模糊日期列渲染（单号入口在展开区）', () => {
     aoi.orders.renderActivities();
     const html = doc.getElementById('activityTbody').innerHTML;
     expect(html).toContain('data-act-buyers="活动A"');
-    expect(html).toContain('data-act-track="活动A"');
     expect(html).toContain('data-field="remark"');
     expect(html).toContain('data-field="shipDateFuzzy"');
     expect(html).toContain('填写'); // 未填写时按钮文案
+    // v3.7.0 S2：点击活动名展开后，展开区出现快递单号入口
+    aoi.orders.toggleActivityExpand('活动A');
+    expect(doc.getElementById('activityTbody').innerHTML).toContain('data-act-track="活动A"');
   });
 
   it('openActBuyers/saveActBuyers：多行购买人信息写回 meta', async () => {

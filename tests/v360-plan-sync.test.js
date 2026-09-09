@@ -170,8 +170,10 @@ describe('购买计划双向同步（v3.6.0 S3）', () => {
     expect(doc.getElementById('actPlanModal').classList.contains('hidden')).toBe(false);
   });
 
-  it('活动管理行渲染「计划」按钮并显示账号数，点击打开弹窗', () => {
+  it('活动管理展开区渲染「计划」按钮并显示账号数，点击打开弹窗', () => {
     aoi.orders.renderActivities();
+    // v3.7.0 S2：计划入口移入活动展开区
+    aoi.orders.toggleActivityExpand('活动A');
     const btn = doc.querySelector('button[data-act-plan="活动A"]');
     expect(btn).not.toBeNull();
     expect(btn.textContent).toContain('2账号');

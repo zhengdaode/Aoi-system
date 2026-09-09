@@ -165,6 +165,25 @@ textarea:focus {
   padding-right: 0.5rem;
 }
 
+/* v3.7.0（S7 流式宽度）：<1280px 收起低优先列（th/td 均带 data-lowpri 才整列隐藏），
+   列内数据不丢——入口保留在活动展开区 / 导出表格中 */
+@media (max-width: 1279.98px) {
+  .data-table [data-lowpri] {
+    display: none;
+  }
+}
+
+/* v3.7.0（S7 流式宽度）：管理端视图容器已去 max-w 上限改全宽，
+   极宽屏下限宽避免表单类内容过度拉伸（宽表视图不受此限） */
+@media (min-width: 1536px) {
+  #view-settings,
+  #view-warehouse,
+  #view-batches,
+  #view-calc {
+    max-width: 64rem;
+  }
+}
+
 /* v1.9.0（问题 4）：移动端适配 —— 首列 sticky 对照 + 容器贴边 */
 @media (max-width: 767px) {
   .data-table th:first-child,

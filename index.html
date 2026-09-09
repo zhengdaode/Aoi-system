@@ -201,6 +201,7 @@
           <div class="space-y-0.5">
             <a data-nav="view-calc" onclick="Aoi.nav('view-calc')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">计算器</a>
             <a data-nav="view-limits" onclick="Aoi.nav('view-limits')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">限购计划</a>
+            <a data-nav="view-catalog" onclick="Aoi.nav('view-catalog');Aoi.catalog.renderAll()" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">PCO 目录</a>
           </div>
         </div>
         <div>
@@ -227,7 +228,7 @@
       </header>
 
       <!-- 总览 -->
-      <div id="view-overview" data-view class="grid gap-4 max-w-5xl">
+      <div id="view-overview" data-view class="grid gap-4">
         <div class="mb-2">
           <h2 class="font-serif text-2xl font-bold">总览</h2>
           <p class="text-sm text-gray-500 mt-1">登录后待办一览，点击卡片直达对应功能</p>
@@ -326,6 +327,67 @@
       </div>
 
       <!-- 账号与设置 -->
+      <!-- PCO 商品目录（v3.7.0 F9） -->
+      <div id="view-catalog" data-view class="hidden grid gap-4 max-w-5xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">PCO 商品目录</h3>
+          <p class="text-sm text-gray-500 mb-3">宝可梦中心 online 商品目录：粘贴解析 → 词典翻译草稿 → 人工校对 → 推入活动商品 / 导出小程序表格（<a href="https://www.pokemoncenter-online.com/" target="_blank" rel="noopener" class="text-blue-600 hover:underline">pokemoncenter-online.com</a>）</p>
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <input id="catGrabUrl" class="border border-gray-300 rounded px-3 py-2 text-sm flex-1 min-w-[16rem]" placeholder="粘贴 PCO 活动链接（抓取通道就绪后可一键抓取）">
+            <button onclick="Aoi.catalog.grab()" class="px-4 py-2 bg-gray-800 text-white rounded text-sm hover:bg-gray-700">提交抓取</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+            <span>dispatch 地址（aoi-pco-monitor 就绪后填入点亮）</span>
+            <input id="catDispatch" class="border border-gray-200 rounded px-2 py-1 text-xs w-64" placeholder="https://…/catalog-dispatch">
+            <button onclick="Aoi.catalog.saveDispatch()" class="px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50">保存</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-2">粘贴导入</h3>
+          <p class="text-sm text-gray-500 mb-2">打开 PCO 页面后整页复制（Ctrl+A → Ctrl+C）粘贴至此：富文本自动带出商品图/链接/价格/限购；纯文本按「名称 + 价格円」逐行解析。</p>
+          <textarea id="catPaste" onpaste="Aoi.catalog.onPaste(event)" class="w-full h-28 border border-gray-300 rounded p-3 text-sm" placeholder="在此粘贴（Ctrl+V）…"></textarea>
+          <button onclick="Aoi.catalog.importPaste()" class="mt-2 px-4 py-2 bg-gray-800 text-white rounded text-sm hover:bg-gray-700">解析粘贴内容</button>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <h3 class="font-bold">校对工作台</h3>
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <select id="catPushActivity" class="border border-gray-300 rounded px-2 py-1.5 text-sm"></select>
+              <input id="catNewActivity" class="border border-gray-300 rounded px-2 py-1.5 text-sm w-36" placeholder="或输入新活动名">
+              <button onclick="Aoi.catalog.pushSelected()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-500">推入活动商品</button>
+              <button onclick="Aoi.catalog.save()" class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">保存目录</button>
+              <button onclick="Aoi.catalog.exportTemplate(this)" data-name="小程序商品导入表" data-activity-from="catPushActivity" class="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">导出小程序表格</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm data-table">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-2 py-2 text-center w-8">选</th><th class="px-2 py-2 w-12">图</th><th class="px-3 py-2">日文名</th>
+                <th class="px-3 py-2">中文名（必填）</th><th class="px-3 py-2">类型</th><th class="px-3 py-2 text-right">日元价</th>
+                <th class="px-3 py-2">人民币价</th><th class="px-3 py-2 w-16">限购</th><th class="px-3 py-2">発売日</th>
+                <th class="px-3 py-2">链接</th><th class="px-2 py-2 text-center w-10">操作</th>
+              </tr></thead>
+              <tbody id="catDraftTbody"></tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-xs text-gray-400">价格留空按计算器汇率自动换算；未识别的日文片段以红色标出，请人工补全；导出严格按小程序模板（说明 6 行 + 表头 + 数据，Sheet1）。</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="flex items-center mb-3"><h3 class="font-bold">已存目录</h3><span class="ml-auto text-xs text-gray-400">勾选=纳入补货监控（aoi-pco-monitor）</span></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm data-table">
+              <thead><tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="px-2 py-2 w-12">图</th><th class="px-3 py-2">商品</th><th class="px-3 py-2">类型</th>
+                <th class="px-3 py-2 text-right">价格</th><th class="px-3 py-2 text-center">限购</th>
+                <th class="px-3 py-2">售况</th><th class="px-3 py-2">発売日</th>
+                <th class="px-2 py-2 text-center">监控</th><th class="px-2 py-2 text-center w-10">操作</th>
+              </tr></thead>
+              <tbody id="catTableTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div id="view-settings" data-view class="hidden grid gap-4 max-w-3xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">团队信息</h3>
@@ -417,7 +479,7 @@
       </div>
 
       <!-- 信息录入 -->
-      <div id="view-entry" data-view class="hidden grid gap-4 max-w-4xl">
+      <div id="view-entry" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">Excel 导入</h3>
           <p class="text-sm text-gray-500 mb-3">支持排谷表 / 拼谷表 / 闲鱼（.xlsx / .xls）、本站「下载表格」导出的 .xlsx / .csv，以及排谷表 / 汇总表的分享直链，自动识别表格结构</p>
@@ -510,7 +572,7 @@
       </div>
 
       <!-- 订单管理 -->
-      <div id="view-orders" data-view class="hidden bg-white rounded-lg border border-gray-200 p-6 max-w-7xl">
+      <div id="view-orders" data-view class="hidden bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex flex-wrap items-center gap-3 mb-3">
           <input id="fBuyer" placeholder="按购买者筛选" oninput="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm">
           <input id="fModel" placeholder="按型号筛选" oninput="Aoi.orders.render()" class="border border-gray-300 rounded px-3 py-2 text-sm">
@@ -567,7 +629,7 @@
               <th class="px-2 py-2 text-right w-8">行号</th>
               <th class="px-2 py-2"></th>
               <th data-sort="activity" class="px-3 py-2 cursor-pointer select-none" title="点击排序">活动<span class="sort-arrow"></span></th><th data-sort="type" class="px-3 py-2 cursor-pointer select-none" title="点击排序">制品类型<span class="sort-arrow"></span></th><th data-sort="model" class="px-3 py-2 cursor-pointer select-none" title="点击排序">型号<span class="sort-arrow"></span></th>
-              <th data-sort="price" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">单价(¥)<span class="sort-arrow"></span></th><th class="px-3 py-2 text-right">外币原价</th><th data-sort="count" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">数量<span class="sort-arrow"></span></th>
+              <th data-sort="price" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">单价(¥)<span class="sort-arrow"></span></th><th data-lowpri class="px-3 py-2 text-right">外币原价</th><th data-sort="count" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">数量<span class="sort-arrow"></span></th>
               <th data-sort="buyer" class="px-3 py-2 cursor-pointer select-none" title="点击排序">购买者<span class="sort-arrow"></span></th><th class="px-3 py-2">备注</th><th data-sort="status" class="px-3 py-2 cursor-pointer select-none" title="点击排序">到货状态<span class="sort-arrow"></span></th><th class="px-3 py-2">到货批次</th><th data-sort="sum" class="px-3 py-2 text-right cursor-pointer select-none" title="点击排序">小计<span class="sort-arrow"></span></th>
               <th class="px-3 py-2"></th>
             </tr></thead>
@@ -651,7 +713,7 @@
       </div>
 
       <!-- 活动管理 -->
-      <div id="view-activities" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-activities" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex items-center mb-2"><h3 class="font-bold">活动管理</h3><button onclick="Aoi.exportSummary()" class="px-3 py-1 border border-blue-300 text-blue-600 rounded text-xs hover:bg-blue-50 ml-auto">导出汇总表（全部活动）</button><button onclick="Aoi.exportImage(this)" data-table="activityTable" data-name="活动管理" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="activityTable" data-name="活动管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
           <p class="text-sm text-gray-500 mb-3">为每个活动记录所属 IP、购买时间、出货日期、平台链接与进度状态</p>
@@ -668,7 +730,7 @@
                 <th class="px-3 py-2">所属 IP</th>
                 <th class="px-3 py-2">购买时间</th>
                 <th class="px-3 py-2">出货日期</th>
-                <th class="px-3 py-2">出货（模糊）</th>
+                <th data-lowpri class="px-3 py-2">出货（模糊）</th>
                 <th class="px-3 py-2">进度</th>
                 <th class="px-3 py-2">购买人</th>
                 <th class="px-3 py-2">商品</th>
@@ -684,7 +746,7 @@
       </div>
 
       <!-- 买家管理（v3.6.0 S1 自活动管理页迁出独立 tab） -->
-      <div id="view-buyers" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-buyers" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex items-center mb-2"><h3 class="font-bold">买家管理</h3><button onclick="Aoi.exportImage(this)" data-table="buyerTable" data-name="买家列表" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="buyerTable" data-name="买家列表" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
           <p class="text-sm text-gray-500 mb-3">列出所有买家圈名；点击圈名查看其全部订单（订单按状态着色：灰=未到货、琥珀=已到货待发货、绿=已发货/已收货）。删除后清除其订单/交费/地址/通知等记录，删除前请确认其无未处理完的订单</p>
@@ -708,7 +770,7 @@
       </div>
 
       <!-- 类型管理 -->
-      <div id="view-types" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-types" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">制品类型库</h3>
           <p class="text-sm text-gray-500 mb-3">为每个类型标注发货线路标签（常规二次元线路 / 一般线路发送 / 大件类 / 名贵类），录入订单时按线路分组选择</p>
@@ -772,7 +834,7 @@
       </div>
 
       <!-- 国际计算 -->
-      <div id="view-intl" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-intl" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">国际运费计算</h3>
           <p class="text-sm text-gray-500 mb-3">选到货批次，填该批国际运费总额，按重量分摊到每件商品</p>
@@ -831,7 +893,7 @@
       </div>
 
       <!-- 事务审批 -->
-      <div id="view-approval" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-approval" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">事务审批（国际费交费审核）</h3>
           <p class="text-sm text-gray-500 mb-3">按到货批次逐人核实国际费交费，标记已交 / 驳回</p>
@@ -895,7 +957,7 @@
       </div>
 
       <!-- 发货管理 -->
-      <div id="view-ship" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-ship" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">发货管理</h3>
           <p class="text-sm text-gray-500 mb-3">选到货批次，录快递单号、设合照、标记发货（单号请复制到菜鸟裹裹查询）</p>
@@ -934,7 +996,7 @@
       </div>
 
       <!-- 通知公告 -->
-      <div id="view-notify" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-notify" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">发布公告</h3>
           <p class="text-sm text-gray-500 mb-2">团员端首页可见，可一键推送 QQ 群</p>
@@ -1009,7 +1071,7 @@
       </div>
 
       <!-- 限购购买计划计算器 -->
-      <div id="view-limits" data-view class="hidden grid gap-4 max-w-5xl">
+      <div id="view-limits" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">限购购买计划计算器</h3>
           <p class="text-sm text-gray-500 mb-3">选活动 → 设限购 → 填包邮金额与账号数：先把全部排单数量分配到各账号，再在账号间调剂，让尽可能多的账号凑满包邮</p>
@@ -1154,5 +1216,8 @@
   <script src="js/stats.js"></script>
   <script src="js/image-upload.js"></script>
   <script src="js/summary-export.js"></script>
+  <script src="js/species-zh.js"></script>
+  <script src="js/catalog-dict.js"></script>
+  <script src="js/catalog.js"></script>
 </body>
 </html>

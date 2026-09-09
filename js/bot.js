@@ -151,7 +151,7 @@ Aoi.bot.saveSettings = async function () {
 };
 
 // F5-H①（v3.5.0）：排发表 xlsx 经 relay 生成并私发管理员。
-// 行数据字段与 Aoi.ship.export 完全一致（购买者/制品/发货线路/数量/囤货地/快递单号/合照/状态）；
+// 行数据字段与发货管理排发表一致（购买者/制品/发货线路/数量/囤货地/快递单号/合照/状态）；
 // relay 生成 xlsx 后经 NapCat upload_private_file 发到 botConfig.adminQq，临时文件用后即删。
 Aoi.bot.exportShipping = async function (batchId) {
   if (!Aoi.bot.config.enabled || !Aoi.bot.config.relay) throw new Error('QQ 机器人未接入');

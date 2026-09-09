@@ -148,12 +148,14 @@
   activityMeta: { [活动名]: { ip, buyDate, shipDate, shipDateFuzzy, link, status, remark,
                               buyers: [{ buyer, account, address }],
                               trackings: [string],
-                              products: [{ id, type, model, refImage, refUrl }] } },
+                              products: [{ id, type, model, refImage, refUrl,
+                                           price?, priceOrig?, currency?, limit? }] } },
   limitPlans: { [活动名]: { activity, freeShip, freeShipRmb, freeCur, accountsCount, maxTypes,
                             limits: { 'type|model': n },
                             items: [{ index, total, diff, reached,
                                       items: [{ type, model, qty, price, amount, status }] }],
                             remaining: [{ type, model, qty }], updatedAt } },
+  pcoItems:  [],   // v3.7.0 F9 接口预留（PCO 商品目录，本期无读写方）
   typeMeta:  { [类型名]: { route } },
   ipTypes:   { [IP]: [类型名...] },
   addresses: { [buyer]: string },
@@ -165,9 +167,12 @@
 - `orders.status`：到货状态（未到货 / 已到货）；`orders.batchId`：所属到货批次。
 - `orders.shipped`：发货状态（未发 / 已发）；`orders.shippedAt`：发货时间戳（v3.5.0 F6 起首标已发时写入 ISO 时间，复盘统计发货时效数据源；旧数据缺失时统计自动排除）；`orders.tracking` / `orders.photo`：快递单号 / 合照 URL；`orders.received`：团员收货确认。
 - `payments.status`：交费状态（待交 / 待审核 / 已交 / 已驳回），按「批次 × 购买者」唯一；`receipt` 为团员上传的付款凭证 URL。
-- `activityMeta.products`（v3.6.0）：活动商品登记，按「类型+型号」对应订单；`refUrl` 为空时团员端回落展示活动平台链接 `link`。
+- `activityMeta.products`（v3.6.0 登记；**v3.7.0 起为唯一商品主档**）：按「类型+型号」弱关联订单，数量/购买人/购买情况一律经 `Aoi.orders.productStats` 从订单与限购计划实时聚合、不在商品上存副本；`refUrl` 为空时团员端回落展示活动平台链接 `link`；v3.7.0 扩展可选字段 `price`（人民币登记价）、`priceOrig`+`currency`（外币原价）、`limit`（单账号限购），向后兼容（旧数据缺省，展示回落订单聚合值）。
+- `activityMeta.buyers`（v3.7.0 同步约定）：购买人=代购工作人员，按行序对应 `limitPlans` 的账号槽位 `1..N`（限购计划页与活动计划弹窗按 `buyers[index-1]` 显示购买人标签）；保存校验一人一账号（账号必填、圈名与账号均不重复）。
+- `products`（顶层旧预建商品池）：**v3.7.0 起废弃**——录入统一走「登记活动商品」写 `activityMeta[].products`，旧数据保留在 blob 中不再读写。
+- `pcoItems`（v3.7.0）：F9 接口预留空数组，PCO 商品目录导入/监控（v3.8.0）的目标结构。
 - `limitPlans`（v3.6.0）：限购购买计划入库，「工具 → 限购计划」与活动管理计划弹窗双侧共读共写（双向同步）；`item.status` ∈ 待购买 / 已购买 / 购买失败，切「购买失败」时按原计算器贪心把该商品整项重分配给其余账号（受 `limits` 限购与 `maxTypes` 约束，装不下的余量入 `remaining`）。
-- 命名约定：`type`（制品类型）+ `model`（型号）在订单、周边、Excel 导入三处统一。
+- 命名约定：`type`（制品类型）+ `model`（型号）在订单、商品主档、Excel 导入处统一（v3.7.0 起旧「周边」池并入主档）。
 
 ## 调试账户
 

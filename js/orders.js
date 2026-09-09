@@ -1173,11 +1173,10 @@ Aoi.orders.buyerRowHtml = function (b) {
     + '</div>';
 };
 
-// 购买人候选：订单购买者 ∪ 团员元数据圈名 ∪ 既有购买人
+// 购买人候选：仅取「以往活动登记过的购买人」（v3.7.0 S3——购买人=代购工作人员，
+// 不再混入全部订单 CN / 团员圈名；新人直接空行手输）
 Aoi.orders.buyerCandidates = function (d) {
   var set = {};
-  Aoi.orders.collectBuyers(d).forEach(function (cn) { set[cn] = 1; });
-  Object.keys(d.memberMeta || {}).forEach(function (cn) { if (cn) set[cn] = 1; });
   Object.keys(d.activityMeta || {}).forEach(function (a) {
     ((d.activityMeta[a] || {}).buyers || []).forEach(function (b) { if (b.buyer) set[b.buyer] = 1; });
   });
@@ -1233,12 +1232,61 @@ Aoi.orders.openActBuyers = function (name) {
     box.innerHTML = rows.map(Aoi.orders.buyerRowHtml).join('');
   }
   Aoi.orders.fillBuyerDatalists();
+  Aoi.orders.renderBuyerSyncHint();
   document.getElementById('actBuyersModal').classList.remove('hidden');
+};
+
+// 购买人 ↔ 计划账号映射提示（v3.7.0 S3）：购买人按行序对应限购计划的账号 1..N
+Aoi.orders.renderBuyerSyncHint = function () {
+  var el = document.getElementById('actBuyersSync');
+  if (!el) return;
+  var name = Aoi.orders.actTarget;
+  var d = Aoi.orders.ensure();
+  var plan = name && d.limitPlans && d.limitPlans[name];
+  var filled = document.querySelectorAll('#actBuyerRows .act-buyer-row').length;
+  if (!plan) { el.textContent = '购买人按行序对应购买计划的账号 1..N（该活动暂无购买计划）'; return; }
+  var slots = Math.max(plan.accountsCount || 0, (plan.items || []).length);
+  el.textContent = '购买人按行序对应计划账号 1..' + slots + '：已填 ' + filled + ' 人 / 计划 ' + slots + ' 个账号'
+    + (filled !== slots ? '（数量不一致，可与计划核对）' : '（数量一致）');
+};
+
+// 从计划生成购买人行：按计划账号数生成行，已有购买人按行序带入（名称/账号可再改）
+Aoi.orders.genBuyersFromPlan = function () {
+  var name = Aoi.orders.actTarget;
+  if (!name) return;
+  var d = Aoi.orders.ensure();
+  var plan = d.limitPlans && d.limitPlans[name];
+  if (!plan) { Aoi.toast('该活动还没有购买计划——先到「工具 → 限购计划」计算', 'warning'); return; }
+  var cur = Aoi.orders.readBuyerRows();
+  var slots = Math.max(plan.accountsCount || 0, (plan.items || []).length);
+  if (slots < 1) { Aoi.toast('该计划没有可用账号', 'warning'); return; }
+  var rows = [];
+  for (var i = 0; i < slots; i++) rows.push(cur[i] || {});
+  var box = document.getElementById('actBuyerRows');
+  if (box) box.innerHTML = rows.map(Aoi.orders.buyerRowHtml).join('');
+  Aoi.orders.renderBuyerSyncHint();
+  Aoi.toast('已按计划生成 ' + slots + ' 行购买人（账号列请补齐邮箱）', 'success');
+};
+
+// 读取弹窗内购买人行（保存 / 从计划带入共用）：圈名为空的行丢弃
+Aoi.orders.readBuyerRows = function () {
+  var rows = [];
+  document.querySelectorAll('#actBuyerRows .act-buyer-row').forEach(function (row) {
+    var buyer = row.querySelector('.ab-buyer').value.trim();
+    if (!buyer) return;
+    rows.push({
+      buyer: buyer,
+      account: row.querySelector('.ab-account').value.trim(),
+      address: row.querySelector('.ab-address').value.trim()
+    });
+  });
+  return rows;
 };
 
 Aoi.orders.addBuyerRow = function () {
   var box = document.getElementById('actBuyerRows');
   if (box) box.insertAdjacentHTML('beforeend', Aoi.orders.buyerRowHtml({}));
+  Aoi.orders.renderBuyerSyncHint();
 };
 
 Aoi.orders.closeActBuyers = function () {
@@ -1246,21 +1294,23 @@ Aoi.orders.closeActBuyers = function () {
   Aoi.orders.actTarget = null;
 };
 
+// 保存购买人（v3.7.0 S3 加固）：一个购买人对应一个账号——账号必填、圈名/账号均不得重复
 Aoi.orders.saveActBuyers = async function () {
   var name = Aoi.orders.actTarget;
   if (!name) return;
+  var rows = Aoi.orders.readBuyerRows();
+  var seenBuyer = {}, seenAccount = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r.account) { Aoi.toast('第 ' + (i + 1) + ' 位购买人「' + r.buyer + '」未填账号（一人一账号）', 'warning'); return; }
+    if (seenBuyer[r.buyer]) { Aoi.toast('购买人「' + r.buyer + '」重复', 'warning'); return; }
+    if (seenAccount[r.account]) { Aoi.toast('账号「' + r.account + '」重复（一个账号只对应一位购买人）', 'warning'); return; }
+    seenBuyer[r.buyer] = 1;
+    seenAccount[r.account] = 1;
+  }
+  if (!rows.length) { Aoi.toast('请至少填写一位购买人', 'warning'); return; }
   var d = Aoi.orders.ensure();
   if (!d.activityMeta[name]) d.activityMeta[name] = {};
-  var rows = [];
-  document.querySelectorAll('#actBuyerRows .act-buyer-row').forEach(function (row) {
-    var buyer = row.querySelector('.ab-buyer').value.trim();
-    if (!buyer) return; // 圈名为空的行丢弃
-    rows.push({
-      buyer: buyer,
-      account: row.querySelector('.ab-account').value.trim(),
-      address: row.querySelector('.ab-address').value.trim()
-    });
-  });
   d.activityMeta[name].buyers = rows;
   await Aoi.saveTeamData(d);
   Aoi.orders.closeActBuyers();

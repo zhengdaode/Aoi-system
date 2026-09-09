@@ -202,8 +202,8 @@ describe('活动购买人搜索下拉与地址回填（v3.2.0 T3）', () => {
     }
   };
 
-  it('buyerCandidates 合并订单购买者/团员元数据/既有购买人并去重排序', () => {
-    expect(aoi.orders.buyerCandidates(d)).toEqual(['小刚', '小明', '小樱', '小红']);
+  it('buyerCandidates 仅取既有购买人（v3.7.0 S3：不再合并订单 CN/团员圈名）', () => {
+    expect(aoi.orders.buyerCandidates(d)).toEqual(['小明', '小樱']);
   });
 
   it('accountCandidates 收集全站既有购买账号并去重', () => {

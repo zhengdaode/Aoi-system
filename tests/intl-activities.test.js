@@ -107,16 +107,23 @@ describe('Aoi.orders v1.9.0：活动管理购买人/快递单号/模糊出荷', 
     expect(m.buyers[0]).toEqual({ buyer: '小樱', account: 'sakura@example.com', address: '上海市某路1号' });
   });
 
-  it('saveActBuyers：圈名为空的行被丢弃；按钮显示人数', async () => {
+  it('saveActBuyers：圈名为空的行被丢弃；账号必填；按钮显示人数', async () => {
     aoi.orders.openActBuyers('活动A');
     aoi.orders.addBuyerRow();
     const rows = doc.querySelectorAll('#actBuyerRows .act-buyer-row');
     rows[0].querySelector('.ab-buyer').value = '小樱';
-    // 第二行留空
+    rows[0].querySelector('.ab-account').value = 'sakura@example.com';
+    // 第二行圈名留空（整行丢弃）
     await aoi.orders.saveActBuyers();
     expect(aoi.state.data.activityMeta['活动A'].buyers).toHaveLength(1);
     aoi.orders.renderActivities();
     expect(doc.getElementById('activityTbody').innerHTML).toContain('1 人');
+    // v3.7.0 S3：缺账号（一人一账号）时拒绝保存
+    aoi.orders.openActBuyers('活动A');
+    doc.querySelector('#actBuyerRows .act-buyer-row .ab-buyer').value = '小狼';
+    doc.querySelector('#actBuyerRows .act-buyer-row .ab-account').value = '';
+    await aoi.orders.saveActBuyers();
+    expect(aoi.state.data.activityMeta['活动A'].buyers[0].buyer).toBe('小樱');
   });
 
   it('openActTrack/saveActTrack：每行一个单号', async () => {

@@ -438,6 +438,15 @@ Aoi.limits.reallocateCore = function (stored, idx, key) {
   return out;
 };
 
+// 账号槽位对应的购买人标签（v3.7.0 S3）：取活动购买人列表的第 idx-1 行（名称+账号）
+Aoi.limits.purchaserLabel = function (activity, idx) {
+  var d = Aoi.orders.ensure();
+  var m = d.activityMeta && d.activityMeta[activity];
+  var b = ((m && m.buyers) || [])[idx - 1];
+  if (!b || (!b.buyer && !b.account)) return '';
+  return (b.buyer || '账号' + idx) + (b.account ? '（' + b.account + '）' : '');
+};
+
 // 渲染已存计划（限购计划结果表 / 活动管理计划弹窗共用；8 列，件数与购买状态可编辑）
 Aoi.limits.renderPlan = function (stored, tbodyId, statId) {
   var tbody = document.getElementById(tbodyId || 'limResultTbody');
@@ -466,7 +475,12 @@ Aoi.limits.renderPlan = function (stored, tbodyId, statId) {
     }).join('');
     return '<tr class="border-b border-gray-100 align-top">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2 wrap">账号 ' + a.index + '</td>'
+      + '<td class="px-3 py-2 wrap">账号 ' + a.index
+      + (function () {
+          var label = Aoi.limits.purchaserLabel(stored.activity, a.index);
+          return label ? '<div class="text-xs text-gray-500">' + Aoi.escapeHtml(label) + '</div>' : '';
+        })()
+      + '</td>'
       + '<td class="px-3 py-2 wrap">' + content + '</td>'
       + '<td class="px-3 py-2 text-right">' + pieces + '</td>'
       + '<td class="px-3 py-2 text-right">' + (a.total == null ? 0 : a.total).toFixed(2) + '</td>'

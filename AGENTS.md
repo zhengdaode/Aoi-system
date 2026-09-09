@@ -24,7 +24,7 @@
 **v3.6.0 管理端体验升级已实施完成**（2026-09-09，见 `docs/PLAN-v3.6.0.md`：S1 买家管理独立 tab（状态分桶 + 点击圈名筛单）/ S2 活动商品按型号管理（参考图 + 跳转链接，空链接回落平台链接，团员端参考列）/ S3 购买计划入库 `d.limitPlans` 双向同步 + 购买失败自动重分配 / S4 图片粘贴上传 `data-img-paste` / S5 导出文件名带活动名 / S6 复盘统计布局修复（view-stats 曾在 `</main>` 外）；测试 254 用例）；
 **F5 QQ 机器人双向已实施完成**（2026-09-09，独立仓库 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7：relay v4 双向/绑定/查单/团况/自动催缴/排发 xlsx/非文本兜底 + 54 测试；主仓库接入 = 3 个 Supabase RPC（`member_lookup_by_qq` / `team_summary_for_group` / `unpaid_members_by_group`）+ 设置页 `botConfig.adminQq/qrUrl` + 排发「设为已发」自动私发管理员；**部署动作待真机执行**：NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 部署新 relay，见 aoi-qqbot README）；
 **v3.6.2 订单管理表头排序已实施完成**（2026-09-09：活动/制品类型/型号/单价/数量/购买者/到货状态/小计 8 列可排序，点击表头循环 不排→升→降，中文拼音 `Intl.Collator('zh-Hans-CN')`、空值恒最后、稳定排序；≤640px 卡片视图无表头，筛选行排序下拉兜底；排序记忆存 `localStorage['aoi_orders_sort']`；仅作用渲染副本不写回 blob，导出行序自动跟随；测试 275 用例）；
-**F9 PCO 商品目录导入+补货监控计划 v3 已产出（2026-09-10，v3.7.0 提案，待审核通过后实施）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)**（手动导入改纯网页端富文本粘贴，书签脚本降为可选；监控采纳 GitHub Actions + Playwright（独立仓库 aoi-pco-monitor，不占主仓库版本号）；ECS relay 机 SSH 不可达、NapCat 机为备用落点；LLM 舍弃；小程序模板已解析；回流不开发）；
+**F9 PCO 商品目录导入+补货监控计划 v3.1 已产出（2026-09-10，v3.7.0 提案，待审核通过后实施）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)**（手动导入主入口=只粘贴活动链接（Edge Function 转发 Actions 按需抓取，异步 1–2 分钟），富文本粘贴兜底；监控 GitHub Actions + Playwright（独立仓库 aoi-pco-monitor，不占主仓库版本号）；ECS relay 机 SSH 不可达、NapCat 机备用；LLM 舍弃；模板已解析；回流不开发）；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
@@ -56,7 +56,7 @@
 | `docs/PLAN-NEXT.md` | **下一轮计划（待批准）**：新功能（F1–F8）× 后端（B1–B7）双路线 + 版本切分 |
 | `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` | F5 QQ 机器人双向（独立项目 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot)）：**已实施（2026-09-09，M1–M7）**，部署动作待真机执行 |
 | `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
-| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**计划 v3（2026-09-10，v3.7.0 提案，待审核通过后实施）**——网页端粘贴导入 + aoi-pco-monitor（GitHub Actions + Playwright）定时监控 |
+| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**计划 v3.1（2026-09-10，v3.7.0 提案，待审核通过后实施）**——只输入活动链接导入（兜底：富文本粘贴）+ aoi-pco-monitor（GitHub Actions + Playwright）定时监控 |
 | `docs/STATUS.md` | 权威状态：已完成阶段、数据模型（blob 结构）、已知限制、**遗留项与线上操作清单** |
 | `CLAUDE.md` | QQ 机器人接入专项（NapCat / relay / 安全红线） |
 | `README.md` | 功能、部署、安全、项目结构 |

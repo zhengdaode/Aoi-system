@@ -1,110 +1,103 @@
-# F9 · PCO 商品目录导入 + 补货监控 —— 可行性评估与实施计划 v2（v3.7.0 提案，待审核）
+# F9 · PCO 商品目录导入 + 补货监控 —— 实施计划 v3（v3.7.0 提案，待审核通过后实施）
 
-> v2 修订（2026-09-10，按负责人批复重写）：数据源改为 **PCO（pokemoncenter-online.com）本体**；所需信息五要素：商品图、商品链接、商品名称、商品价格、商品限购。分两步交付：①手动粘贴 PCO 链接导入商品信息；②自动监控 PCO（新活动上架 / 商品补货变动）并同步回本系统。**LLM 方案完全舍弃**；**定时监控已批准立项**；小程序导入模板已拿到并解析。回流方向（小程序→Aoi）现有 `import.js` 已完全覆盖，不做新开发。
-> v1（2026-09-09）以 pokemon.co.jp 情报站为主的结论归档于 git 历史；情报站降级为「新活动预告的辅助信号」。
+> v3 修订（2026-09-10，按负责人第二轮批复）：①手动导入**放弃书签脚本**，改为纯网页端形态；②定时监控评估并采纳 **GitHub Actions**；③按指令核查了仓库内的服务器部署权限记录并给出部署可行性判定（写入 §5 与 AGENTS.md）；④明确 v3.7.0 内容（§7）。
+> v2 要点延续：数据源 = PCO 本体五要素（商品图/链接/名称/价格/限购）；LLM 完全舍弃（仅词典）；回流方向不开发（`import.js` 已覆盖）；小程序模板已解析（§2）。
+> 技术边界（不变）：「忽略 PCO 对机器人的限制」以**真实浏览器执行站点自身 JS** 实现；不做验证码破解/指纹伪造/反检测对抗；低频（≥30 分钟）、单会话、不自动下单。剩余 ToS 风险由负责人知悉并承担。
 
 ## 0. 结论速览
 
-| 评估项 | 结论 | 依据 |
-|---|---|---|
-| PCO 数据可达性 | **可达，走「真实浏览器执行」路线** | PCO 的拦截对象是非浏览器 HTTP 客户端（实测 302→JS 质询死循环）；真实浏览器执行站点自身 JS 后质询自然通过——用户浏览器（书签脚本）与 Playwright 自带 Chromium（监控端）都属此类。**不做验证码破解、指纹伪造、检测对抗**；若站点升级到验证码级拦截，监控自动降级为「提醒管理员人工收集」，见 §4 |
-| 翻译 | **词典法（L0），LLM 完全移除** | 品类词表 + PokeAPI 官方中文名表 + 杂项词表，未识别片段高亮人工补 |
-| 小程序导出 | **模板已解析，可精确生成** | `goods_import_template.xlsx`：第 1–6 行使用说明（模板要求勿删）+ 第 7 行表头 + 第 8 行起数据，A–F 六列 |
-| 新活动 / 补货监控 | **已批准立项**，独立项目 `aoi-pco-monitor`（仿 F5 独立仓库模式） | 新着列表 diff 检测新活动（开售前一天公布商品信息）；watch 商品状态 diff 检测补货/售罄/限购变动 |
+| 问题 | 结论 |
+|---|---|
+| 手动导入能否不用书签脚本、纯网页端实现？ | **能（v1 即可用）**：Aoi 目录页提供「粘贴整页」区——用户打开 PCO 页 Ctrl+A/Ctrl+C 后到 Aoi 粘贴，富文本粘贴携带 `text/html`（含图片 URL、商品链接、名称、价格文本），解析五要素；附纯文本正则兜底。书签脚本降级为可选加速器（P3）。「粘贴链接一键抓取」作为 P2 增强，走 Edge Function 转发 GitHub dispatch（§4 M5） |
+| 自动监控能否用 GitHub Actions？ | **能，且是唯一无服务器登录需求的方案**：Playwright 官方支持 Actions（自带 Chromium），public 仓库免费；service key 存 Actions Secret；定时 cron 60 分钟。数据写 Supabase blob，通知先走应用内通知（`d.notifications`，今天已可用），QQ 推送待 F5 链路真机部署后接入 |
+| ECS 部署是否可行？ | **原 relay 机（47.101.194.103）不可行**——CHANGELOG v3.5.2 部署记录明确「部署者本机 SSH 密钥仅授权 NapCat 所在机（106.14.28.206），relay 机无法登录」；**NapCat 机（106.14.28.206）可登录**，作为 Actions 方案被 PCO 风控拦截时的备用部署点。详见 §5（已同步写入 AGENTS.md） |
+| v3.7.0 是什么？ | 主仓库下一个功能版本 = F9 主仓库侧交付：PCO 目录页 + 粘贴导入解析 + 词典翻译 + 校对工作台 + 小程序模板导出（§3/§7）。监控是独立仓库 `aoi-pco-monitor`，不占主仓库版本号 |
 
 ## 1. 目标工作流 → 交付物映射
 
 | 你的步骤 | 承载 |
 |---|---|
-| 手动：粘贴 PCO 链接导入商品信息 | 浏览器打开该链接（PCO 对真实浏览器放行）→ 点书签脚本「采集本页」→ JSON 自动进剪贴板 → Aoi「工具 → PCO 目录」粘贴解析入库。粘贴整页 HTML 为兜底入口 |
-| 自动：监控新活动上架 | `aoi-pco-monitor` 定时扫 PCO 新着列表，发现新商品/新発売日组 → 写入 Supabase + QQ 通知管理员 |
-| 自动：监控商品变动（补货） | watch 列表内商品状态 diff（在售/缺货/预约/终止 + 限购数变动）→ 同上 |
-| 网站同步信息 | monitor 直写 `team_data.data` blob 的 `d.pcoItems`，Aoi 打开即见；目录页提供「立即检查」按钮 |
-| 人工检查修改 | S3 校对工作台（名称/分类/价格换算/限购/图/链接） |
-| 生成小程序表格上架 | S4 严格按已解析模板生成 xlsx |
-| 从小程序导出拼团情况 | 现有 `import.js` 已覆盖，**不做新开发**（负责人已确认） |
+| 手动：粘贴 PCO 链接导入商品信息 | 网页端完成：Aoi 目录页「打开此链接」按钮拉起 PCO 页 → Ctrl+A/C → 回 Aoi 粘贴 → 自动解析五要素进草稿表（纯文本粘贴亦可兜底解析） |
+| 自动：监控新活动上架（开售前一天公布） | `aoi-pco-monitor`（GitHub Actions cron）扫新着列表 → 与 `d.pcoItems` diff → 新商品写库 + 应用内通知 |
+| 自动：监控商品变动（补货/售罄/限购变化） | watch 列表状态 diff → `history` 记录 + 通知（补货为最高优先级） |
+| 同步信息到网站 | monitor 直写 Supabase `team_data.data` blob 的 `d.pcoItems`，Aoi 打开即见 |
+| 人工检查修改 | S3 校对工作台（中文名/分类/价格换算/限购/参考图/链接） |
+| 生成小程序表格上架 | S4 按已解析模板生成 xlsx |
+| 从小程序导出拼团情况回流 | 现有 `import.js` 已覆盖，不开发 |
 
 ## 2. 小程序导入模板（已实测解析 `D:\download\goods_import_template.xlsx`）
 
-- Sheet 名 `Sheet1`，有效列 A–F；**第 1–6 行为使用说明文字，模板注明「请勿删除」，导出时必须原样保留**。
-- 第 7 行表头：`谷子分类（选填）｜谷子名称（必填）｜价格（必填）｜库存（选填）｜冻结（选填：是或否）｜采购状态（选填）`；第 8 行起为示例数据（蔬菜/水果），导出时**清空不带入**。
-- 列映射：
+- Sheet 名 `Sheet1`，有效列 A–F；**第 1–6 行使用说明文字导出时原样保留**（模板注明勿删）；第 7 行表头；第 8 行起数据（自带示例行清空不带入）。
+- 表头：`谷子分类（选填）｜谷子名称（必填）｜价格（必填）｜库存（选填）｜冻结（选填：是或否）｜采购状态（选填）`。
+- 列映射：分类←词典匹配类型（空=小程序默认分类）；名称←校对后中文名；**价格←日元价×`d.calc` 汇率**（≤2 位小数，工作台逐条可改）；库存留空=不限；冻结默认「否」；采购状态默认「备货中」。
 
-| 模板列 | 来源 | 默认策略 |
-|---|---|---|
-| 谷子分类（选填） | S2 品类词典匹配的类型（毛绒/徽章/立牌…） | 空 = 小程序「默认分类」 |
-| 谷子名称（必填） | S3 校对后的中文名 | — |
-| 价格（必填，≤2 位小数） | PCO 含税日元价 × 汇率（`d.calc`，工作台内可逐条改） | 汇率取系统当前设置 |
-| 库存（选填） | PCO 无库存数 | 留空 = 不限库存 |
-| 冻结（选填：是或否） | 售罄/下架可标「是」 | 否 |
-| 采购状态（选填） | 备货中/已采购/已到货 | 备货中 |
+## 3. 主仓库 Aoi-system 交付（= v3.7.0）
 
-## 3. 主仓库 Aoi-system 交付（v3.7.0）
+新增 `js/catalog.js`（挂 `Aoi.catalog`）+ `js/catalog-dict.js`（品类/杂项词表）+ `js/species-zh.json`（PokeAPI 一次性预生成 `ja→zh-hans` 种名表入仓）；页面「工具 → PCO 目录」。
 
-新增模块 `js/catalog.js`（挂 `Aoi.catalog`）+ 词典 `js/catalog-dict.js` + 种名表 `js/species-zh.json`（PokeAPI 一次性预生成入仓，运行时零依赖）；页面入口「工具 → PCO 目录」。
+| 项 | 内容 |
+|---|---|
+| S1 粘贴导入（纯网页端，无书签脚本） | ①富文本粘贴区：捕获 `paste` 事件的 `text/html`（含 `<img src>`/`<a href>`/价格文本），解析出五要素；②纯文本粘贴兜底（正则 `名称　X,XXX円` 逐行）；③「打开此链接」辅助按钮（新开 PCO 页，省去手动输网址）；④relay 直抓通道保留为尽力而为（当前必被 302 质询，报错分级不误导）。统一产出 `d.pcoItems` 草稿 |
+| S2 词典翻译（仅 L0，无 LLM/无在线机翻） | 中文名草稿 + 品类建议；品类词表 ~60 条 + 官方种名表 + 杂项词表（设置页可扩充，存 blob）；未识别片段高亮人工补 |
+| S3 校对工作台 | 表格编辑：中文名/分类/价格（日元↔人民币换算）/限购/参考图（v3.6.1 图片弹窗，PCO 图链防盗链时一键转存图床）/PCO 链接；可一键推入活动 `activityMeta.products`（v3.6.0 S2 模型扩展可选 `price/limit`，向后兼容） |
+| S4 小程序模板导出 | 按 §2 结构 SheetJS 生成 xlsx；文件名带活动名（`exportBaseName`）；测试读回断言（说明行/表头行/数据起始/示例不带入） |
+| S5 目录页 | 展示 `d.pcoItems`（售况/限购/最后检查时间/watch 标记）；「立即检查」按钮 v1 隐藏（待 M5 dispatch 通道点亮） |
 
-| 项 | 内容 | 关键点 |
-|---|---|---|
-| S1 PCO 数据接入 | 三种入口统一解析为 `d.pcoItems` 草稿：①**书签脚本 JSON 粘贴**（主力，见下）②整页 HTML/文本粘贴（兜底）③relay 直抓（尽力而为接口，当前必 302，报错分级不误导） | 书签脚本：`bookmarklet/pco-collector.js` 构建为 javascript: 单行（也可作 Tampermonkey 脚本安装）。在 PCO 列表页/详情页点一下 → 提取当前页商品（名称/价格/图 URL/链接/限购文本/售况）→ JSON 复制到剪贴板。运行在用户自己的浏览器会话里，质询天然通过，读的就是用户看到的 DOM |
-| S2 词典翻译（仅 L0） | 中文名草稿 + 品类建议；未识别片段高亮 | 品类词表 ~60 条；种名官方中文名表（PokeAPI 预生成）；杂项词表可在设置页扩充（存 blob）。**无任何 LLM/在线机翻调用** |
-| S3 校对工作台 | 表格编辑：中文名/分类/价格（日元↔人民币换算）/限购/参考图/PCO 链接 | 参考图复用 v3.6.1 图片弹窗（PCO 图链若有防盗链，一键转存图床，不自动批量）；可一键推入某活动的 `activityMeta.products`（复用 v3.6.0 S2 模型，扩展可选 `price/limit` 字段，向后兼容） |
-| S4 小程序模板导出 | 严格按 §2 结构生成 xlsx（SheetJS；文件名带活动名复用 `exportBaseName`） | fixtures 测试用 SheetJS 读回断言：说明行保留、表头第 7 行、数据自第 8 行、示例数据不带入 |
-| S5 目录页 + 手动检查 | 展示 `d.pcoItems`（含 monitor 同步的售况/限购/最后检查时间）；「立即检查」按钮调 monitor 的 run-now HTTP 端点 | monitor 未部署时按钮隐藏并提示 |
+**数据模型**（blob 新增）：`d.pcoItems = [{ id, url, jpName, name, type, priceJpy, limit, image, status ∈ {在售,售罄,预约,终止,未知}, saleDate, watched, firstSeenAt, lastCheckedAt, lastChangedAt, history:[{at,from,to}] }]`。约 30 商品/活动，blob 增量可忽略。
 
-**数据模型**（blob 新增 key）：`d.pcoItems = [{ id, url, jpName, name, type, priceJpy, limit, image, status, saleDate, firstSeenAt, lastCheckedAt, lastChangedAt, history: [{ at, from, to }] }]`。售况 `status ∈ {在售, 售罄, 预约, 终止, 未知}`；`limit` 为「お一人様○個」解析出的数字（可空）。一个活动约 30 商品，blob 增量可忽略。
+**测试**：富文本/文本解析 fixtures（真实 DOM 快照脱敏）、词典映射、价格换算、模板读回断言、diff 逻辑；`tests/helpers/aoi.js` MODULES 按序插入 `js/catalog.js`。预估新增 40–60 用例。
 
-**测试**：粘贴解析 fixtures（真实 DOM 快照脱敏入 `tests/fixtures/`）、词典映射、价格换算、模板生成读回断言、`d.pcoItems` diff；`tests/helpers/aoi.js` MODULES 按顺序插入。预估新增 40–60 用例。
+## 4. 独立项目 `aoi-pco-monitor`（GitHub Actions 形态）
 
-## 4. 独立项目 `aoi-pco-monitor`（定时监控，已批准立项）
-
-仿 F5 模式：独立仓库，Node + **Playwright（自带 Chromium，不依赖系统浏览器）**，部署 ECS（与 relay 并存，systemd 常驻，Caddy 路由，F5 已建 TLS 链路）。
-
-**技术立场（务必知悉）**：「忽略 PCO 对机器人访问的限制」按以下方式实现——用真实浏览器执行站点自身的 JS，让质询按设计自然通过；**不进行验证码破解、指纹伪造、反检测对抗（不用 stealth 类补丁）**。配套纪律：单会话、抓取间隔 ≥30 分钟且可配置、错峰、真实 UA、优先用保存的 HTML 回放做解析开发。若 PCO 升级为验证码/人工验证级拦截：监控自动停止抓取、QQ 通知管理员「需人工打开浏览器 → 书签脚本采集 → 粘贴回流」，即监控退化为提醒器，链路不断。ToS 层面的剩余风险由项目负责人知悉并承担（已明确指示）。
+独立仓库（public，Actions 免费；Playwright 自带 Chromium 不依赖系统浏览器）。**不部署任何服务器**——ECS relay 机本就 SSH 不可达（§5），Actions 是唯一零登录需求的真实浏览器载体。
 
 | 里程碑 | 内容 |
 |---|---|
-| M1 采集器原型 | Playwright 打开 PCO 新着列表/商品详情 → 确定解析锚点（SFCC 站商品数据通常在 DOM `data-*` 属性/内嵌 JSON，实现期锁定）→ 单页抽取五要素（图/链接/名称/价格/限购），解析器用保存的 HTML 回放开发与测试，不真连 |
-| M2 新活动监控 | 定时（默认 60 分钟，可配置 ≥30）抓新着列表 → 与 `d.pcoItems` diff → 新商品/新発売日组 → 写 Supabase + QQ 通知（名称/数量/発売日/链接） |
-| M3 变动监控 | watch 列表内商品状态 diff：售罄→在售（**补货**，即时通知）、在售→售罄、预约开启、限购数变动 → `lastChangedAt` + `history` + QQ 通知 |
-| M4 常驻与降级 | systemd 常驻、结构化日志、连续失败告警、验证码级拦截检测→自动降级通知；Supabase 写入用 service key（不进前端） |
-| M5 联调 | run-now HTTP 端点（主仓库 S5「立即检查」调用）；QQ 推送复用 aoi-qqbot relay v4 私发管理员链路（`botConfig.adminQq`） |
+| M1 Actions 实抓验证 + 锚点锁定 | workflow 手动触发：Playwright 打开 PCO 新着页/详情页 → 验证 JS 质询在 Actions 环境（Azure 出口 IP）通过 → 锁定解析锚点（SFCC 商品数据通常在 DOM `data-*`/内嵌 JSON）。**此步是整个监控方案的前置验证**，若被风控拦截 → 备选：NapCat 机（106.14.28.206，SSH 可登录）部署同代码 |
+| M2 新活动监控 | cron 60 分钟（Actions 实际有 ±延迟，够用；下限 30 分钟硬编码）扫新着列表 → diff `d.pcoItems`（service key 走 Supabase REST）→ 新商品/新発売日组写库 + `d.notifications` 应用内通知 |
+| M3 变动监控 | watch 商品状态 diff：售罄→在售（**补货**）/在售→售罄/预约开启/限购数变动 → `lastChangedAt`+`history`+通知；补货通知最高优先级 |
+| M4 通知与健壮性 | 通知先走应用内 `d.notifications`（今天可用）；QQ 推送待 F5 relay v4/NapCat 真机部署后接入（复用私发管理员链路）；连续失败/解析失败告警；HTML 快照存 workflow artifact 供锚点修复 |
+| M5 一键抓取（P2 增强，可选） | 主仓库「粘贴链接 → 立即抓取」：Edge Function 小端点（GH token 存 env、团长鉴权转发 `workflow_dispatch`，qq-relay Management API 部署通道已验证可行）；点亮后 S5「立即检查」按钮同步启用 |
 
-**依赖与前置**：ECS 内存需评估（headless Chromium 约 300MB 量级，与 relay/NapCat 并存的余量）；Playwright Chromium 在 ECS 的一次性安装；service key 配置。这些列入部署清单（真机操作，同 F5 模式由部署者执行）。
+**维护注意**：public 仓库 scheduled workflow 60 天无活动会被 GitHub 自动停用——monitor 自身每周都有 run 即为活动；另在 README 记录「停用自查」一条。
 
-## 5. 风险与对策
+## 5. 服务器部署权限现状与可行性判定（按指令核查，已同步 AGENTS.md）
+
+| 目标机/平台 | 权限现状（仓库记录） | monitor 部署判定 |
+|---|---|---|
+| 原 relay 机 ECS `47.101.194.103` | CHANGELOG v3.5.2（2026-09-09）：部署者本机 SSH 密钥**无法登录**（仅授权 NapCat 机）；其上 qq-relay 更新已降级「可选」 | ❌ 不可行 |
+| NapCat 机 ECS `106.14.28.206` | 部署者 SSH 密钥**可登录**（F5 待真机部署动作在此机执行） | ⚠️ 可行但非首选：与 NapCat 争内存（Chromium ~300MB）；仅当 Actions 出口 IP 被 PCO 风控拦截时作为备用落点 |
+| Supabase Edge Function | qq-relay v5 已成功经 Management API 部署（免 SSH），**但 Edge Function 无浏览器/禁子进程** | ❌ 不能跑抓取；可承担 M5 的 dispatch 转发小端点 |
+| **GitHub Actions** | 仓库已有 Actions 基建（deploy.yml），public repo 免费；Playwright 官方支持 | ✅ **首选方案**（M1 先行验证风控） |
+
+凭据纪律：服务器凭据/密钥不入仓库（仓库公开，AGENTS「密钥不进仓库」红线），AGENTS.md 只记录授权范围与结论，不含凭据本体。
+
+## 6. 风险与对策
 
 | 风险 | 对策 |
 |---|---|
-| PCO 改版/锚点失效 | 书签脚本读用户所见 DOM（最贴近真实渲染）；monitor 解析器 fixtures 回放 + 锚点集中定义；解析失败发告警而非静默 |
-| PCO 升级拦截（验证码级） | §4 降级路径：停止抓取 → QQ 提醒人工采集；手动链路（书签脚本）永远可用 |
-| ECS 资源不足跑不动 Chromium | 部署前内存评估；必要时 monitor 降频或与 NapCat 错峰；最坏情况退回纯手动链路 |
-| 图链防盗链 | 工作台一键转存图床（v3.6.0 S4 基建），不自动批量搬运图片 |
-| 汇率波动导致价格失真 | 价格默认按 `d.calc` 当前汇率换算，工作台逐条可改，导出前人工确认 |
-| 频率失控伤害站点 | 间隔下限 30 分钟硬编码、单会话、缓存优先；不做购买自动化 |
+| Actions 出口 IP（Azure 数据中心）触发 PCO 更严风控 | M1 首项实抓验证；被拦 → 备用 NapCat 机部署；手动粘贴链路永远可用 |
+| PCO 改版锚点失效 | 锚点集中定义 + HTML 快照 artifact + 解析失败告警；粘贴导入在用户真实浏览器侧读所见 DOM，最抗改版 |
+| 富文本粘贴解析因浏览器/站点结构差异缺字段 | 纯文本正则兜底 + 缺失字段留空由工作台人工补 |
+| Actions cron 延迟/停排 | 60 分钟粒度对补货监控足够；README 停用自查条目 |
+| 汇率波动 → 价格失真 | 默认 `d.calc` 汇率换算，导出前工作台逐条确认 |
+| 频率失控 | 间隔下限 30 分钟硬编码、单会话、不做购买自动化 |
 
-## 6. 开放问题（需你确认，不阻塞 M1/S1–S3 开工）
+## 7. 版本切分（明确回答「v3.7.0 是什么」）
 
-1. **ECS 内存余量**：relay（+未来的 NapCat）之外能否稳定承载 headless Chromium（约 300MB）？若吃紧，monitor 降频或换低配方案再议。
-2. **价格换算默认汇率**取 `d.calc` 当前设置、导出前人工确认——是否符合你的定价习惯？
-3. **库存/冻结/采购状态默认值**（空/否/备货中）是否认可？
-4. **监控频率**默认 60 分钟（下限 30 分钟）是否合适？开售日前夜是否需要临时调密？
-5. 手动导入接受「打开链接 + 点书签脚本 + 回 Aoi 粘贴」三步操作？（relay 直抓在 PCO 当前的拦截下注定失败，仅保留接口）
-
-## 7. 版本切分
-
-- **v3.7.0（主仓库）**：S1 书签脚本 + 三入口解析、S2 词典翻译、S3 校对工作台、S4 模板导出、S5 目录页（S5 的「立即检查」在 monitor 就绪前隐藏）。
-- **aoi-pco-monitor（独立项目，与 v3.7.0 并行）**：M1 → M5 顺序交付；M2 上线即产生监控价值，M3 补货通知是核心卖点。
-- 回流方向不开发（现有 import.js 覆盖，负责人已确认）。
+- **v3.7.0（主仓库，本计划主体）** = §3 全部：S1 粘贴导入 + S2 词典翻译 + S3 校对工作台 + S4 小程序模板导出 + S5 目录页；新增 `js/catalog.js`/词典/种名表，blob 新增 `d.pcoItems`，测试 40–60 例。**监控不在 v3.7.0 里**。
+- **`aoi-pco-monitor`（独立仓库，与 v3.7.0 并行开工）** = §4 M1→M5，M1 通过（Actions 实抓验证）是后续里程碑的前置；M2 上线即有新活动监控价值，M3 补货通知为核心卖点。
+- P2/P3 增强项（M5 一键抓取、书签脚本加速器）默认不做，需要时另批。
 
 ## 8. 与现有基建复用对照
 
 | 现有能力 | 位置 | F9 复用方式 |
 |---|---|---|
 | 活动商品模型 `{id,type,model,refImage,refUrl}` | `d.activityMeta[活动].products`（`js/orders.js:1292`） | S3 一键推入，扩展可选 `price/limit` |
-| 类型字典 `typeMeta` | `js/orders.js:17` | S2 品类匹配目标 |
-| 汇率设置 | `js/calc.js`、`d.calc` | S3/S4 价格换算 |
-| SheetJS 导出 + `exportBaseName` | `js/core.js:148-247`、`:180` | S4 模板导出引擎 |
-| 图片粘贴/上传/图床三合一弹窗 | v3.6.0 S4 / v3.6.1 | S3 参考图与图床转存 |
-| ECS + Caddy TLS + systemd | F5 已建 | monitor 部署载体 |
-| QQ 私发管理员 | aoi-qqbot relay v4 + `botConfig.adminQq` | monitor 通知通道 |
+| 类型字典 `typeMeta` / 汇率 `d.calc` | `js/orders.js:17` / `js/calc.js` | S2 品类匹配 / S3·S4 价格换算 |
+| SheetJS 导出 + `exportBaseName` | `js/core.js:148-247`、`:180` | S4 模板导出 |
+| 图片三合一弹窗 | v3.6.0 S4 / v3.6.1 | S3 参考图与图床转存 |
+| 应用内通知 `d.notifications` | F1 已建 | monitor 通知第一通道 |
+| Supabase Edge Function 部署通道（Management API） | qq-relay v5 先例 | M5 dispatch 转发端点 |
+| GitHub Actions 基建 | `.github/workflows/deploy.yml` | monitor 仓库 cron 载体 |
 | 排谷表/汇总表导入 | `js/import.js` | 回流方向，已覆盖不开发 |

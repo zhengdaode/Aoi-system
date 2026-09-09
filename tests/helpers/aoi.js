@@ -37,7 +37,8 @@ const MODULES = [
   'js/limits.js',
   'js/warehouse.js',
   'js/stats.js',
-  'js/image-upload.js'
+  'js/image-upload.js',
+  'js/summary-export.js'
 ];
 
 const loadErrors = [];

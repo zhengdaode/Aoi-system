@@ -1139,6 +1139,8 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
   var syn = e.target.closest('button[data-act-sync]');
   if (syn) { Aoi.orders.syncProductsFromOrders(syn.getAttribute('data-act-sync')); return; }
+  var es = e.target.closest('button[data-act-exportsummary]');
+  if (es) { Aoi.exportSummary(es.getAttribute('data-act-exportsummary')); return; }
   var ap = e.target.closest('button[data-act-addproduct]');
   if (ap) { Aoi.orders.addActProduct(ap); return; }
   var ps = e.target.closest('button[data-psave]');
@@ -1583,6 +1585,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
     + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
     + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
+    + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap">导出汇总表</button>'
     + '</div>';
   var form = '<div class="flex flex-wrap items-center gap-2 mb-3">'
     + '<input id="apNewType' + sfx + '" list="actProductTypeOptions" placeholder="制品类型" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'

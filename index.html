@@ -27,6 +27,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -586,7 +587,7 @@
       <!-- 活动管理 -->
       <div id="view-activities" data-view class="hidden grid gap-4 max-w-5xl">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <div class="flex items-center mb-2"><h3 class="font-bold">活动管理</h3><button onclick="Aoi.exportImage(this)" data-table="activityTable" data-name="活动管理" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="activityTable" data-name="活动管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
+          <div class="flex items-center mb-2"><h3 class="font-bold">活动管理</h3><button onclick="Aoi.exportSummary()" class="px-3 py-1 border border-blue-300 text-blue-600 rounded text-xs hover:bg-blue-50 ml-auto">导出汇总表（全部活动）</button><button onclick="Aoi.exportImage(this)" data-table="activityTable" data-name="活动管理" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="activityTable" data-name="活动管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
           <p class="text-sm text-gray-500 mb-3">为每个活动记录所属 IP、购买时间、出货日期、平台链接与进度状态</p>
           <div class="flex flex-wrap items-center gap-3 mb-4">
             <input id="newActivity" type="text" placeholder="新活动名称" class="border border-gray-300 rounded px-3 py-2 text-sm">
@@ -1153,5 +1154,6 @@
   <script src="js/warehouse.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/image-upload.js"></script>
+  <script src="js/summary-export.js"></script>
 </body>
 </html>

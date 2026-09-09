@@ -9,7 +9,7 @@
 2. **每次改动完成后，必须编写或更新相关测试，并在交付给用户前，确保所有测试和验证全部通过。**
    （测试基建已建立：vitest + jsdom，`npm test`；harness 见 `tests/helpers/aoi.js`，新增 js 模块需加入其 MODULES 列表。）
 3. **推送规则（2026-09-09 修订）：`origin`（zhengdaode/Aoi-system）可随时随意推送，无需逐次请示——GitHub Pages 通道即由 origin 驱动（push main 触发 `.github/workflows/deploy.yml`：先跑测试、通过后自动部署 Pages），Netlify 通道亦随 origin 推送自动构建，即推 origin = 双通道上线；`deploy` 远端（ICGP-Click/Click_sales_system）未经部署者明确允许，禁止 push 及任何其他改动**（确需操作 deploy 时由部署者明确指示后执行）。
-4. **服务器部署权限现状（2026-09-09 CHANGELOG 实测记录）**：原 relay 机 ECS `47.101.194.103` **SSH 无法登录**（部署者本机密钥仅授权 NapCat 机），其上 qq-relay 更新已降级为「可选」；NapCat 机 ECS `106.14.28.206` **SSH 可登录**（F5 待真机部署动作在此机执行）；免 SSH 的服务端部署走 Supabase Edge Function（先例：qq-relay v5 经 Management API 部署成功）。**服务器凭据一律不入仓库**，此处仅记录授权范围与结论。
+4. **服务器部署权限现状（2026-09-10 SSH 实测复核）**：工作服务器 `47.101.194.103`（relay 所在，:8080 存活）**SSH 密钥不可达**（root/ecs-user/admin/ubuntu 均 Permission denied，与 CHANGELOG v3.5.2 记录一致）——常驻服务部署与配置查询需先由负责人在该机为部署者公钥授权（authorized_keys 或阿里云控制台绑定密钥）；`106.14.28.206` 为负责人**自用机**（docker 跑 napcat + astrbot；2C/1.6G 内存仅剩 ~98MB）SSH 可登录（F5 待真机部署在此执行）但**不可承载 Chromium 类负载**；免 SSH 的服务端部署走 Supabase Edge Function（先例：qq-relay v5 经 Management API）。**服务器凭据一律不入仓库**，此处仅记录授权范围与结论。
 
 ## 当前项目计划
 
@@ -24,7 +24,7 @@
 **v3.6.0 管理端体验升级已实施完成**（2026-09-09，见 `docs/PLAN-v3.6.0.md`：S1 买家管理独立 tab（状态分桶 + 点击圈名筛单）/ S2 活动商品按型号管理（参考图 + 跳转链接，空链接回落平台链接，团员端参考列）/ S3 购买计划入库 `d.limitPlans` 双向同步 + 购买失败自动重分配 / S4 图片粘贴上传 `data-img-paste` / S5 导出文件名带活动名 / S6 复盘统计布局修复（view-stats 曾在 `</main>` 外）；测试 254 用例）；
 **F5 QQ 机器人双向已实施完成**（2026-09-09，独立仓库 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7：relay v4 双向/绑定/查单/团况/自动催缴/排发 xlsx/非文本兜底 + 54 测试；主仓库接入 = 3 个 Supabase RPC（`member_lookup_by_qq` / `team_summary_for_group` / `unpaid_members_by_group`）+ 设置页 `botConfig.adminQq/qrUrl` + 排发「设为已发」自动私发管理员；**部署动作待真机执行**：NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 部署新 relay，见 aoi-qqbot README）；
 **v3.6.2 订单管理表头排序已实施完成**（2026-09-09：活动/制品类型/型号/单价/数量/购买者/到货状态/小计 8 列可排序，点击表头循环 不排→升→降，中文拼音 `Intl.Collator('zh-Hans-CN')`、空值恒最后、稳定排序；≤640px 卡片视图无表头，筛选行排序下拉兜底；排序记忆存 `localStorage['aoi_orders_sort']`；仅作用渲染副本不写回 blob，导出行序自动跟随；测试 275 用例）；
-**F9 PCO 商品目录导入+补货监控计划 v3.1 已产出（2026-09-10，v3.7.0 提案，待审核通过后实施）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)**（手动导入主入口=只粘贴活动链接（Edge Function 转发 Actions 按需抓取，异步 1–2 分钟），富文本粘贴兜底；监控 GitHub Actions + Playwright（独立仓库 aoi-pco-monitor，不占主仓库版本号）；ECS relay 机 SSH 不可达、NapCat 机备用；LLM 舍弃；模板已解析；回流不开发）；
+**F9 PCO 商品目录导入+补货监控计划 v3.2 已产出（2026-09-10，v3.7.0 提案，待审核通过后实施）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)**（手动导入主入口=只粘贴活动链接（Edge Function 转发 Actions 按需抓取，异步 1–2 分钟），富文本粘贴兜底；监控以 GitHub Actions + Playwright 为主方案（实测：工作机 47 SSH 不可达、自用机 106 内存不足），工作机授权 SSH 后升级常驻同步形态；LLM 舍弃；模板已解析；回流不开发）；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
@@ -56,7 +56,7 @@
 | `docs/PLAN-NEXT.md` | **下一轮计划（待批准）**：新功能（F1–F8）× 后端（B1–B7）双路线 + 版本切分 |
 | `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` | F5 QQ 机器人双向（独立项目 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot)）：**已实施（2026-09-09，M1–M7）**，部署动作待真机执行 |
 | `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
-| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**计划 v3.1（2026-09-10，v3.7.0 提案，待审核通过后实施）**——只输入活动链接导入（兜底：富文本粘贴）+ aoi-pco-monitor（GitHub Actions + Playwright）定时监控 |
+| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**计划 v3.2（2026-09-10，v3.7.0 提案，待审核通过后实施）**——只输入活动链接导入 + aoi-pco-monitor（GitHub Actions 为主，工作机授权 SSH 后可转常驻同步） |
 | `docs/STATUS.md` | 权威状态：已完成阶段、数据模型（blob 结构）、已知限制、**遗留项与线上操作清单** |
 | `CLAUDE.md` | QQ 机器人接入专项（NapCat / relay / 安全红线） |
 | `README.md` | 功能、部署、安全、项目结构 |

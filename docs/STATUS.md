@@ -1,17 +1,21 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-09-10 · 版本 **v3.6.3**（v3.6.3：F10 QQ 机器人用户交互迭代——绑定唯一性校验（两端）/ bot 解绑·我是谁·查单筛选·我的快递 / 网页端解绑与复制绑定指令，零 schema 改动，上线随 relay 真机部署批次（见 `docs/PLAN-F10-BOT-INTERACTION.md`）。v3.5：①F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js，只读统计）+ 发货时间戳埋点 `orders.shippedAt`，demo 路线按用户决策取消（迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`）；②从链接导入订单——排谷表/汇总表分享直链经 `/media-proxy` 同源代理一键导入。v3.4：数据安全兜底 + 团员感知增强（B1/F4、B2 Phase 1、F1、F2）；F5 QQ 机器人双向移出为独立项目并于 2026-09-09 实施（aoi-qqbot 仓库 M1–M7，主仓库接入 3 RPC + 设置页 + 排发钩子；部署动作待真机）；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
+> 更新日期：2026-09-10 · 版本 **v3.7.0 / v3.6.3**（v3.7.0：管理端第二轮 S1–S8 已实施上线（商品主档聚合/活动展开区/购买人体系/登记活动商品/汇总表导出/复盘并入总览/流式宽度/合照缩略图）；v3.6.3：F10 QQ 机器人用户交互迭代——绑定唯一性校验（两端）/ bot 解绑·我是谁·查单筛选·我的快递 / 网页端解绑与复制绑定指令（见 `docs/PLAN-F10-BOT-INTERACTION.md`）。F5 的 3 个机器人 RPC 已于 2026-09-10 经 sb.js 应用线上并探针验证；QQ 侧功能上线仅剩 relay 真机部署批次。v3.5：①F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js，只读统计）+ 发货时间戳埋点 `orders.shippedAt`，demo 路线按用户决策取消（迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`）；②从链接导入订单——排谷表/汇总表分享直链经 `/media-proxy` 同源代理一键导入。v3.4：数据安全兜底 + 团员感知增强（B1/F4、B2 Phase 1、F1、F2）；F5 QQ 机器人双向移出为独立项目并于 2026-09-09 实施（aoi-qqbot 仓库 M1–M7，主仓库接入 3 RPC + 设置页 + 排发钩子）；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
 
-## 当前状态速览（2026-09-08 v3.5.0 后）
+## 当前状态速览（2026-09-10 v3.7.0 / v3.6.3 后）
 
-- **代码层**：v3.4.0 实施完成（B1 备份兜底 / B2 Phase 1 密钥与 PII 隔离 / F1 自动通知 / F2 进度时间线 / F4 备份卡）；**v3.5.0 实施完成**（F6 团期复盘统计并入主系统 + `orders.shippedAt` 发货时间戳埋点 + 从链接导入）；vitest 全套用例全绿（`npm test`；F6 新增 stats.test.js 13 例、shipping 增 2 例）。
-- **✅ 线上库已升级并验证（2026-09-08）**：先建快照表（`team_data_bak_20260908` / `teams_bak_20260908`）→ 经 `scripts/sb.js` 重跑 `supabase-schema.sql` → 探针全过：①团员读回 blob 已无 addresses（PII 裁剪生效）；②写链路端到端可用（同数据回写返回新版本号，`team_data_history` 自动存档）；③业务 blob 完好（orders 完整）。
-- **⚠️ 待用户操作**：
-  1. 重新部署前端（Netlify / GitHub Pages）——v3.4.0 全部功能上线；旧前端经兼容桥仍可用，但团员「QQ 号输入进看板」依赖新版。注意：v3.5.0「从链接导入」的 `/media-proxy` 直链代理仅 Netlify 通道生效（GitHub Pages 无服务端配置，该通道自动回退直连/手动导入）；v3.5.2 增加备用 `/media-relay`（ECS relay 国内中转），需在 ECS 更新部署 `relay/relay.js` 后点亮。
-  2. QQ 机器人最后一步：用真实管理员账号（非 debug）在设置页把 relay 地址改为 Edge Function 地址（`https://blfzbrivtxjxlbhgabqi.supabase.co/functions/v1/qq-relay`）并保存，通知页点「推送·私聊+群@（推荐）」端到端验证。
-  3. （建议）设置页试一次「下载全量备份」，把备份文件存到本地/网盘一份。
-  4. ~~GitHub Pages 测试链接导入~~ **已完成（2026-09-09）**：qq-relay Edge Function v5 已部署（`GET /fetch` 直连源站 + 白名单，实测 200/~350ms），Pages 通道链接导入可用，无需 ECS 操作；ECS relay v4 更新（git pull + pm2 restart）仍建议但可选（/media-relay 备用通道与 bot v4 功能）。
-- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目并**已实施（2026-09-09，[aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7）**：relay v4 双向 + 54 测试；主仓库接入见 CHANGELOG v3.5.3；**待真机部署**（NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 新 relay）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
+- **代码层**：**v3.7.0 管理端第二轮已实施完成**（2026-09-10 凌晨，S1 商品主档聚合 / S2 活动展开区 / S3 购买人体系 / S4 登记活动商品 / S5 汇总表导出 / S6 复盘并入总览 / S7 流式宽度 / S8 合照缩略图，见归档计划与 CHANGELOG）；**v3.6.3 F10 QQ 机器人用户交互迭代已实施**（绑定唯一性校验 / bot 解绑·我是谁·查单筛选·我的快递）；vitest 全套 **336 例全绿**，aoi-qqbot node:test **68 例全绿**。前端两通道（GitHub Pages / Netlify）已随推送自动部署上线（CI 全绿）。
+- **✅ 线上库已再升级并验证（2026-09-10，经 `scripts/sb.js`）**：先建快照表（`team_data_bak_20260910` / `teams_bak_20260910`）→ 重跑全量 `supabase-schema.sql`（补齐 F5 的 3 个机器人 RPC）→ 探针全过：①三 RPC anon EXECUTE 均 true；②`team_summary_for_group` 阶段/计数正确、`deadline` 恒 null；③`unpaid_members_by_group` 名单与 `settings(qrUrl/adminQq)` 白名单出参正常；④`member_lookup_by_qq` 未绑定返回 null；⑤业务数据完好（orders 74 条）。
+- **⚠️ 待用户操作（按优先级）**：
+  1. **QQ 机器人真机部署批次（唯一阻塞 QQ 侧全部功能的事，F5+F10 同批）**：ECS 上 `git pull` aoi-qqbot（已是 F10 版）+ `pm2 restart qq-relay`；NapCat WebUI 开 HTTP POST 上报（`http://127.0.0.1:8080/onebot/event?token=<EVENT_TOKEN>`）；Caddy TLS 反代（`Caddyfile` 已附）；网页设置页 relay 改 https 域名 + 填 `botConfig.adminQq/qrUrl` 并保存。验收：QQ 私聊「帮助/查单/我的进度/我的快递/我是谁」+ 群内 @「团况」+ 绑定/解绑全链路（README 冒烟 curl 可先行）。**前置：47.101.194.103 SSH 密钥不可达，需负责人授权公钥或由负责人本人执行。**
+  2. **F9 监控载体拍板**：PCO 风控实测否决自动化浏览器（Actions/本地、headless/有头全拒，3 轮实验记录见 PLAN-F9 §9）；恢复条件=日常浏览器可达性确认→择载体复验；「只粘贴链接一键抓取」入口已预留（`d.catalogConfig.dispatchUrl`）。
+  3. （建议）设置页「下载全量备份」存本地/网盘一份；线上另有 `*_bak_20260908` / `*_bak_20260910` 快照表可随时查。
+- **下一步目标（2026-09-10 复盘定稿）**：
+  1. **完成 relay 真机部署批次**并做 F5/F10 全功能真机验收（见待用户操作 1）——这是当前唯一的大阻塞项。
+  2. **v3.8.0：F9 商品目录模块点亮**——`js/catalog.js` / `catalog-dict.js` / `species-zh.js` 已随 F9 交付入库但未接入（待登记进 `tests/helpers/aoi.js` MODULES + 工具菜单入口 + 粘贴导入/校对工作台/小程序模板导出联调）；`dispatchUrl` 通道就绪即点亮一键抓取。
+  3. **流程纪律固化**（2026-09-10 当夜两个教训）：①改 `supabase-schema.sql` 的提交应**随提交即经 sb.js 应用线上 + 探针**，不再积压（本次 F5 RPC 积压一日余才补）；②每个里程碑提交后 `git status` 必须干净再进下一项（S7 曾漏提交 index.html，靠复盘补正）。
+  4. 小改进待办：`scripts/sb.js` 对象单元格打印 `[object Object]`，改 JSON.stringify 展开。
+- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目并**已实施（2026-09-09，[aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7）**：relay v4 双向；主仓库接入见 CHANGELOG v3.5.3；3 个 RPC 已入库（2026-09-10 sb.js 重跑+探针），**QQ 侧待真机部署**（NapCat 上报 / Caddy TLS / ECS relay 更新）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
 - **F10 QQ 机器人用户交互迭代（2026-09-10，v3.6.3）已实施**：绑定唯一性校验（relay 冲突暂拒/幂等，网页冲突拒绝/异常放行）、bot「解绑 <密钥> <圈名>」「我是谁」「查单 <活动名>」「我的快递」、网页端解绑按钮与复制绑定指令；aoi-qqbot 54→68 测试、主仓库新增 member-qq-bind 11 例；上线与 F5 同一真机部署批次（ECS relay git pull + pm2 restart 即含新指令）。
 - **已知限制（v3.4.0 后）**：
   - member_key 仍为团队级凭证（一个团一把），但读已按 CN 裁剪 PII、写已白名单合并（防整份覆盖与自批「已交」）、密钥已升 128bit；设置页重新生成即作废旧密钥。

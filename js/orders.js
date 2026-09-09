@@ -19,6 +19,8 @@ Aoi.orders.ensure = function () {
   if (!d.addresses) d.addresses = {};
   if (!d.memberMeta) d.memberMeta = {};
   if (!Array.isArray(d.cnChanges)) d.cnChanges = [];
+  // v3.7.0 F9 接口预留：PCO 商品目录（aoi-pco-monitor 直写 / 书签脚本导入的目标结构，本期无 UI）
+  if (!Array.isArray(d.pcoItems)) d.pcoItems = [];
   // v1.8.0 迁移：外币原价 / 币种 / 备注（旧数据视为人民币已换算）
   d.orders.forEach(function (o) {
     if (o.currency == null) o.currency = 'cny';
@@ -1320,6 +1322,98 @@ Aoi.orders.productBuyers = function (activity, type, model) {
     if (o.activity === activity && o.type === type && o.model === model && o.buyer) set[o.buyer] = 1;
   });
   return Object.keys(set).sort();
+};
+
+// —— 商品主档聚合（v3.7.0 S1）：数量/购买人/购买情况一律从订单与限购计划实时聚合，不在商品上存副本 ——
+
+// 单商品聚合：qty 购买件数(Σcount)、buyers 购买者去重、priceAvg 人民币均价(按件加权，无订单价时回落商品登记价)、
+// plan 购买情况（有限购计划时按状态累计件数 {pending,bought,failed}；无计划为 null，展示层改用订单到货状态）
+Aoi.orders.productStats = function (activity, p) {
+  var d = Aoi.orders.ensure();
+  var qty = 0, priceSum = 0, priceN = 0, buyers = {};
+  (d.orders || []).forEach(function (o) {
+    if (o.activity !== activity || o.type !== p.type || o.model !== p.model) return;
+    qty += o.count || 0;
+    if (o.price != null) { priceSum += o.price * (o.count || 0); priceN += (o.count || 0); }
+    if (o.buyer) buyers[o.buyer] = 1;
+  });
+  var reg = Aoi.orders.activityProduct(activity, p.type, p.model) || {};
+  var stats = {
+    qty: qty,
+    buyers: Object.keys(buyers).sort(),
+    priceAvg: priceN ? Math.round(priceSum / priceN * 100) / 100
+      : (p.price != null ? p.price : (reg.price != null ? reg.price : null)),
+    plan: null
+  };
+  var plan = d.limitPlans && d.limitPlans[activity];
+  if (plan) {
+    var acc = { pending: 0, bought: 0, failed: 0 };
+    (plan.items || []).forEach(function (a) {
+      (a.items || []).forEach(function (it) {
+        if (it.type !== p.type || it.model !== p.model) return;
+        var q = it.qty || 0;
+        if (it.status === '已购买') acc.bought += q;
+        else if (it.status === '购买失败') acc.failed += q;
+        else acc.pending += q;
+      });
+    });
+    stats.plan = acc;
+  }
+  return stats;
+};
+
+// 扫描活动订单中「未登记进商品主档」的 (类型,型号) 组合（从订单同步商品的数据源）
+Aoi.orders.missingProducts = function (activity) {
+  var d = Aoi.orders.ensure();
+  var m = d.activityMeta && d.activityMeta[activity];
+  var reg = {};
+  ((m && m.products) || []).forEach(function (p) { reg[p.type + '|' + p.model] = 1; });
+  var map = {};
+  (d.orders || []).forEach(function (o) {
+    if (o.activity !== activity || !o.type || !o.model) return;
+    var key = o.type + '|' + o.model;
+    if (reg[key] || map[key]) return;
+    map[key] = { type: o.type, model: o.model };
+  });
+  return Object.keys(map).sort().map(function (k) { return map[k]; });
+};
+
+// 统一商品登记入口（活动管理展开区 / 信息录入页共用）：
+// type+model 去重；price/priceOrig/currency/limit 为可选扩展字段（v3.7.0，F9 目录推入同构，向后兼容）
+Aoi.orders.registerProduct = async function (activity, input) {
+  input = input || {};
+  if (!activity) { Aoi.toast('请先选择活动', 'warning'); return null; }
+  var type = (input.type || '').trim(), model = (input.model || '').trim();
+  if (!type || !model) { Aoi.toast('请填写制品类型和型号', 'warning'); return null; }
+  var d = Aoi.orders.ensure();
+  var m = Aoi.orders.ensureActMeta(d, activity);
+  if (m.products.some(function (p) { return p.type === type && p.model === model; })) {
+    Aoi.toast('该活动已存在同型号商品「' + type + '-' + model + '」', 'warning'); return null;
+  }
+  var p = { id: Aoi.genId(), type: type, model: model, refImage: input.refImage || '', refUrl: input.refUrl || '' };
+  if (input.price != null && !isNaN(input.price)) p.price = input.price;
+  if (input.priceOrig != null && !isNaN(input.priceOrig)) p.priceOrig = input.priceOrig;
+  if (input.currency) p.currency = input.currency;
+  if (input.limit != null && !isNaN(input.limit)) p.limit = input.limit;
+  m.products.push(p);
+  await Aoi.saveTeamData(d);
+  return p;
+};
+
+// 从订单同步商品：把活动订单中未登记的 (类型,型号) 一次性补进商品主档，返回补登数量
+Aoi.orders.syncProductsFromOrders = async function (activity) {
+  var missing = Aoi.orders.missingProducts(activity);
+  if (!missing.length) { Aoi.toast('订单中的商品均已登记', 'info'); return 0; }
+  var d = Aoi.orders.ensure();
+  var m = Aoi.orders.ensureActMeta(d, activity);
+  missing.forEach(function (x) {
+    m.products.push({ id: Aoi.genId(), type: x.type, model: x.model, refImage: '', refUrl: '' });
+  });
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderActivities();
+  if (Aoi.orders.actProductsTarget === activity) Aoi.orders.renderActProducts();
+  Aoi.toast('已从订单补登记 ' + missing.length + ' 款商品', 'success');
+  return missing.length;
 };
 
 Aoi.orders.openActProducts = function (name) {

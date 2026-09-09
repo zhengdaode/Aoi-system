@@ -6,6 +6,8 @@
 > v2 要点延续：数据源 = PCO 本体五要素（商品图/链接/名称/价格/限购）；LLM 完全舍弃（仅词典）；回流方向不开发（`import.js` 已覆盖）；小程序模板已解析（§2）。
 > 技术边界（不变）：「忽略 PCO 对机器人的限制」以**真实浏览器执行站点自身 JS** 实现；不做验证码破解/指纹伪造/反检测对抗；低频（≥30 分钟）、单会话、不自动下单。剩余 ToS 风险由负责人知悉并承担。
 
+> **实施记录（2026-09-10）**：主仓库侧（§3 S1–S5）已随 commit `2bed645` 交付并 CI 通过（含「工具 → PCO 目录」粘贴导入/词典翻译/校对工作台/模板导出/目录页，tests/catalog.test.js 18 例）。**监控 M1 实测否决自动化浏览器方案**（§9 三组对照实验）：PCO 风控对自动化 Chromium 一律「Restricted access」，监控载体待负责人拍板；正文 §0/§4/§5 中关于 Actions 可行性的表述已被实测修正。
+
 ## 0. 结论速览
 
 | 问题 | 结论 |
@@ -108,3 +110,24 @@
 | Supabase Edge Function 部署通道（Management API） | qq-relay v5 先例 | M5 dispatch 转发端点 |
 | GitHub Actions 基建 | `.github/workflows/deploy.yml` | monitor 仓库 cron 载体 |
 | 排谷表/汇总表导入 | `js/import.js` | 回流方向，已覆盖不开发 |
+
+## 9. 实施记录与 M1 结论（2026-09-10）
+
+**已交付（主仓库，commit `2bed645`，CI 绿）**：`js/catalog.js` + `js/catalog-dict.js` + `js/species-zh.js`（PokeAPI 官方种名 1025 条，`scripts/build-species-dict.js` 生成）+ 「工具 → PCO 目录」视图 + `tests/catalog.test.js`（18 例；全套 336 例绿）。粘贴导入（富文本三策略/文本正则）→ 词典翻译草稿（无 LLM，未识别高亮）→ 校对工作台（汇率换算/类型映射 `d.typeMeta`/经 `registerProduct` 同构推入活动商品）→ 小程序模板导出（说明 6 行 + 表头 + 数据，Sheet1）→ `d.pcoItems` 目录。链接一键抓取入口已预留（`d.catalogConfig.dispatchUrl`，通道就绪即点亮）。
+
+**M1 实测：PCO 风控否决自动化浏览器**（监控仓 aoi-pco-monitor，grab workflow + 本地对照）：
+
+| 实验 | 环境 | 结果 |
+|---|---|---|
+| Actions grab workflow | ubuntu-latest + Playwright headless Chromium（Azure 数据中心 IP） | ❌ 「Restricted access」，卡 `wr.` 质询页 |
+| 本地 headless | 负责人 Windows + 家庭网络 + Playwright headless Chromium | ❌ 同样 Restricted access |
+| 本地有头 | 同机同网络，`headless: false` 真实窗口 | ❌ 同样 Restricted access |
+| （对照）curl 直取 | 非浏览器 HTTP 客户端 | ❌ 302 质询死循环（v1 实测） |
+
+结论：拦截对象是「自动化浏览器」本身（Playwright 指纹/webdriver 特征），与 IP、headless 与否无关。负责人日常浏览器不受影响——**粘贴导入链路完全可用**；在计划边界内（不做指纹伪造/反检测对抗），**自动监控暂无可行载体**，monitor 仓定时抓取已暂停（保留 workflow_dispatch 复验入口）。
+
+**待负责人拍板的监控载体选项**：
+1. **维持人工粘贴**（现状可用，零风险）：日常浏览 PCO 时顺手整页复制粘贴；
+2. **浏览器内脚本**（半自动）：Tampermonkey 用户脚本跑在负责人自己的日常浏览器会话里，PCO 页面一键提取→自动回填 Aoi——自动化发生在天然合法的会话内，不新建自动化浏览器；
+3. **放宽边界**（需明确授权）：对自动化浏览器做常规去自动化特征处理（如 AutomationControlled 规避）——属于此前划定的「反检测对抗」红线，默认不做，负责人明确要求才立项；
+4. **工作机真实会话**：SSH 授权解锁后在负责人 Windows 工作机以其真实浏览器配置定时驱动（CDP attach 真实 profile），同为边界灰色项，需拍板。

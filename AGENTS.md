@@ -24,18 +24,20 @@
 **v3.6.0 管理端体验升级已实施完成**（2026-09-09，见 `docs/PLAN-v3.6.0.md`：S1 买家管理独立 tab（状态分桶 + 点击圈名筛单）/ S2 活动商品按型号管理（参考图 + 跳转链接，空链接回落平台链接，团员端参考列）/ S3 购买计划入库 `d.limitPlans` 双向同步 + 购买失败自动重分配 / S4 图片粘贴上传 `data-img-paste` / S5 导出文件名带活动名 / S6 复盘统计布局修复（view-stats 曾在 `</main>` 外）；测试 254 用例）；
 **F5 QQ 机器人双向已实施完成**（2026-09-09，独立仓库 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7：relay v4 双向/绑定/查单/团况/自动催缴/排发 xlsx/非文本兜底 + 54 测试；主仓库接入 = 3 个 Supabase RPC（`member_lookup_by_qq` / `team_summary_for_group` / `unpaid_members_by_group`）+ 设置页 `botConfig.adminQq/qrUrl` + 排发「设为已发」自动私发管理员；**部署动作待真机执行**：NapCat 上报 / Caddy TLS / SQL Editor 重跑 schema / ECS 部署新 relay，见 aoi-qqbot README）；
 **v3.6.2 订单管理表头排序已实施完成**（2026-09-09：活动/制品类型/型号/单价/数量/购买者/到货状态/小计 8 列可排序，点击表头循环 不排→升→降，中文拼音 `Intl.Collator('zh-Hans-CN')`、空值恒最后、稳定排序；≤640px 卡片视图无表头，筛选行排序下拉兜底；排序记忆存 `localStorage['aoi_orders_sort']`；仅作用渲染副本不写回 blob，导出行序自动跟随；测试 275 用例）；
-**F9 PCO 商品目录导入+补货监控计划 v3.2 已产出（2026-09-10，v3.7.0 提案，待审核通过后实施）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)**（手动导入主入口=只粘贴活动链接（Edge Function 转发 Actions 按需抓取，异步 1–2 分钟），富文本粘贴兜底；监控以 GitHub Actions + Playwright 为主方案（实测：工作机 47 SSH 不可达、自用机 106 内存不足），工作机授权 SSH 后升级常驻同步形态；LLM 舍弃；模板已解析；回流不开发）；
+**F9 PCO 商品目录导入+补货监控——主仓库侧已交付（2026-09-10，随 commit 2bed645 入库；版本顺延 v3.8.0）**：「工具 → PCO 目录」页（粘贴导入富文本/纯文本双入口 + 词典翻译【品类词典 + PokeAPI 官方种名 1025 条 + 地区形态前缀，无 LLM】+ 校对工作台【计算器汇率换算/未识别高亮/经 registerProduct 同构推入活动商品】+ 小程序模板导出【说明 6 行+表头+数据，Sheet1】+ `d.pcoItems` 目录与监控标记；tests/catalog.test.js 18 例，全套 336 例绿）。**监控 M1 实测否决自动化浏览器**：PCO 风控对 Actions 数据中心 IP 与本地家庭网络、headless 与有头 Chromium 一律「Restricted access」（监控仓 aoi-pco-monitor 定时抓取已暂停），监控载体待负责人拍板；「只粘贴链接一键抓取」入口已预留（`d.catalogConfig.dispatchUrl`，通道就绪即点亮）：见 [docs/PLAN-F9-CATALOG-IMPORT.md](docs/PLAN-F9-CATALOG-IMPORT.md)；
 **F10 QQ 机器人用户交互迭代已实施完成（2026-09-10，v3.6.3，见 [docs/PLAN-F10-BOT-INTERACTION.md](docs/PLAN-F10-BOT-INTERACTION.md)）**：QQ 绑定唯一性校验（两端：relay 冲突暂拒/幂等，网页冲突拒绝/异常放行）/ bot「解绑 密钥 圈名」「我是谁」「查单 <活动名>」「我的快递」指令 + 帮助更新（aoi-qqbot commit 69ebe1b/abde065，node:test 54→68）/ 网页端解绑按钮 + 复制绑定指令（js/member.js，vitest 275→286）；零 schema 改动；**上线待 relay 真机部署批次（与 F5 同批：ECS pm2 更新 + NapCat 上报 + Caddy TLS + schema 重跑）**；
+**v3.7.0 管理端第二轮已实施完成（2026-09-10，见 [docs/PLAN-v3.7.0.md](docs/PLAN-v3.7.0.md)）**：S1 商品主档聚合（`activityMeta[].products` 升级唯一商品主档 + `productStats` 实时聚合 + `d.pcoItems` F9 预留）/ S2 活动管理展开区（点击活动名展开商品卡片，取代 v3.6.0 商品弹窗，活动表 14→11 列）/ S3 购买人体系（候选仅以往购买人 + 一人一账号 + 计划账号槽位标签同步）/ S4 信息录入改「登记活动商品」（`d.products` 废弃保留）/ S5 汇总表导出（`js/summary-export.js` 复刻 7.8汇总表：采购表 + 每活动汇总矩阵，exceljs/SheetJS 双通道）/ S6 复盘并入总览 + 删发货 CSV / S7 流式宽度（去 max-w 上限 + data-lowpri 响应式隐藏列）/ S8 合照缩略图；测试 275→336+ 全绿；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
 ## 技术栈与架构速览
 
-- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 17 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
+- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 18 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
   核心模块：`core.js`（路由/通用）、`data.js`（Supabase 读写）、`auth.js`、`team.js`、`member.js`（团员端）、
-  `orders.js`（订单/活动/批次/类型）、`calc.js`（汇率换算）、`intl.js`（国际运费分摊）、`approval.js`（交费审批）、
+  `orders.js`（订单/活动/批次/类型/商品主档）、`calc.js`（汇率换算）、`intl.js`（国际运费分摊）、`approval.js`（交费审批）、
   `shipping.js`、`warehouse.js`、`notify.js`（通知 + QQ 推送入口）、`bot.js`（OneBot v11 客户端）、`import.js`、
-  `limits.js`（限购计算器）、`stats.js`（复盘统计）、`image-upload.js`。
+  `limits.js`（限购计算器）、`stats.js`（复盘统计）、`image-upload.js`、`summary-export.js`（v3.7.0 汇总表导出）；
+  另有 `catalog.js`/`catalog-dict.js`/`species-zh.js` 为 F9 并行引入（待 v3.8.0 点亮）。
 - 存储：Supabase 三表（`teams` / `team_members` / `team_data`）；**全部业务数据存在 `team_data.data` 一个 JSONB blob 里**，
   schema 与 RPC 见 `supabase-schema.sql`（手工在 SQL Editor 执行，无版本化迁移）。
 - QQ 机器人链路：前端 `js/bot.js` → `relay/relay.js`（ECS，校验登录态+owner/admin）→ NapCat（OneBot v11）。
@@ -57,7 +59,7 @@
 | `docs/PLAN-NEXT.md` | **下一轮计划（待批准）**：新功能（F1–F8）× 后端（B1–B7）双路线 + 版本切分 |
 | `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` | F5 QQ 机器人双向（独立项目 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot)）：**已实施（2026-09-09，M1–M7）**，部署动作待真机执行 |
 | `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
-| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**计划 v3.2（2026-09-10，v3.7.0 提案，待审核通过后实施）**——只输入活动链接导入 + aoi-pco-monitor（GitHub Actions 为主，工作机授权 SSH 后可转常驻同步） |
+| `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**主仓库侧已交付（2026-09-10，v3.8.0）**——粘贴导入+词典翻译+校对工作台+小程序模板导出；监控被 PCO 风控实测否决（自动化浏览器一律 Restricted access），载体待拍板 |
 | `docs/PLAN-F10-BOT-INTERACTION.md` | F10 QQ 机器人用户交互迭代：**已实施（2026-09-10，v3.6.3）**——QQ 绑定唯一性校验 / bot 解绑·我是谁·查单筛选·我的快递 / 网页端解绑与复制绑定指令，零 schema 改动，上线随 relay 真机部署批次 |
 | `docs/STATUS.md` | 权威状态：已完成阶段、数据模型（blob 结构）、已知限制、**遗留项与线上操作清单** |
 | `CLAUDE.md` | QQ 机器人接入专项（NapCat / relay / 安全红线） |

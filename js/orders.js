@@ -47,12 +47,15 @@ Aoi.orders.collectIps = function (d) {
   return Object.keys(set);
 };
 
-// 刷新 datalist（IP；活动下拉按 IP 过滤，由 refillActivitySelect 负责）
+// 刷新 datalist（IP；活动下拉按 IP 过滤，由 refillActivitySelect 负责；登记商品页活动候选）
 Aoi.orders.refillDatalists = function () {
   var d = Aoi.orders.ensure();
   var ipList = document.getElementById('ipOptions');
   if (ipList) ipList.innerHTML = Aoi.orders.collectIps(d)
     .map(function (ip) { return '<option value="' + Aoi.escapeHtml(ip) + '">'; }).join('');
+  var pAct = document.getElementById('pActivityOptions');
+  if (pAct) pAct.innerHTML = d.activities
+    .map(function (a) { return '<option value="' + Aoi.escapeHtml(a) + '">'; }).join('');
 };
 
 // —— 导入 ——
@@ -228,20 +231,39 @@ Aoi.orders.addManual = async function () {
   Aoi.toast('已为 ' + buyers.length + ' 位购买者新增订单' + (prices.price == null ? '（人民币价待批量生成）' : ''), 'success');
 };
 
-// 手动新增周边（预建商品，价格统一转为人民币）
+// 信息录入页：登记活动商品（v3.7.0 S4 统一入活动商品主档 activityMeta[].products，
+// 取代旧「预建商品池」d.products 的读写；活动不存在时按名称新建）
 Aoi.orders.addProduct = async function () {
-  var get = function (id) { return document.getElementById(id).value.trim(); };
-  var ip = get('pIp'), type = get('pType'), model = get('pModel');
+  var get = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  var activity = get('pActivity');
+  var ip = get('pIp');
   var currency = document.getElementById('pCurrency').value;
   var price = parseFloat(get('pPrice'));
-  if (!type || !model || isNaN(price)) { Aoi.toast('请填写制品类型、型号、价格', 'warning'); return; }
+  var limitRaw = get('pLimit');
+  var input = {
+    type: get('pType'), model: get('pModel'),
+    refImage: get('pImage'), refUrl: get('pUrl'),
+    limit: limitRaw === '' ? null : parseInt(limitRaw, 10)
+  };
+  if (isNaN(price)) { input.price = null; }
+  else if (currency === 'cny') { input.price = price; }
+  else { input.priceOrig = price; input.currency = currency; input.price = Aoi.calc.toRmb(price, currency); }
+
   var d = Aoi.orders.ensure();
-  d.products.push({ id: Aoi.genId(), ip: ip, type: type, model: model, price: Aoi.calc.toRmb(price, currency) });
-  if (ip && d.ips.indexOf(ip) < 0) d.ips.push(ip);
-  await Aoi.saveTeamData(d);
-  Aoi.orders.renderProducts();
+  if (activity && d.activities.indexOf(activity) < 0) d.activities.push(activity);
+  if (activity && ip) {
+    if (!d.activityMeta[activity]) d.activityMeta[activity] = {};
+    if (!d.activityMeta[activity].ip) d.activityMeta[activity].ip = ip;
+    if (ip && d.ips.indexOf(ip) < 0) d.ips.push(ip);
+  }
+  var p = await Aoi.orders.registerProduct(activity, input);
+  if (!p) return;
+  ['pModel', 'pPrice', 'pLimit', 'pImage', 'pUrl'].forEach(function (id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
   Aoi.orders.refillDatalists();
-  Aoi.toast('已新增周边', 'success');
+  Aoi.orders.renderActivities();
+  Aoi.toast('已登记商品 ' + p.type + '-' + p.model + '（' + activity + '）', 'success');
 };
 
 // —— 批次（按到货日期划分）——
@@ -806,30 +828,8 @@ Aoi.orders.batchDelete = async function () {
   Aoi.toast('已删除 ' + ids.length + ' 条', 'success');
 };
 
-// —— 周边 ——
-
-Aoi.orders.renderProducts = function () {
-  var d = Aoi.orders.ensure();
-  var tbody = document.getElementById('productTbody');
-  if (!tbody) return;
-  tbody.innerHTML = d.products.map(function (p, i) {
-    return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
-      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(p.type + '-' + p.model) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(p.ip) + '</td>'
-      + '<td class="px-3 py-2 text-right">' + p.price.toFixed(2) + '</td>'
-      + '<td class="px-3 py-2"><button class="text-red-500 hover:underline" onclick="Aoi.orders.removeProduct(\'' + p.id + '\')">删</button></td>'
-      + '</tr>';
-  }).join('');
-};
-
-Aoi.orders.removeProduct = async function (id) {
-  var d = Aoi.orders.ensure();
-  Aoi.undo.arm('删除周边', d);
-  d.products = d.products.filter(function (p) { return p.id !== id; });
-  await Aoi.saveTeamData(d);
-  Aoi.orders.renderProducts();
-};
+// —— 周边（旧预建商品池）：v3.7.0 S4 起录入统一走「登记活动商品」（addProduct），
+// d.products 旧数据保留但不再读写与展示 ——
 
 // 刷新活动下拉（去重）
 Aoi.orders.refillActivities = function () {

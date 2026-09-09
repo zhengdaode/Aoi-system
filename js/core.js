@@ -284,7 +284,6 @@ Aoi.undo.clear = function () {
 // 刷新所有视图（撤销恢复后调用）
 Aoi.refreshViews = function () {
   Aoi.orders.render();
-  Aoi.orders.renderProducts();
   Aoi.orders.refillDatalists();
   Aoi.orders.refillBatches();
   Aoi.orders.renderBatches();

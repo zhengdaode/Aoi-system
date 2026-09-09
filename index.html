@@ -402,9 +402,11 @@
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <div class="flex items-center mb-3"><h3 class="font-bold">手动录入周边（预建商品）</h3><button onclick="Aoi.exportImage(this)" data-table="productTable" data-name="周边列表" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="productTable" data-name="周边列表" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <input id="pIp" list="ipOptions" placeholder="所属 IP（作品）" onchange="Aoi.orders.onIpChange('pIp')" class="border border-gray-300 rounded px-3 py-2 text-sm">
+          <h3 class="font-bold mb-1">登记活动商品</h3>
+          <p class="text-sm text-gray-500 mb-3">把商品元数据（参考图 / 跳转链接 / 单价 / 限购）登记进活动商品主档，与「活动管理」展开区和团员端「我的订单」参考列同源；订单里已有的商品可在活动管理展开区点「从订单同步商品」批量补登记</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <input id="pActivity" list="pActivityOptions" placeholder="活动（必填，可新建名称）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="pIp" list="ipOptions" placeholder="所属 IP（选填，联动活动）" onchange="Aoi.orders.onIpChange('pIp')" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <div class="relative">
               <input id="pType" placeholder="制品类型" readonly onclick="Aoi.orders.toggleTypePanel('pType')" class="w-full border border-gray-300 rounded px-3 py-2 text-sm cursor-pointer bg-white">
               <div id="pTypePanel" class="hidden absolute left-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded shadow-lg w-72">
@@ -420,22 +422,23 @@
                 <div id="pTypeList" class="max-h-64 overflow-y-auto p-2"></div>
               </div>
             </div>
-            <input id="pModel" placeholder="型号" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="pModel" placeholder="型号（必填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <select id="pCurrency" onchange="Aoi.orders.previewRmb('pPrice','pCurrency','pPricePreview')" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="cny">人民币</option>
               <option value="jpy">日元</option>
               <option value="krw">韩元</option>
             </select>
-            <input id="pPrice" type="number" step="0.01" placeholder="价格" oninput="Aoi.orders.previewRmb('pPrice','pCurrency','pPricePreview')" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="pPrice" type="number" step="0.01" placeholder="单价（人民币 / 外币原价）" oninput="Aoi.orders.previewRmb('pPrice','pCurrency','pPricePreview')" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <input id="pLimit" type="number" step="1" min="0" placeholder="单账号限购（选填）" class="border border-gray-300 rounded px-3 py-2 text-sm">
+            <div class="flex gap-2 md:col-span-2">
+              <input id="pImage" data-img-paste placeholder="参考图 URL（可上传/粘贴）" class="flex-1 min-w-0 border border-gray-300 rounded px-3 py-2 text-sm">
+              <button type="button" onclick="Aoi.img.openPicker('pImage')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>
+            </div>
+            <input id="pUrl" placeholder="跳转链接（选填，空=活动平台链接）" class="md:col-span-2 border border-gray-300 rounded px-3 py-2 text-sm">
           </div>
           <p class="mt-2 text-xs text-gray-500">价格预览 <span id="pPricePreview" class="font-semibold text-gray-700"></span></p>
-          <button onclick="Aoi.orders.addProduct()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">添加周边</button>
-          <table id="productTable" class="w-full mt-4 text-sm data-table">
-            <thead><tr class="text-left text-gray-500 border-b border-gray-200">
-              <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">周边</th><th class="px-3 py-2">IP</th><th class="px-3 py-2 text-right">单价</th><th></th>
-            </tr></thead>
-            <tbody id="productTbody"></tbody>
-          </table>
+          <button onclick="Aoi.orders.addProduct()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">登记商品</button>
+          <datalist id="pActivityOptions"></datalist>
         </div>
       </div>
 

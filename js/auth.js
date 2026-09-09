@@ -131,7 +131,6 @@ Aoi.enterApp = async function () {
   Aoi.renderSettings();
   Aoi.announce.render();
   Aoi.orders.render();
-  Aoi.orders.renderProducts();
   Aoi.orders.refillDatalists();
   Aoi.orders.refillBatches();
   Aoi.orders.renderBatches();

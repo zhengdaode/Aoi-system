@@ -281,13 +281,33 @@ Aoi.member.renderBind = function (cn) {
   var box = document.getElementById('memberQqBox');
   if (!box) return;
   var qq = Aoi.member.qq(cn);
-  box.innerHTML = qq
-    ? '<p class="text-sm text-gray-600">已绑定 QQ：<span class="font-semibold">' + Aoi.escapeHtml(qq) + '</span></p>'
-    : '<div class="flex items-center gap-2">'
+  if (qq) {
+    // F10-C（v3.6.3）：已绑定态提供解绑入口（网页端登录态即权限；bot 端解绑需密钥防冒用）
+    box.innerHTML = '<p class="text-sm text-gray-600">已绑定 QQ：<span class="font-semibold">' + Aoi.escapeHtml(qq) + '</span>'
+      + '<button onclick="Aoi.member.unbindQq()" class="ml-3 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">解绑</button></p>'
+      + '<p class="text-xs text-gray-400 mt-1">机器人可私聊你查单/进度/催缴提醒；私聊机器人「我是谁」可验证绑定</p>';
+  } else {
+    box.innerHTML = '<div class="flex items-center gap-2">'
       + '<input id="memberQq" type="text" placeholder="QQ 号（可选，便于机器人联系提醒）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">'
       + '<button onclick="Aoi.member.bindQq()" class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">绑定</button>'
       + '</div>'
+      + '<div class="flex items-center gap-2 mt-2">'
+      + '<button onclick="Aoi.member.copyBindCommand()" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">复制绑定指令</button>'
+      + '<span class="text-xs text-gray-400">粘贴给 QQ 机器人私聊发送，验证式绑定（顺带确认私聊可达）</span>'
+      + '</div>'
       + '<p class="text-xs text-gray-400 mt-1">绑定后可用 QQ 号登录查询；团长也能通过机器人私聊提醒</p>';
+  }
+};
+
+// F10-A（v3.6.3）：QQ 唯一性校验——已被其他圈名绑定时返回 true。
+// debug 团（localStorage）无线上库可查，跳过；校验接口异常时放行（网页绑定不为单点校验阻塞）。
+Aoi.member.qqTakenByOther = async function (qq, cn) {
+  var debugTeam = JSON.parse(localStorage.getItem('aoi_debug_team') || 'null');
+  if (debugTeam && (debugTeam.member_key || 'DEMO') === Aoi.member.state.key) return false;
+  if (!Aoi.db || !Aoi.db.rpc) return false;
+  var own = await Aoi.db.rpc('member_lookup_by_qq', { p_qq: qq });
+  var ownerCn = own && own.data && own.data.cn ? own.data.cn : null;
+  return !!(ownerCn && ownerCn !== cn);
 };
 
 Aoi.member.bindQq = async function () {
@@ -295,6 +315,10 @@ Aoi.member.bindQq = async function () {
   var cn = Aoi.member.state.cn;
   if (!qq) { Aoi.toast('请输入 QQ 号', 'warning'); return; }
   try {
+    if (await Aoi.member.qqTakenByOther(qq, cn)) {
+      Aoi.toast('该 QQ 已绑定其他圈名，请先解绑（可私聊机器人「解绑 团员密钥 圈名」）或联系团长', 'error');
+      return;
+    }
     var d = Aoi.orders.ensure();
     d.memberMeta = d.memberMeta || {};
     d.memberMeta[cn] = d.memberMeta[cn] || {};
@@ -304,6 +328,47 @@ Aoi.member.bindQq = async function () {
     Aoi.toast('QQ 已绑定', 'success');
   } catch (e) {
     Aoi.toast('QQ 绑定失败：' + (e && e.message ? e.message : e), 'error');
+  }
+};
+
+Aoi.member.unbindQq = async function () {
+  var cn = Aoi.member.state.cn;
+  if (!(await Aoi.confirm('确认解绑 QQ？解绑后机器人无法再私聊提醒你这个账号', { title: '解绑 QQ', danger: true }))) return;
+  try {
+    var d = Aoi.orders.ensure();
+    d.memberMeta = d.memberMeta || {};
+    d.memberMeta[cn] = d.memberMeta[cn] || {};
+    d.memberMeta[cn].qq = '';
+    await Aoi.member.persist(d);
+    Aoi.member.renderBind(cn);
+    Aoi.toast('QQ 已解绑', 'success');
+  } catch (e) {
+    Aoi.toast('QQ 解绑失败：' + (e && e.message ? e.message : e), 'error');
+  }
+};
+
+// F10-C（v3.6.3）：拼装 bot 绑定指令（密钥来自本机登录态，仅供复制粘贴，不上传任何地方）
+Aoi.member.bindCommand = function () {
+  return '绑定 ' + (Aoi.member.state.key || '') + ' ' + (Aoi.member.state.cn || '');
+};
+
+Aoi.member.copyBindCommand = async function () {
+  if (!Aoi.member.state.key) { Aoi.toast('缺少团员密钥，无法生成绑定指令', 'warning'); return; }
+  var text = Aoi.member.bindCommand();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    Aoi.toast('绑定指令已复制，去 QQ 私聊机器人粘贴发送即可', 'success');
+  } catch (e) {
+    Aoi.toast('复制失败，请检查浏览器剪贴板权限后重试', 'error');
   }
 };
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.9.4 (2026-09-11)
+
+> **导出提速（图片→表格）+ 汇总表外币原价 + PCO 导入 ChatGPT 翻译工作流**。零 schema 改动；`js/plan-export.js` 原地重写。
+
+### Changed
+- **购买清单导出：图片方案 → 表格方案（v3.9.0 PNG 方案废除）**——实测逐账号 canvas 生成太慢。`js/plan-export.js` 重写为 `buildWorkbook` 纯函数：整个限购计划导出为一个 xlsx，**每个账号一个 Sheet**；版式沿用原图片方案（顶部账号名大字标题 + 逐商品行），列为 **参考图（exceljs 通道转 base64 内嵌图片，失败回落链接）/ 商品名（外文原名，nameOrig → pcoItems 回查 → 型号兜底）/ 型号 / 外币单价 / 件数 / 外币小计** + 合计行（件数与按币种分组的外币合计）；渲染复用 `exportSummary.renderExcelJS/renderPlain`（renderExcelJS 改为返回写入 promise，exportAll 以 loading 包裹）。外币价解析：商品主档 `priceOrig/currency` 优先 → 订单外币原价均价（`limits.productsForActivity` 同源）。
+- **导出入口**：限购计划结果区「导出购买清单表（每账号一个 Sheet）」；活动管理展开区新增「导出购买清单表」按钮（`data-act-planexport` 委托）+ 购买计划弹窗同款按钮。**单账号「导出清单图」按钮与 `data-plan-export` 委托删除**（不再提供单账号导出）。
+- **侧边导航**：「PCO 目录导入」自「工具」组移入「业务」组，与「信息录入」**并列**（两者实为重叠功能）；工具组保留计算器/限购计划。
+
+### Added
+- **汇总表新增「外币原价」列（与 RMB 金额同地位）**：①采购表购买人子表由 4 列扩为 5 列（购买人/购买金额(¥)/**外币原价**/购买总数/实际购买总数），商品矩阵右移至 F 列起，需求总数行 C 列顺势承载日元总计；②每活动【活动名】汇总买家矩阵新增外币原价列（A=金额/B=外币原价/C=昵称/D..=商品矩阵）；口径均为逐件 qty×外币原价均价按币种累加，多币种以 `+` 连接，缺数据 `—`。
+- **PCO 导入接入 ChatGPT 翻译工作流**：新方案 = PCO 页 Ctrl+A/Ctrl+C → 粘贴给 ChatGPT（用页面「复制翻译提示词」按钮一键复制的 `Aoi.catalog.AI_PROMPT`：固定列 Markdown 表格输出，命名遵循本系统「型号=简短中文名+类型独立列」逻辑，宝可梦物种用常见官方译名，品类词与 catalogDict 同源）→ 回复表格贴回导入框。`Aoi.catalog.parseAi` 解析器（Markdown 管道表/TSV、表头关键字映射列、无表头按固定列序兜底、代码围栏/加粗/千分位容错），`addToDraft` 支持 AI 中文译名/类型直入（词典翻译降为无 AI 兜底）；UI 提示词可复制、可展开查看。
+
+### Tests
+- 370 → 377 用例全绿：v394-plan-table-export（buildWorkbook 版式/名称链/外币价链/合计行、exportAll 接线与兜底、按钮入口、单账号按钮移除）9 例；catalog parseAi/草稿直入/copyPrompt 6 例；v370/v390 汇总测试同步新列布局并补外币原价断言。
+
 ## v3.9.3 (2026-09-10)
 
 > 导出链路可用性修复：实测「导出的 Excel 仍只有图片超链接」「list 点导出图片没反应」的根因治理。

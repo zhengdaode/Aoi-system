@@ -1,5 +1,5 @@
 // F9 PCO 目录模块测试（v3.7.0 F9）：解析（文本/富文本）、词典翻译、类型匹配、草稿去重、汇率换算、模板导出结构
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, win, doc } from './helpers/aoi.js';
 
 const CARDS_HTML = `<ul>
@@ -269,5 +269,88 @@ describe('保存到目录 + 渲染', () => {
     win.fetch = async () => { fetched = true; return { ok: true }; };
     await aoi.catalog.grab();
     expect(fetched).toBe(false);
+  });
+});
+
+describe('v3.9.4 ChatGPT 翻译工作流：parseAi + 草稿直入中文译名', () => {
+  beforeEach(() => {
+    aoi.toast = vi.fn();
+    aoi.catalog.draft = [];
+    aoi.state.data = { activities: [], orders: [], typeMeta: { '毛绒玩偶': {}, '亚克力立牌': {} }, pcoItems: [], calc: { jpyRate: 0.048, jpyMarkup: 0.005 } };
+  });
+
+  const AI_TABLE = [
+    '好的，以下是整理结果：',
+    '',
+    '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |',
+    '| --- | --- | --- | --- | --- | --- |',
+    '| ピカチュウ ぬいぐるみ | 皮卡丘 毛绒玩偶 | 毛绒玩偶 | 4,180 | 3 | 11月8日発売 |',
+    '| **リザードン アクリルスタンド** | 喷火龙 亚克力立牌 | 亚克力立牌 | 1,650 |  |  |'
+  ].join('\n');
+
+  it('parseAi：Markdown 表格按表头映射列（千分位/加粗/空单元格/代码围栏）', () => {
+    const items = aoi.catalog.parseAi('```markdown\n' + AI_TABLE + '\n```');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({
+      jpName: 'ピカチュウ ぬいぐるみ', name: '皮卡丘 毛绒玩偶', type: '毛绒玩偶',
+      priceJpy: 4180, limit: 3, saleDate: '11月8日発売', image: '', url: ''
+    });
+    expect(items[1]).toEqual({
+      jpName: 'リザードン アクリルスタンド', name: '喷火龙 亚克力立牌', type: '亚克力立牌',
+      priceJpy: 1650, limit: '', saleDate: '', image: '', url: ''
+    });
+  });
+
+  it('parseAi：TSV 无表头按固定列序兜底；列名被改写时按关键字识别', () => {
+    const tsv = 'ピカチュウ バッジ\t皮卡丘 徽章\t徽章\t880\t5';
+    expect(aoi.catalog.parseAi(tsv)).toEqual([
+      { jpName: 'ピカチュウ バッジ', name: '皮卡丘 徽章', type: '徽章', priceJpy: 880, limit: 5, saleDate: '', image: '', url: '' }
+    ]);
+    const renamed = '| 原文 | 译名 | 品类 | 价格 | | |\n| --- | --- | --- | --- | --- | --- |\n| イーブイ ぬいぐるみ | 伊布 毛绒玩偶 | 毛绒玩偶 | 3960 | 2 |  |';
+    const items = aoi.catalog.parseAi(renamed);
+    expect(items[0].jpName).toBe('イーブイ ぬいぐるみ');
+    expect(items[0].name).toBe('伊布 毛绒玩偶');
+    expect(items[0].priceJpy).toBe(3960);
+  });
+
+  it('parseAi：非表格文本返回 null（调用方回落原解析）', () => {
+    expect(aoi.catalog.parseAi('ぬいぐるみ ピカチュウ 3,960円\nイーブイ マスコット 1,320円')).toBeNull();
+    expect(aoi.catalog.parseAi('')).toBeNull();
+  });
+
+  it('addToDraft：AI 中文译名/类型直入草稿，不依赖词典、无未识别高亮；类型匹配 typeMeta', () => {
+    aoi.catalog.addToDraft([{ jpName: 'ピカチュウ ぬいぐるみ', name: '皮卡丘 毛绒玩偶', type: '毛绒玩偶', priceJpy: 4180, limit: 3 }]);
+    expect(aoi.catalog.draft[0]).toMatchObject({ name: '皮卡丘 毛绒玩偶', type: '毛绒玩偶', priceJpy: 4180, limit: 3, unmatched: [] });
+    // 类型词表外 → 原样保留（校对工作台可改），未给中文名时仍走词典
+    aoi.catalog.addToDraft([{ jpName: 'リザードン フィギュア', name: '喷火龙 手办', type: '手办（新）' }]);
+    expect(aoi.catalog.draft[1].type).toBe('手办（新）');
+    // 无中文名 → 词典翻译兜底（物种 品类 语序），未收录片段进 unmatched
+    aoi.catalog.addToDraft([{ jpName: 'メガシンカ ピカチュウ ぬいぐるみ', priceJpy: 3960 }]);
+    expect(aoi.catalog.draft[2].name).toBe('メガシンカ 皮卡丘 毛绒玩偶');
+    expect(aoi.catalog.draft[2].unmatched).toContain('メガシンカ');
+  });
+
+  it('importPaste：AI 表格优先解析并写入草稿（toast 注明 AI 表格）', () => {
+    doc.getElementById('catPaste').value = AI_TABLE;
+    aoi.catalog.importPaste();
+    expect(aoi.catalog.draft).toHaveLength(2);
+    expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('AI 翻译表格'), 'success');
+    expect(doc.getElementById('catPaste').value).toBe('');
+  });
+
+  it('copyPrompt：clipboard 可用时写入 AI_PROMPT 全文', async () => {
+    const written = [];
+    const orig = win.navigator.clipboard;
+    Object.defineProperty(win.navigator, 'clipboard', { value: { writeText: (t) => { written.push(t); return Promise.resolve(); } }, configurable: true });
+    try {
+      aoi.catalog.copyPrompt();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(written).toHaveLength(1);
+      expect(written[0]).toBe(aoi.catalog.AI_PROMPT);
+      expect(written[0]).toContain('| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |');
+      expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('提示词已复制'), 'success');
+    } finally {
+      Object.defineProperty(win.navigator, 'clipboard', { value: orig, configurable: true });
+    }
   });
 });

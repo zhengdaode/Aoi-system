@@ -8,7 +8,7 @@
 //     a) 已达标账号在不跌破包邮线的前提下向未达标账号补差（先一步达标、再部分补差）；
 //     b) 总货值不足以全员包邮时，牺牲金额最低的账号，把最接近包邮线的账号
 //        逐个顶过线（已达标账号绝不动）。
-// 输出：每个账号的购买内容 + 金额 + 距包邮差额（可导出表格/图片）
+// 输出：每个账号的购买内容 + 金额 + 距包邮差额（整表导出走 Aoi.planExport 表格方案，v3.9.4 起不再出单账号图片）
 window.Aoi = window.Aoi || {};
 Aoi.limits = {};
 
@@ -480,7 +480,6 @@ Aoi.limits.renderPlan = function (stored, tbodyId, statId) {
           var label = Aoi.limits.purchaserLabel(stored.activity, a.index);
           return label ? '<div class="text-xs text-gray-500">' + Aoi.escapeHtml(label) + '</div>' : '';
         })()
-      + '<button data-plan-export="' + a.index + '" data-plan-export-activity="' + Aoi.escapeHtml(stored.activity) + '" class="mt-1 block text-xs text-blue-600 hover:underline">导出清单图</button>'
       + '</td>'
       + '<td class="px-3 py-2 wrap">' + content + '</td>'
       + '<td class="px-3 py-2 text-right">' + pieces + '</td>'
@@ -637,17 +636,6 @@ document.addEventListener('change', function (e) {
   if (sel) { Aoi.limits.onPlanStatus(sel); return; }
   var qty = e.target.closest ? e.target.closest('input[data-plan-qty]') : null;
   if (qty) Aoi.limits.onPlanQty(qty);
-});
-
-// 「导出清单图」按钮事件委托（限购结果表与活动计划弹窗共用，v3.9.0 购买清单图片导出）
-document.addEventListener('click', function (e) {
-  var btn = e.target.closest ? e.target.closest('button[data-plan-export]') : null;
-  if (btn && window.Aoi.planExport) {
-    Aoi.planExport.exportAccount(
-      btn.getAttribute('data-plan-export-activity'),
-      parseInt(btn.getAttribute('data-plan-export'), 10)
-    );
-  }
 });
 
 // 刷新（视图切换 / 数据变化后）

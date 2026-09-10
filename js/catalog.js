@@ -1,5 +1,7 @@
 // Aoi.catalog — PCO 商品目录（v3.7.0 F9）
-// 职责：粘贴解析（富文本/纯文本双入口）→ 词典翻译出草稿（无 LLM）→ 人工校对 →
+// 职责：粘贴解析（富文本/纯文本双入口，v3.9.4 起 ChatGPT 翻译表格优先——整页复制 →
+//   复制「翻译提示词」发给 ChatGPT → 回复表格贴回，translateName 词典翻译仍作无 AI 时兜底）→
+//   人工校对 →
 //   ① 推入活动商品主档（复用 Aoi.orders.registerProduct，price/priceOrig/currency/limit 同构扩展字段）
 //   ② 按小程序模板导出 xlsx（说明 6 行 + 表头行 + 数据，模板结构见 docs/PLAN-F9-CATALOG-IMPORT.md §2）
 //   ③ 保存到 d.pcoItems 目录（aoi-pco-monitor 与本模块共读写的同一结构）
@@ -88,6 +90,117 @@ Aoi.catalog.matchTypeKey = function (zhType) {
     if (keys[i].indexOf(zhType) >= 0 || zhType.indexOf(keys[i]) >= 0) return keys[i];
   }
   return '';
+};
+
+// —— ChatGPT 翻译工作流（v3.9.4：整页复制 → 贴给 ChatGPT 按下方提示词翻译 → 表格贴回本页）——
+// 提示词：输出固定列表格，命名遵循本系统「型号=简短中文名 + 类型独立成列」的商品命名逻辑；
+// 宝可梦物种名用常见官方译名，品类词表与 Aoi.catalogDict.categories 同源（节选高频项）。
+Aoi.catalog.AI_PROMPT = [
+  '你是宝可梦中心 online（pokemoncenter-online.com）商品目录整理助手。我下面粘贴的是 PCO 商品页面的全文，请把其中每一件商品整理成一张表格，严格遵守以下要求：',
+  '',
+  '一、输出格式：Markdown 表格，列的顺序固定，不要增删列、不要输出表格以外的解释文字：',
+  '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |',
+  '',
+  '二、各列要求：',
+  '1. 日文原名：照抄页面上的日文商品名，一字不差，不要翻译、不要改写、不要加序号。',
+  '2. 中文名：简体中文译名，作为我们系统的商品「型号」，遵循以下命名逻辑：',
+  '   - 宝可梦物种名一律用最常见的官方中文译名，例如：ピカチュウ→皮卡丘、リザードン→喷火龙、イーブイ→伊布、カビゴン→卡比兽、ミュウツー→超梦、ゼニガメ→杰尼龟、フシギダネ→妙蛙种子。',
+  '   - 地区形态加前缀：アローラ→阿罗拉、ガラル→伽勒尔、ヒスイ→洗翠、パルデア→帕底亚。',
+  '   - 品类词按下表翻译（与「类型」列保持一致）：ぬいぐるみ→毛绒玩偶、ぬいぐるみバッジ→毛绒徽章、バッジ→徽章、缶バッジ→铁质徽章、アクリルスタンド→亚克力立牌、アクリルキーホルダー→亚克力挂件、マスコット→挂件、クリアファイル→文件夹、クリアカード→透卡、ステッカー/シール→贴纸、フィギュア→手办、スイーツフィギュア→甜品手办、タペストリー→挂画、ポーチ→收纳包、トートバッグ→托特包、マグカップ→马克杯、ランダム→随机、セット→套装、限定→限定、ハロウィン→万圣节、クリスマス→圣诞节。',
+  '   - 中文名 = 物种/角色名 + 主题词（如万圣节、圣诞节、2025 等），品类词可以省略（品类已单独成列）；保持简短，不超过 12 个字；英文字母系列名（如 Pokémon accessory）保留原文。',
+  '3. 类型：从上面品类词表中选一个最贴切的中文类型名；确实没有合适的就填「未分类」。',
+  '4. 日元价：只填数字，去掉「円」和千位逗号（如 385）。',
+  '5. 限购：页面标注「お一人様○個」时填数字 ○，未标注留空。',
+  '6. 発売日：形如「11月8日発売」照抄，没有就留空。',
+  '',
+  '三、不要遗漏任何商品，也不要虚构页面上不存在的商品；同系列不同款式照页面逐条列出。',
+  '',
+  '页面全文如下：'
+].join('\n');
+
+// 提示词进剪贴板：clipboard API 优先，execCommand 兜底（非安全源/旧环境）
+Aoi.catalog.copyPrompt = function () {
+  var text = Aoi.catalog.AI_PROMPT;
+  var done = function () { Aoi.toast('提示词已复制——连同整页复制的 PCO 内容一起发给 ChatGPT', 'success'); };
+  var fail = function () { Aoi.toast('复制失败，请展开下方文本手动全选复制', 'warning'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, function () { fallback(); });
+  } else fallback();
+  function fallback() {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand && document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) done(); else fail();
+    } catch (e) { fail(); }
+  }
+};
+
+// 表头关键字 → 草稿字段（parseAi 按表头识别列序，兼容 ChatGPT 对列名的轻微改写）
+Aoi.catalog.AI_HEADER_KEYS = [
+  ['jp', /日文原名|日文名|原名|日文|原文/],
+  ['name', /中文名|中文|译名|名称|型号/],
+  ['type', /类型|分类|品类|制品/],
+  ['priceJpy', /日元|价格|円|价/],
+  ['limit', /限购|限制/],
+  ['saleDate', /発売|发售/],
+  ['image', /图链|图片|缩略图/],
+  ['url', /链接|URL|网址/]
+];
+
+// 解析 ChatGPT 回复的表格（Markdown 管道表或 TSV）→ 目录条目数组。
+// 有表头按关键字映射列；无表头按固定顺序 [原名, 中文, 类型, 价格, 限购] 兜底。
+// 无法解析出任何行时返回 null（调用方回落富文本/纯文本解析）。
+Aoi.catalog.parseAi = function (text) {
+  var rows = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach(function (ln) {
+    var s = ln.trim();
+    if (!s || /^`{3,}/.test(s)) return;                       // 跳过空行与代码围栏
+    var cells;
+    if (s.indexOf('|') >= 0) cells = s.replace(/^\|/, '').replace(/\|$/, '').split('|');
+    else if (s.indexOf('\t') >= 0) cells = s.split('\t');
+    else return;
+    cells = cells.map(function (x) { return x.replace(/\*\*/g, '').trim(); }); // 去 Markdown 加粗
+    if (cells.every(function (x) { return x === '' || /^:?-{2,}:?$/.test(x); })) return; // 表头分隔行
+    if (cells.length >= 3) rows.push(cells);
+  });
+  if (!rows.length) return null;
+  var map = null;
+  var first = rows[0].join(' ');
+  if (/原文|日文|原名/.test(first) && /中文|译名|名称/.test(first)) {
+    map = {};
+    rows.shift().forEach(function (h, i) {
+      for (var k = 0; k < Aoi.catalog.AI_HEADER_KEYS.length; k++) {
+        var f = Aoi.catalog.AI_HEADER_KEYS[k];
+        if (f[1].test(h) && map[f[0]] == null) { map[f[0]] = i; return; }
+      }
+    });
+  }
+  var items = [];
+  rows.forEach(function (cells) {
+    var g = function (field, fallbackIdx) {
+      if (map) return map[field] != null ? cells[map[field]] || '' : '';
+      return fallbackIdx != null ? (cells[fallbackIdx] || '') : '';
+    };
+    var jpName = (g('jp', 0) || '').replace(/^\d+[.、)]\s*/, '').trim();
+    if (!jpName) return;
+    var pm = String(g('priceJpy', 3)).match(/[\d,]{1,9}/);
+    var lm = String(g('limit', 4)).match(/\d{1,2}/);
+    items.push({
+      jpName: jpName,
+      name: g('name', 1).trim(),
+      type: g('type', 2).trim(),
+      priceJpy: pm ? parseInt(pm[0].replace(/,/g, ''), 10) : null,
+      limit: lm ? parseInt(lm[0], 10) : '',
+      saleDate: g('saleDate', null).trim(),
+      image: g('image', null).trim(),
+      url: g('url', null).trim()
+    });
+  });
+  return items.length ? items : null;
 };
 
 // —— 解析 ——
@@ -195,6 +308,12 @@ Aoi.catalog.addToDraft = function (items) {
   (items || []).forEach(function (it) {
     if (!it.jpName) return;
     var tr = Aoi.catalog.translateName(it.jpName);
+    // ChatGPT 工作流直带中文译名/类型：不再依赖词典，未识别高亮也无意义
+    var hasCn = !!(it.name && String(it.name).trim());
+    var cn = hasCn ? String(it.name).trim() : tr.cn;
+    var type = (it.type && String(it.type).trim())
+      ? (Aoi.catalog.matchTypeKey(String(it.type).trim()) || String(it.type).trim())
+      : (tr.typeKey || tr.type);
     var existing = null;
     for (var i = 0; i < Aoi.catalog.draft.length; i++) {
       var x = Aoi.catalog.draft[i];
@@ -206,19 +325,19 @@ Aoi.catalog.addToDraft = function (items) {
         if ((existing[f] == null || existing[f] === '') && it[f] != null && it[f] !== '') existing[f] = it[f];
       });
       if (it.url && !existing.url) existing.url = it.url;
-      if (!existing.name && tr.cn) existing.name = tr.cn;
-      if (!existing.type && tr.typeKey) existing.type = tr.typeKey;
+      if (!existing.name && cn) existing.name = cn;
+      if (!existing.type && type) existing.type = type;
     } else {
       Aoi.catalog.draft.push({
         id: Aoi.genId(),
         url: it.url || '',
         jpName: it.jpName,
-        name: tr.cn,
-        type: tr.typeKey || tr.type,
+        name: cn,
+        type: type,
         typeSuggest: tr.type,
-        unmatched: tr.unmatched,
+        unmatched: hasCn ? [] : tr.unmatched,
         priceJpy: it.priceJpy != null ? it.priceJpy : null,
-        limit: it.limit != null ? it.limit : '',
+        limit: it.limit != null && it.limit !== '' ? it.limit : '',
         image: it.image || '',
         status: it.status || '未知',
         saleDate: it.saleDate || '',
@@ -258,12 +377,17 @@ Aoi.catalog.importPaste = function () {
   var box = document.getElementById('catPaste');
   if (!box || !box.value.trim()) { Aoi.toast('请先粘贴内容（整页复制后粘贴至此）', 'warning'); return; }
   var v = box.value;
-  var items = /<\s*(img|a|div|span|table|li)\b/i.test(v) ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v);
-  if (!items.length) { Aoi.toast('未解析出商品（需「名称 + 价格円」行或商品卡结构）', 'error'); return; }
+  // v3.9.4：ChatGPT 翻译表格优先（Markdown/TSV）；否则回落富文本商品卡 / 纯文本「名称+价格円」
+  var ai = Aoi.catalog.parseAi(v);
+  var items = ai || (/<\s*(img|a|div|span|table|li)\b/i.test(v) ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v));
+  if (!items.length) {
+    Aoi.toast('未解析出商品（AI 翻译表格、「名称 + 价格円」行或商品卡结构均可）', 'error');
+    return;
+  }
   var r = Aoi.catalog.addToDraft(items);
   box.value = '';
   Aoi.catalog.render();
-  Aoi.toast('解析 ' + items.length + ' 条：新增 ' + r.added + '，合并 ' + r.updated, 'success');
+  Aoi.toast((ai ? '已按 AI 翻译表格解析 ' : '解析 ') + items.length + ' 条：新增 ' + r.added + '，合并 ' + r.updated, 'success');
 };
 
 // 粘贴事件：剪贴板带 text/html 时直接采用（保真图片/链接）；纯文本走默认插入 + 解析按钮
@@ -405,6 +529,8 @@ Aoi.catalog.saveDispatch = async function () {
 
 // 导航进入本页时的一次性全量渲染（index.html nav 项 onclick 调用）
 Aoi.catalog.renderAll = function () {
+  var pre = document.getElementById('catAiPrompt');
+  if (pre && !pre.textContent) pre.textContent = Aoi.catalog.AI_PROMPT;
   Aoi.catalog.render();
   Aoi.catalog.renderCatalogList();
 };

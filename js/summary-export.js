@@ -2,11 +2,12 @@
 // 复刻《7.8汇总表》结构：①「采购表」= 商品维度主表（名称/参考图/日元价/人民币价/需求总数/链接
 //   + 购买人×商品分摊矩阵【取限购计划】+ 购入多余部分行【取 plan.remaining】）；
 // ② 每活动一个「【活动名】汇总」= 结算矩阵（图片链接行/种类/人民币单价/每款总件数 + 每购买人一行数量矩阵 + 应付总额）。
+// v3.9.4：购买人金额旁新增「外币原价」列（采购表购买人子表与每活动汇总矩阵同地位，逐件 qty×外币均价按币种累加）。
 // 参考图（v3.9.0）：exceljs 通道拉取图床图片转 base64 直接内嵌（复刻参考文件的内嵌图意图），
 //   拉取失败/格式不支持（如 webp）→ 回落「图片链接」超链接单元格；SheetJS 回退通道仅超链接。
 // 商品跳转链接（链接行）：写入超链接单元格（exceljs hyperlink / SheetJS .l），点击直达；相对链接自动绝对化。
 // 架构：buildWorkbook(d, onlyActivity) 为纯函数（数据→描述符，供单测）；
-// 渲染层 exceljs（带样式，CDN）优先，SheetJS 回退（仅数值/合并/列宽/超链接）。
+// 渲染层 exceljs（带样式，CDN）优先，SheetJS 回退（仅数值/合并/列宽/超链接）；renderExcelJS 返回写入 promise。
 window.Aoi = window.Aoi || {};
 Aoi.exportSummary = function (onlyActivity) {
   var d = Aoi.orders.ensure();
@@ -86,6 +87,15 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
     sheet.rowHeights[r] = 90;
   }
 
+  // 外币原价合计单元格文本：{币种: 金额} → 'JP¥1,100 + ₩3,000'；空 → '—'
+  function origTotalsText(groups) {
+    var keys = Object.keys(groups);
+    if (!keys.length) return '—';
+    return keys.map(function (cur) {
+      return Aoi.currencySymbol(cur) + groups[cur].toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+    }).join(' + ');
+  }
+
   // 活动筛选：有订单或登记商品的活动才导出
   var acts = (d.activities || []).filter(function (a) {
     if (onlyActivity && a !== onlyActivity) return false;
@@ -147,15 +157,16 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
 
   // —— Sheet 1：采购表 ——
   var pc = new Sheet(sheetName('采购表'));
-  var col = 4; // A–D 列留给行标签与购买人子表（A=标签/购买人，B=金额，C=总数，D=实际），商品组自 E 列起（同参考文件）
+  // A–E 列留给行标签与购买人子表（A=标签/购买人，B=金额，C=外币原价，D=总数，E=实际），商品组自 F 列起（同参考文件）
+  var col = 5;
   groups.forEach(function (g) {
     g.colStart = col;
     g.colEnd = col + Math.max(1, g.products.length) - 1;
     col = g.colEnd + 1;
   });
   var totalCols = col;
-  pc.cols = [{ w: 16 }, { w: 14 }, { w: 10 }, { w: 12 }];
-  for (var i = 4; i < totalCols; i++) pc.cols.push({ w: 16 });
+  pc.cols = [{ w: 16 }, { w: 14 }, { w: 14 }, { w: 10 }, { w: 12 }];
+  for (var i = 5; i < totalCols; i++) pc.cols.push({ w: 16 });
   pc.freeze = { r: 2, c: 1 };
 
   // 组标题行（r0）
@@ -191,9 +202,9 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
   pc.put(5, 1, c(totalQty, { bold: true, right: true }));
   if (totalJpy) pc.put(5, 2, c(R2(totalJpy), { bold: true, right: true }));
 
-  // 购买人子表（r8 表头，r9+ 数据；分摊数量取限购计划）
+  // 购买人子表（r8 表头，r9+ 数据；分摊数量取限购计划；外币原价 = 逐件 qty×外币原价均价按币种累加）
   var SUB_HEAD = 8;
-  ['购买人', '购买金额(¥)', '购买总数', '实际购买总数'].forEach(function (label, i) {
+  ['购买人', '购买金额(¥)', '外币原价', '购买总数', '实际购买总数'].forEach(function (label, i) {
     pc.put(SUB_HEAD, i, c(label, { bold: true, border: true, center: true }));
   });
   groups.forEach(function (g) {
@@ -210,6 +221,7 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
       var label = (b.buyer || '账号 ' + slot.index) + (b.account ? '（' + b.account + '）' : '');
       var pieces = 0, done = 0;
       var qtyByCol = {};
+      var origGroups = {};
       (slot.items || []).forEach(function (it) {
         pieces += it.qty || 0;
         if (it.status === '已购买') done += it.qty || 0;
@@ -217,14 +229,20 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
           if (g.products[pi].key === it.type + '|' + it.model) {
             var ci = g.colStart + pi;
             qtyByCol[ci] = (qtyByCol[ci] || 0) + (it.qty || 0);
+            // 外币原价：该商品主流币种均价 × 件数，按币种累加（缺原价数据的商品不计入）
+            var pr = g.products[pi];
+            if (pr.origAvg != null && pr.origCurrency) {
+              origGroups[pr.origCurrency] = Math.round(((origGroups[pr.origCurrency] || 0) + pr.origAvg * (it.qty || 0)) * 100) / 100;
+            }
             break;
           }
         }
       });
       pc.put(row, 0, c(label, { border: true, wrap: true }));
       pc.put(row, 1, c(slot.total || 0, { fmt: '0.00', right: true, border: true }));
-      pc.put(row, 2, c(pieces, { right: true, border: true }));
-      pc.put(row, 3, c(done, { right: true, border: true }));
+      pc.put(row, 2, c(origTotalsText(origGroups), { right: true, border: true }));
+      pc.put(row, 3, c(pieces, { right: true, border: true }));
+      pc.put(row, 4, c(done, { right: true, border: true }));
       Object.keys(qtyByCol).forEach(function (ci) {
         pc.put(row, parseInt(ci, 10), c(qtyByCol[ci], { fill: 'B4C7E7', right: true, border: true }));
       });
@@ -248,6 +266,7 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
   var sheets = [pc];
 
   // —— Sheet 2..n：每活动【活动名】汇总 ——
+  // 列布局（v3.9.4）：A=金额、B=外币原价、C=昵称、D..=商品矩阵（外币原价与金额同地位，v3.9.4 新增）
   var HEAD_FILLS = [
     { label: '689F38', cells: ['C6E0B4', '689F38'] },   // 种类
     { label: 'E65100', cells: ['FFB74D', 'E65100'] },  // 单价
@@ -256,48 +275,53 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
   groups.forEach(function (g) {
     var sh = new Sheet(sheetName('【' + g.name + '】汇总'));
     var n = Math.max(1, g.products.length);
-    sh.cols = [{ w: 12 }, { w: 14 }];
+    sh.cols = [{ w: 12 }, { w: 14 }, { w: 14 }];
     for (var i = 0; i < n; i++) sh.cols.push({ w: 16 });
-    sh.freeze = { r: 5, c: 2 };
+    sh.freeze = { r: 5, c: 3 };
     // 标题
     sh.put(0, 0, c('【' + g.name + '】汇总', { fill: 'FFF2CC', bold: true, center: true, size: 16 }));
-    sh.merge(0, 0, 0, 1 + n);
+    sh.merge(0, 0, 0, 2 + n);
     // 参考图内嵌行（r1）
     g.products.forEach(function (p, pi) {
-      if (p.refImage) imgCell(sh, 1, 2 + pi, p.refImage);
+      if (p.refImage) imgCell(sh, 1, 3 + pi, p.refImage);
     });
     // 种类 / 单价 / 总数
-    sh.put(2, 1, c('种类', FW(HEAD_FILLS[0].label)));
-    sh.put(3, 1, c('单价', FW(HEAD_FILLS[1].label)));
+    sh.put(2, 2, c('种类', FW(HEAD_FILLS[0].label)));
+    sh.put(3, 2, c('单价', FW(HEAD_FILLS[1].label)));
     sh.put(4, 0, c('总金额', { bold: true, center: true }));
-    sh.put(4, 1, c('昵称/总数', FW(HEAD_FILLS[2].label)));
+    sh.put(4, 1, c('外币原价', { bold: true, center: true }));
+    sh.put(4, 2, c('昵称/总数', FW(HEAD_FILLS[2].label)));
     g.products.forEach(function (p, pi) {
       var alt = pi % 2;
-      sh.put(2, 2 + pi, c(p.type + ' ' + p.model, { fill: HEAD_FILLS[0].cells[alt], color: alt ? 'FFFFFF' : undefined, wrap: true }));
-      sh.put(3, 2 + pi, c(p.priceAvg != null ? p.priceAvg : '', { fill: HEAD_FILLS[1].cells[alt], color: alt ? 'FFFFFF' : undefined, fmt: p.priceAvg != null ? '0.00' : undefined }));
-      sh.put(4, 2 + pi, c(p.qty, { fill: HEAD_FILLS[2].cells[alt], color: alt ? 'FFFFFF' : undefined, right: true }));
+      sh.put(2, 3 + pi, c(p.type + ' ' + p.model, { fill: HEAD_FILLS[0].cells[alt], color: alt ? 'FFFFFF' : undefined, wrap: true }));
+      sh.put(3, 3 + pi, c(p.priceAvg != null ? p.priceAvg : '', { fill: HEAD_FILLS[1].cells[alt], color: alt ? 'FFFFFF' : undefined, fmt: p.priceAvg != null ? '0.00' : undefined }));
+      sh.put(4, 3 + pi, c(p.qty, { fill: HEAD_FILLS[2].cells[alt], color: alt ? 'FFFFFF' : undefined, right: true }));
     });
     if (!g.products.length) {
-      sh.put(2, 2, c('（无商品）', { fill: HEAD_FILLS[0].cells[0] }));
+      sh.put(2, 3, c('（无商品）', { fill: HEAD_FILLS[0].cells[0] }));
     }
-    // 买家矩阵（按订单逐单累计金额，数量按 type+model 归位）
+    // 买家矩阵（按订单逐单累计金额与外币原价，数量按 type+model 归位）
     var buyers = {};
     (d.orders || []).forEach(function (o) {
       if (o.activity !== g.name || !o.buyer) return;
-      var b = buyers[o.buyer] || (buyers[o.buyer] = { qty: {}, amount: 0 });
+      var b = buyers[o.buyer] || (buyers[o.buyer] = { qty: {}, amount: 0, origs: {} });
       var key = o.type + '|' + o.model;
       b.qty[key] = (b.qty[key] || 0) + (o.count || 0);
       if (o.price != null) b.amount += o.price * (o.count || 0);
+      if (o.priceOrig != null && o.currency && o.currency !== 'cny') {
+        b.origs[o.currency] = Math.round(((b.origs[o.currency] || 0) + o.priceOrig * (o.count || 0)) * 100) / 100;
+      }
     });
     var names = Object.keys(buyers).sort(function (a, b2) { return a.localeCompare(b2, 'zh-Hans-CN'); });
     names.forEach(function (name, ri) {
       var b = buyers[name];
       var r = 5 + ri;
       sh.put(r, 0, c(R2(b.amount), { fmt: '0.00', right: true, border: true }));
-      sh.put(r, 1, c(name, { fill: ri % 2 ? '7F7F7F' : 'BFBFBF', color: ri % 2 ? 'FFFFFF' : undefined }));
+      sh.put(r, 1, c(origTotalsText(b.origs), { right: true, border: true }));
+      sh.put(r, 2, c(name, { fill: ri % 2 ? '7F7F7F' : 'BFBFBF', color: ri % 2 ? 'FFFFFF' : undefined }));
       g.products.forEach(function (p, pi) {
         var q = b.qty[p.key];
-        if (q) sh.put(r, 2 + pi, c(q, { fill: ri % 2 ? 'FFE699' : 'BDD7EE', right: true }));
+        if (q) sh.put(r, 3 + pi, c(q, { fill: ri % 2 ? 'FFE699' : 'BDD7EE', right: true }));
       });
     });
     sheets.push(sh);
@@ -396,6 +420,7 @@ Aoi.exportSummary.collectImageCells = function (desc) {
 };
 
 Aoi.exportSummary.renderExcelJS = function (desc, base) {
+  // 返回写入 promise（toast 在链内发出）——供购买清单表格导出等外部调用方收尾 loading
   var wb = new window.ExcelJS.Workbook();
   var wss = [];
   desc.sheets.forEach(function (sh) {
@@ -428,7 +453,7 @@ Aoi.exportSummary.renderExcelJS = function (desc, base) {
   // 失败/格式不支持 → 保留链接单元格不动。并行拉取，单张失败不阻断。
   var jobs = Aoi.exportSummary.collectImageCells(desc);
   var failed = 0;
-  Promise.all(jobs.map(function (j) {
+  return Promise.all(jobs.map(function (j) {
     return Aoi.exportSummary.fetchImageBase64(j.url).then(function (im) {
       if (!im) { failed++; return; }
       var id = wb.addImage({ base64: im.dataUrl, extension: im.ext });

@@ -45,20 +45,20 @@ describe('汇总表：链接绝对化 + 内嵌图描述符（v3.9.0 buildWorkboo
 
   it('采购表参考图单元格：s.img + s.link 均为绝对地址，行高加到 90pt', () => {
     const pc = aoi.exportSummary.buildWorkbook(fixture(), null).sheets[0];
-    expect(val(pc, 2, 4)).toBe('图片链接');
-    expect(cell(pc, 2, 4).s.img).toBe('https://img.example/m1.jpg');
-    expect(cell(pc, 2, 4).s.link).toBe('https://img.example/m1.jpg');
+    expect(val(pc, 2, 5)).toBe('图片链接');
+    expect(cell(pc, 2, 5).s.img).toBe('https://img.example/m1.jpg');
+    expect(cell(pc, 2, 5).s.link).toBe('https://img.example/m1.jpg');
     expect(pc.rowHeights[2]).toBe(90);
-    expect(cell(pc, 2, 5)).toBeNull();            // 无参考图的商品不占格
+    expect(cell(pc, 2, 6)).toBeNull();            // 无参考图的商品不占格
     // 跳转商品链接：相对链接绝对化后写 s.link（可点击直达）
-    expect(cell(pc, 6, 4).s.link).toBe('https://www.pokemoncenter-online.com/products/jan1.html');
-    expect(cell(pc, 6, 5).s.link).toBe('https://shop.example/p/2');
+    expect(cell(pc, 6, 5).s.link).toBe('https://www.pokemoncenter-online.com/products/jan1.html');
+    expect(cell(pc, 6, 6).s.link).toBe('https://shop.example/p/2');
   });
 
   it('每活动汇总参考图行同样内嵌 + 加高', () => {
     const desc = aoi.exportSummary.buildWorkbook(fixture(), null);
     const sh = desc.sheets.find((s) => s.name === '【CP27】汇总');
-    expect(cell(sh, 1, 2).s.img).toBe('https://img.example/m1.jpg');
+    expect(cell(sh, 1, 3).s.img).toBe('https://img.example/m1.jpg');
     expect(sh.rowHeights[1]).toBe(90);
   });
 
@@ -66,8 +66,8 @@ describe('汇总表：链接绝对化 + 内嵌图描述符（v3.9.0 buildWorkboo
     const desc = aoi.exportSummary.buildWorkbook(fixture(), null);
     const jobs = aoi.exportSummary.collectImageCells(desc);
     expect(jobs).toEqual([
-      { si: 0, ri: 2, ci: 4, url: 'https://img.example/m1.jpg' },
-      { si: 1, ri: 1, ci: 2, url: 'https://img.example/m1.jpg' }
+      { si: 0, ri: 2, ci: 5, url: 'https://img.example/m1.jpg' },
+      { si: 1, ri: 1, ci: 3, url: 'https://img.example/m1.jpg' }
     ]);
   });
 });
@@ -163,10 +163,10 @@ describe('SheetJS 回退通道超链接（v3.9.0 renderPlain）', () => {
     const desc = aoi.exportSummary.buildWorkbook(fixture(), null);
     aoi.exportSummary.renderPlain(desc, '测试汇总');
     expect(written).toEqual(['测试汇总.xlsx']);
-    // renderPlain 写入的采购表 ws：图片链接格 E3 与跳转链接格 E7 均带 .l 绝对地址
+    // renderPlain 写入的采购表 ws：图片链接格 F3 与跳转链接格 F7 均带 .l 绝对地址
     const pc = seen[desc.sheets[0].name];
-    expect(pc['E3'].v).toBe('图片链接');
-    expect(pc['E3'].l.Target).toBe('https://img.example/m1.jpg');
-    expect(pc['E7'].l.Target).toBe('https://www.pokemoncenter-online.com/products/jan1.html');
+    expect(pc['F3'].v).toBe('图片链接');
+    expect(pc['F3'].l.Target).toBe('https://img.example/m1.jpg');
+    expect(pc['F7'].l.Target).toBe('https://www.pokemoncenter-online.com/products/jan1.html');
   });
 });

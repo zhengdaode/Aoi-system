@@ -1159,6 +1159,8 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   }
   var pl = e.target.closest('button[data-act-plan]');
   if (pl) { Aoi.limits.openActPlan(pl.getAttribute('data-act-plan')); return; }
+  var pe = e.target.closest('button[data-act-planexport]');
+  if (pe && window.Aoi.planExport) { Aoi.planExport.exportAll(pe.getAttribute('data-act-planexport')); return; }
   var t = e.target.closest('button[data-act-track]');
   if (t) Aoi.orders.openActTrack(t.getAttribute('data-act-track'));
 });
@@ -1610,6 +1612,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="w-48 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
     + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
+    + '<button data-act-planexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="按已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>'
     + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
     + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap">导出汇总表</button>'
     + '</div>';

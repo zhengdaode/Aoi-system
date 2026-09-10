@@ -8,8 +8,16 @@
 //   （Pages 无服务端重写，https 页面也无法直连 http relay，只能经本函数桥接）。
 //   host 白名单防开放代理；响应内存缓冲（运行时对透传流式 body 不稳，实测 500）；
 //   直连源站 + 15s 超时（实测 Edge→境内源站 ~350ms，偶发网关挂起由前端 20s 超时+重试兜底）。
+// v3.9.3：/fetch 白名单由单主机扩为共享主机表（与前端 PROXY_HOSTS 同步）——汇总表参考图
+//   内嵌 / 购买清单图绘制需要拉图床（esaimg/img.cdn1.vip）与商品图（PCO 主站）的字节，
+//   这些源站无 CORS 头，Pages/本地环境唯一代理路径就是本通道。
 const UPSTREAM = 'http://47.101.194.103:8080/';
-const FETCH_ORIGIN = 'https://static.zwlhome.com/';
+const FETCH_HOSTS = [
+  'static.zwlhome.com',
+  'www.pokemoncenter-online.com',
+  'esaimg.cdn1.vip',
+  'img.cdn1.vip',
+];
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +30,7 @@ Deno.serve(async (req) => {
   const u = new URL(req.url);
   const fm = req.method === 'GET' && u.pathname.match(/\/fetch\/([^/]+)\/(.+)$/);
   if (fm) {
-    if (fm[1] !== 'static.zwlhome.com') {
+    if (FETCH_HOSTS.indexOf(fm[1]) < 0) {
       return new Response(JSON.stringify({ error: 'host not allowed' }),
         { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } });
     }
@@ -31,7 +39,7 @@ Deno.serve(async (req) => {
       const timer = setTimeout(() => ctrl.abort(), 15000);
       let r;
       try {
-        r = await fetch(FETCH_ORIGIN + fm[2] + u.search, { redirect: 'follow', signal: ctrl.signal });
+        r = await fetch('https://' + fm[1] + '/' + fm[2] + u.search, { redirect: 'follow', signal: ctrl.signal });
       } finally {
         clearTimeout(timer);
       }

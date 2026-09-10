@@ -311,8 +311,9 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
 // exceljs 支持的图片格式（其余如 webp 不内嵌，保留链接单元格）
 Aoi.exportSummary.IMG_EXT = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/gif': 'gif' };
 
-// 拉取图片的候选通道（v3.9.1）：白名单主机直连失败（无 CORS 头源站，实测 esaimg 图床）
-// 后回落 /media-proxy（Netlify 转发）→ /media-relay（ECS relay /fetch），复用链接导入同组白名单
+// 拉取图片的候选通道（v3.9.1，v3.9.3 补 Edge）：白名单主机直连失败（无 CORS 头源站，实测 esaimg 图床）
+// 后回落 /media-proxy（Netlify 转发）→ /media-relay（ECS relay /fetch，需部署新版）→
+// 设置页 relay 的 Edge /fetch（Supabase 全球函数，GitHub Pages / 本地环境唯一已部署代理路径）
 Aoi.exportSummary.imageCandidates = function (url) {
   var s = String(url || '').trim();
   var candidates = [s];
@@ -322,6 +323,8 @@ Aoi.exportSummary.imageCandidates = function (url) {
       candidates.push(proxied);
       var relay = Aoi.import.mapRelayUrl(s);
       if (relay) candidates.push(relay);
+      var edge = Aoi.import.mapEdgeUrl ? Aoi.import.mapEdgeUrl(s) : null;
+      if (edge) candidates.push(edge);
     }
   }
   return candidates;

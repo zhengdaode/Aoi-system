@@ -27,6 +27,34 @@ beforeEach(() => {
   aoi.saveTeamData = async (d) => { aoi._saved = JSON.parse(JSON.stringify(d)); };
 });
 
+const PCO_CARDS_HTML = `<ul class="comltemlist product-grid">
+<li class="product" data-pid="4521329439365"><div class="pho"><a href="https://www.pokemoncenter-online.com/4521329439365.html"><img src="https://www.pokemoncenter-online.com/a/img/item/4521329439365/M/x.jpg" alt="A4クリアファイル Pokémon Magic Hour Illusion!"></a></div><div class="txtBox"><p class="txt"><a href="https://www.pokemoncenter-online.com/4521329439365.html">A4クリアファイル Pokémon Magic Hour Illusion!</a></p><p class="price"><a href="https://www.pokemoncenter-online.com/4521329439365.html">385<small>円</small></a></p></div></li>
+<li class="product" data-pid="4521329439310"><div class="pho"><a href="https://www.pokemoncenter-online.com/4521329439310.html"><img src="https://www.pokemoncenter-online.com/a/img/item/4521329439310/M/y.jpg" alt="ぬいぐるみ ピカチュウ"></a></div><div class="txtBox"><p class="txt"><a href="https://www.pokemoncenter-online.com/4521329439310.html">ぬいぐるみ ピカチュウ</a></p><p class="price"><a href="https://www.pokemoncenter-online.com/4521329439310.html">3,960<small>円</small></a><span>お一人様2個まで</span></p></div></li>
+</ul>`;
+
+describe('parseHtml：PCO 真实结构（li[data-pid]，2026-09-10 实测）', () => {
+  it('策略A1：JAN.html 链接 / .txt 名称 / .price 连写价格 / 限购 / 图', () => {
+    const items = aoi.catalog.parseHtml(PCO_CARDS_HTML);
+    expect(items).toHaveLength(2);
+    expect(items[0].jpName).toBe('A4クリアファイル Pokémon Magic Hour Illusion!');
+    expect(items[0].priceJpy).toBe(385);
+    expect(items[0].url).toBe('https://www.pokemoncenter-online.com/4521329439365.html');
+    expect(items[0].image).toContain('/a/img/item/4521329439365/');
+    expect(items[1].jpName).toBe('ぬいぐるみ ピカチュウ');
+    expect(items[1].priceJpy).toBe(3960);
+    expect(items[1].limit).toBe(2);
+  });
+});
+
+describe('parseText：PCO 连写形态（名称与价格间无空格）', () => {
+  it('名称直接衔接价格也能解析', () => {
+    const items = aoi.catalog.parseText('ぬいぐるみ ピカチュウ3,960円');
+    expect(items).toHaveLength(1);
+    expect(items[0].jpName).toBe('ぬいぐるみ ピカチュウ');
+    expect(items[0].priceJpy).toBe(3960);
+  });
+});
+
 describe('parseText：逐行「名称　X,XXX円」', () => {
   it('解析名称与含税价，忽略无价格行', () => {
     const items = aoi.catalog.parseText(TEXT_INPUT);

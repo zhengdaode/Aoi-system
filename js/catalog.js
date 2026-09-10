@@ -98,7 +98,7 @@ Aoi.catalog.parseText = function (text) {
   String(text == null ? '' : text).split(/\r?\n/).forEach(function (raw) {
     var line = raw.replace(/^[\s　·•・\-–—*>#]+/, '').trim();
     if (!line) return;
-    var m = line.match(/^(.{2,100}?)[\s　]+([\d,]{1,9})\s*円/);
+    var m = line.match(/^(.{2,100}?)[\s　]*([\d,]{1,9})\s*円/);
     if (!m) return;
     var name = m[1].trim();
     if (!name) return;
@@ -128,6 +128,26 @@ Aoi.catalog.parseHtml = function (html) {
     seen[key] = it;
     items.push(it);
   };
+  // A1：PCO 真实结构（2026-09-10 实测）——li.product[data-pid]，链接为 JAN.html，
+  // 价格「385<small>円</small>」textContent 连写无空格，名称在 .txt a / 图 alt
+  doc.querySelectorAll('li[data-pid]').forEach(function (li) {
+    var text = li.textContent || '';
+    var a = li.querySelector('a[href]');
+    var nameEl = li.querySelector('.txt a');
+    var img = li.querySelector('.pho img') || li.querySelector('img');
+    var priceEl = li.querySelector('.price');
+    var pm = (priceEl ? priceEl.textContent : text).match(/([\d,]{1,9})\s*円/);
+    var lm = text.match(/お一人様[^0-9]{0,6}(\d{1,2})\s*(?:個|点)/);
+    var name = ((nameEl && nameEl.textContent) || (img && img.getAttribute('alt')) || '').trim();
+    push({
+      jpName: name,
+      priceJpy: pm ? parseInt(pm[1].replace(/,/g, ''), 10) : null,
+      limit: lm ? parseInt(lm[1], 10) : null,
+      image: (img && (img.getAttribute('src') || img.getAttribute('data-src'))) || '',
+      url: (a && a.getAttribute('href')) || ''
+    });
+  });
+  // A2：通用商品卡兜底（/products/ 链接形态的其他结构）
   doc.querySelectorAll('a[href*="/products/"]').forEach(function (a) {
     var card = a.closest('li') || a.closest('[class*="tile"]') || a.closest('[class*="product"]') || a.parentElement;
     var text = card ? card.textContent : (a.textContent || '');

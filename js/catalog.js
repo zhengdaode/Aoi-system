@@ -305,6 +305,9 @@ Aoi.catalog.pushSelected = async function () {
   var activity = (newEl && newEl.value.trim()) || (selEl && selEl.value) || '';
   if (!activity) { Aoi.toast('请先选择或输入目标活动', 'warning'); return; }
   if (!sel.length) { Aoi.toast('请勾选要推入的商品', 'warning'); return; }
+  // 新活动名直接建档（否则 activityMeta 成孤儿，活动管理里看不到）
+  var dPre = Aoi.orders.ensure();
+  if (dPre.activities.indexOf(activity) < 0) dPre.activities.push(activity);
   var ok = 0;
   for (var i = 0; i < sel.length; i++) {
     var it = sel[i];
@@ -321,7 +324,13 @@ Aoi.catalog.pushSelected = async function () {
     });
     if (r) ok++;
   }
-  Aoi.toast('已推入 ' + ok + '/' + sel.length + ' 件到「' + activity + '」（重复型号自动跳过）', ok ? 'success' : 'warning');
+  if (ok) {
+    if (newEl) newEl.value = '';
+    var sel2 = document.getElementById('catPushActivity');
+    if (sel2) sel2.innerHTML = '';
+    Aoi.catalog.render(); // 重填活动下拉（含新活动）
+  }
+  Aoi.toast('已推入 ' + ok + '/' + sel.length + ' 件到「' + activity + '」（重复型号自动补全缺失信息）', ok ? 'success' : 'warning');
   if (ok && Aoi.orders.render) Aoi.orders.render();
 };
 

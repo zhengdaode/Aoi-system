@@ -916,15 +916,19 @@ Aoi.orders.addActivity = async function () {
 };
 
 Aoi.orders.removeActivity = async function (name) {
-  if (!(await Aoi.confirm('确定删除活动「' + name + '」？相关订单将变为「无活动」'))) return;
   var d = Aoi.orders.ensure();
+  var targets = d.orders.filter(function (o) { return o.activity === name; });
+  if (!(await Aoi.confirm('确定删除活动「' + name + '」？将同时删除其 ' + targets.length + ' 笔订单（30 秒内可撤销）'))) return;
   Aoi.undo.arm('删除活动', d);
   var affected = {};
-  d.orders.forEach(function (o) { if (o.activity === name && o.buyer) affected[o.buyer] = 1; });
+  targets.forEach(function (o) { if (o.buyer) affected[o.buyer] = 1; });
   d.activities = d.activities.filter(function (a) { return a !== name; });
   delete d.activityMeta[name];
   delete Aoi.orders.expandedActivities[name];
-  d.orders.forEach(function (o) { if (o.activity === name) o.activity = ''; });
+  if (d.limitPlans) delete d.limitPlans[name];
+  var removed = {};
+  targets.forEach(function (o) { removed[o.id] = 1; });
+  d.orders = d.orders.filter(function (o) { return !removed[o.id]; });
   // 级联清理：受影响买家若无未处理完订单，一并删除其 CN
   var purged = [];
   Object.keys(affected).forEach(function (buyer) {
@@ -1446,8 +1450,9 @@ Aoi.orders.missingProducts = function (activity) {
   return Object.keys(map).sort().map(function (k) { return map[k]; });
 };
 
-// 统一商品登记入口（活动管理展开区 / 信息录入页共用）：
-// type+model 去重；price/priceOrig/currency/limit 为可选扩展字段（v3.7.0，F9 目录推入同构，向后兼容）
+// 统一商品登记入口（活动管理展开区 / 信息录入页 / F9 目录推入共用）：
+// type+model 去重；price/priceOrig/currency/limit 为可选扩展字段（v3.7.0，向后兼容）；
+// 重复型号：补充缺失字段而非跳过（v3.8.0——目录重复推入时回填参考图/链接/价格/限购）
 Aoi.orders.registerProduct = async function (activity, input) {
   input = input || {};
   if (!activity) { Aoi.toast('请先选择活动', 'warning'); return null; }
@@ -1455,8 +1460,26 @@ Aoi.orders.registerProduct = async function (activity, input) {
   if (!type || !model) { Aoi.toast('请填写制品类型和型号', 'warning'); return null; }
   var d = Aoi.orders.ensure();
   var m = Aoi.orders.ensureActMeta(d, activity);
-  if (m.products.some(function (p) { return p.type === type && p.model === model; })) {
-    Aoi.toast('该活动已存在同型号商品「' + type + '-' + model + '」', 'warning'); return null;
+  var existing = null;
+  for (var i = 0; i < m.products.length; i++) {
+    if (m.products[i].type === type && m.products[i].model === model) { existing = m.products[i]; break; }
+  }
+  if (existing) {
+    var filled = [];
+    [['refImage', input.refImage], ['refUrl', input.refUrl], ['price', input.price],
+     ['priceOrig', input.priceOrig], ['currency', input.currency], ['limit', input.limit]].forEach(function (pair) {
+      if ((existing[pair[0]] == null || existing[pair[0]] === '') && pair[1] != null && pair[1] !== '') {
+        existing[pair[0]] = pair[1];
+        filled.push(pair[0]);
+      }
+    });
+    if (filled.length) {
+      await Aoi.saveTeamData(d);
+      Aoi.toast('已存在同型号商品「' + type + '-' + model + '」，补充了 ' + filled.join('/'), 'success');
+    } else {
+      Aoi.toast('已存在同型号商品「' + type + '-' + model + '」，信息完整无需补充', 'info');
+    }
+    return existing;
   }
   var p = { id: Aoi.genId(), type: type, model: model, refImage: input.refImage || '', refUrl: input.refUrl || '' };
   if (input.price != null && !isNaN(input.price)) p.price = input.price;

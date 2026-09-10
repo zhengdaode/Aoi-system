@@ -142,10 +142,15 @@ describe('草稿：去重合并 + 汇率换算', () => {
   });
   it('推入活动商品主档走 registerProduct 同构字段', async () => {
     const pushed = [];
+    const orig = aoi.orders.registerProduct;
     aoi.orders.registerProduct = async (activity, input) => { pushed.push({ activity, input }); return { id: 'x' }; };
-    aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960, limit: 2, url: 'https://x/p/1', image: 'https://img.example/1.jpg' }]);
-    doc.getElementById('catPushActivity').innerHTML = '<option value="测试活动" selected>测试活动</option>';
-    await aoi.catalog.pushSelected();
+    try {
+      aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960, limit: 2, url: 'https://x/p/1', image: 'https://img.example/1.jpg' }]);
+      doc.getElementById('catPushActivity').innerHTML = '<option value="测试活动" selected>测试活动</option>';
+      await aoi.catalog.pushSelected();
+    } finally {
+      aoi.orders.registerProduct = orig;
+    }
     expect(pushed).toHaveLength(1);
     expect(pushed[0].activity).toBe('测试活动');
     expect(pushed[0].input).toMatchObject({
@@ -190,6 +195,61 @@ describe('小程序模板导出', () => {
     delete win.XLSX;
     aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 }]);
     expect(() => aoi.catalog.exportTemplate(doc.createElement('button'))).not.toThrow();
+  });
+});
+
+describe('v3.8.0 修复：推入新活动 / 重复回填 / 删活动级联删订单', () => {
+  it('pushSelected 支持直接新建活动（写入 d.activities）', async () => {
+    const pushed = [];
+    const orig = aoi.orders.registerProduct;
+    aoi.orders.registerProduct = async (activity, input) => { pushed.push(activity); return { id: 'x' }; };
+    try {
+      aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 }]);
+      doc.getElementById('catNewActivity').value = '全新活动';
+      await aoi.catalog.pushSelected();
+    } finally {
+      aoi.orders.registerProduct = orig;
+    }
+    expect(aoi.state.data.activities).toContain('全新活动');
+    expect(pushed[0]).toBe('全新活动');
+    expect(doc.getElementById('catNewActivity').value).toBe('');
+  });
+  it('registerProduct 重复型号：补充缺失字段而非跳过', async () => {
+    aoi.state.data.activityMeta['测试活动'] = { products: [{ id: 'e1', type: '毛绒玩偶', model: '毛绒玩偶 皮卡丘', refImage: '', refUrl: '' }], buyers: [], trackings: [] };
+    const r = await aoi.orders.registerProduct('测试活动', {
+      type: '毛绒玩偶', model: '毛绒玩偶 皮卡丘', refUrl: 'https://x/p/1',
+      price: 210, priceOrig: 3960, currency: 'jpy', limit: 2
+    });
+    expect(r).toBeTruthy();
+    const list = aoi.state.data.activityMeta['测试活动'].products;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ refUrl: 'https://x/p/1', price: 210, priceOrig: 3960, currency: 'jpy', limit: 2 });
+  });
+  it('removeActivity：级联删除该活动的订单/商品主档/限购计划（可撤销）', async () => {
+    aoi.state.data = {
+      activities: ['万圣节', '其他活动'],
+      orders: [
+        { id: 'o1', activity: '万圣节', buyer: 'A', type: '毛绒', model: 'M1', count: 1 },
+        { id: 'o2', activity: '万圣节', buyer: 'B', type: '徽章', model: 'M2', count: 2 },
+        { id: 'o3', activity: '其他活动', buyer: 'A', type: '毛绒', model: 'M1', count: 1 },
+        { id: 'o4', activity: '其他活动', buyer: 'B', type: '徽章', model: 'M2', count: 1 }
+      ],
+      activityMeta: {
+        '万圣节': { products: [{ id: 'p1', type: '毛绒', model: 'M1' }], buyers: [], trackings: [] },
+        '其他活动': { products: [], buyers: [], trackings: [] }
+      },
+      limitPlans: { '万圣节': { items: [] } },
+      typeMeta: {}, batches: [], pcoItems: [], calc: { jpyRate: 0.048, jpyMarkup: 0.005 }
+    };
+    aoi.confirm = async () => true;
+    aoi.orders.renderActivities = () => {}; aoi.orders.refillDatalists = () => {};
+    aoi.orders.refillActivities = () => {}; aoi.orders.render = () => {};
+    await aoi.orders.removeActivity('万圣节');
+    expect(aoi.state.data.activities).toEqual(['其他活动']);
+    expect(aoi.state.data.orders.map(o => o.id)).toEqual(['o3', 'o4']);
+    expect(aoi.state.data.activityMeta['万圣节']).toBeUndefined();
+    expect(aoi.state.data.limitPlans['万圣节']).toBeUndefined();
+    expect(aoi.undo.snapshot).toBeTruthy();
   });
 });
 

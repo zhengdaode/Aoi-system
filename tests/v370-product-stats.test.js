@@ -79,18 +79,21 @@ describe('商品主档聚合（v3.7.0 S1）', () => {
   it('registerProduct 统一登记：去重 + 可选扩展字段', async () => {
     const p = await aoi.orders.registerProduct('CP27', {
       type: ' 色纸 ', model: 'S1', refImage: 'https://img.example/s1', refUrl: 'https://shop.example/s1',
-      price: 8.5, priceOrig: 220, currency: 'jpy', limit: 2
+      price: 8.5, priceOrig: 220, currency: 'jpy'
     });
     expect(p).not.toBeNull();
     expect(p.type).toBe('色纸');
     expect(p.price).toBe(8.5);
     expect(p.priceOrig).toBe(220);
     expect(p.currency).toBe('jpy');
-    expect(p.limit).toBe(2);
     expect(aoi.saveTeamData).toHaveBeenCalled();
-    // 同 type+model 拒绝重复
-    const dup = await aoi.orders.registerProduct('CP27', { type: '色纸', model: 'S1' });
-    expect(dup).toBeNull();
+    // 同 type+model：返回既有商品并回填缺失字段，不新建（v3.8.0 目录重复推入补全语义）
+    const dup = await aoi.orders.registerProduct('CP27', { type: '色纸', model: 'S1', limit: 3 });
+    expect(dup).not.toBeNull();
+    expect(dup.id).toBe(p.id);
+    expect(dup.limit).toBe(3);                    // 缺失字段被补充
+    expect(dup.price).toBe(8.5);                  // 已有字段不被覆盖
+    expect(aoi.state.data.activityMeta.CP27.products).toHaveLength(3);
     // 缺活动/缺型号被拒
     expect(await aoi.orders.registerProduct('', { type: '色纸', model: 'S2' })).toBeNull();
     expect(await aoi.orders.registerProduct('CP27', { type: '色纸' })).toBeNull();

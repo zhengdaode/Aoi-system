@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.9.3 (2026-09-10)
+
+> 导出链路可用性修复：实测「导出的 Excel 仍只有图片超链接」「list 点导出图片没反应」的根因治理。
+> 检索佐证：SheetJS CE 不支持内嵌图（[官方文档](https://docs.sheetjs.com/docs/api/write-options)、[issue #2330](https://github.com/SheetJS/sheetjs/issues/2330)）；
+> jsDelivr 自 2022-05 起大陆被 DNS 污染/SNI 阻断（[jsdelivr #18407](https://github.com/jsdelivr/jsdelivr/issues/18407)），实测本机对该域名返回**伪造证书**。
+
+### Fixed
+- **GitHub Pages / 本地环境的参考图内嵌与购买清单图真实可用（三处断点全打通）**：
+  ① 前端 `imageCandidates` 拉图候选链接入**已部署的 Edge `/fetch` 通道**（v3.5.2 起它只服务链接导入，图片拉取一直没接——Pages/本地唯一已部署代理路径）；
+  ② 线上 qq-relay Edge 函数 `/fetch` 白名单由硬编码单主机扩为共享四主机表（+PCO 主站/esaimg/img.cdn1.vip），经 Management API **重新部署生效**（version 6；实测 `GET /fetch/img.cdn1.vip/…` → 200 image/png + ACAO=\*，非白名单仍 403，原有 POST 机器人链路零改动）；
+  ③ 新增 `scripts/deploy-edge.js`（Management API 部署器，免 CLI/SSH；实测教训：bundle 接口 metadata 字段为 `entrypoint_path`，PATCH 通道只改配置不更新代码）
+- **端到端实测（本地 Chromium）**：真图上传图床 → 候选链（直连无 ACAO 失败 → /media-\* 本地 404 → **Edge 200**）→ 导出的 xlsx 内含 `xl/media` 图片文件、toast「参考图已全部内嵌」；购买清单图 `loadImage` 装载 369×800 真图。Edge 通道就绪后，ECS relay 重部署不再是内嵌功能的前置条件
+
+### Added
+- **第三方组件库本地自托管（`js/vendor/`）** —— supabase-js@2.116.0 / xlsx@0.18.5 / exceljs@4.4.0 / html2canvas@1.4.1 改同源加载，index.html 不再引用 cdn.jsdelivr.net（该 CDN 抽风曾致「导出图片没反应」、Excel 回退无图通道、甚至登录不可用）；升级方法见 `js/vendor/README.md`（经 npm registry 官方 tarball，不经 jsdelivr）
+- `Aoi.promiseTimeout` + 导出图片 30s 超时 + loading 遮罩——html2canvas 遇挂起外域图不再无限 pending（此前 toast 一闪即逝、观感"点了没反应"），超时/失败均显式 toast
+
+### Tests
+- 362 → 370 用例：Edge 候选链（配 relay 四通道 / 无 relay 三通道 / 非白名单仅直连）、index.html 去 jsDelivr + vendor 接线与文件存在性、promiseTimeout 三态；全套全绿
+
 ## v3.9.2 (2026-09-10)
 
 > **商品元数据「原名」+ 参考图转存自有图床 + 万圣节订单统一**（宝可梦万圣节活动数据治理）。**零 schema 改动**（`nameOrig` 为商品主档可选扩展字段）。

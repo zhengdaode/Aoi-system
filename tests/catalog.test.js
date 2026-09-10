@@ -354,3 +354,72 @@ describe('v3.9.4 ChatGPT 翻译工作流：parseAi + 草稿直入中文译名', 
     }
   });
 });
+
+describe('v3.9.5 两步导入：页面粘贴带图 + AI 表格按日文原名合并，图片不丢', () => {
+  beforeEach(() => {
+    aoi.toast = vi.fn();
+    aoi.catalog.draft = [];
+    aoi.state.data = { activities: [], orders: [], typeMeta: { '毛绒玩偶': {}, '亚克力立牌': {} }, pcoItems: [], calc: { jpyRate: 0.048, jpyMarkup: 0.005 } };
+  });
+
+  it('页面先、AI 后：合并为一行——图片/链接/价格/限购保留，AI 译名覆盖词典草稿并清掉未识别高亮', () => {
+    // ① 页面整页复制粘贴（富文本解析产物：带图/链接/价格/限购，名称走词典、含未识别片段）
+    aoi.catalog.addToDraft([{ jpName: 'メガシンカ ピカチュウ ぬいぐるみ', priceJpy: 4180, limit: 3, image: 'https://img.example/p1.jpg', url: 'https://x/p/1' }]);
+    expect(aoi.catalog.draft).toHaveLength(1);
+    expect(aoi.catalog.draft[0].unmatched.length).toBeGreaterThan(0);
+    expect(aoi.catalog.draft[0].name).toContain('メガシンカ'); // 词典兜底保留原文
+    // ② ChatGPT 表格粘贴 → 按「日文原名」对齐合并
+    const ai = aoi.catalog.parseAi(
+      '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |\n'
+      + '| --- | --- | --- | --- | --- | --- |\n'
+      + '| メガシンカ ピカチュウ ぬいぐるみ | 皮卡丘 毛绒玩偶 | 毛绒玩偶 | 4,180 | 3 | 11月8日発売 |'
+    );
+    const r = aoi.catalog.addToDraft(ai);
+    expect(r).toEqual({ added: 0, updated: 1 });
+    expect(aoi.catalog.draft).toHaveLength(1);
+    expect(aoi.catalog.draft[0]).toMatchObject({
+      jpName: 'メガシンカ ピカチュウ ぬいぐるみ',
+      name: '皮卡丘 毛绒玩偶',          // AI 译名覆盖词典草稿
+      type: '毛绒玩偶',
+      image: 'https://img.example/p1.jpg', // 图片/链接保留
+      url: 'https://x/p/1',
+      priceJpy: 4180, limit: 3,        // 价格/限购以页面数据为准，不被空值冲掉
+      unmatched: []                    // 名称已 AI 化，未识别高亮清除
+    });
+  });
+
+  it('AI 先、页面后：按日文原名对齐不产生重复行，图片/链接/限购回填，AI 译名不被词典冲掉', () => {
+    aoi.catalog.addToDraft([{ jpName: 'リザードン アクリルスタンド', name: '喷火龙 亚克力立牌', type: '亚克力立牌', priceJpy: 1650 }]);
+    aoi.catalog.addToDraft([{ jpName: 'リザードン アクリルスタンド', priceJpy: null, limit: 2, image: 'https://img.example/p2.jpg', url: 'https://x/p/2' }]);
+    expect(aoi.catalog.draft).toHaveLength(1);
+    expect(aoi.catalog.draft[0]).toMatchObject({
+      name: '喷火龙 亚克力立牌', type: '亚克力立牌',
+      image: 'https://img.example/p2.jpg', url: 'https://x/p/2', limit: 2
+    });
+  });
+
+  it('parseAiHtml：ChatGPT 页面渲染表格（text/html <table>）还原为管道行解析；无 AI 表头返回 null', () => {
+    const html = '<table><tr><th>日文原名</th><th>中文名</th><th>类型</th><th>日元价</th><th>限购</th><th>発売日</th></tr>'
+      + '<tr><td>イーブイ ぬいぐるみ</td><td>伊布 毛绒玩偶</td><td>毛绒玩偶</td><td>3,960</td><td>2</td><td></td></tr></table>';
+    const items = aoi.catalog.parseAiHtml(html);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ jpName: 'イーブイ ぬいぐるみ', name: '伊布 毛绒玩偶', type: '毛绒玩偶', priceJpy: 3960, limit: 2 });
+    expect(aoi.catalog.parseAiHtml('<div>没有表格</div>')).toBeNull();
+  });
+
+  it('importPaste：ChatGPT 渲染表格以富文本（<table>）粘进文本框也能按 AI 表格解析合并', () => {
+    aoi.catalog.addToDraft([{ jpName: 'イーブイ ぬいぐるみ', priceJpy: 3960, image: 'https://img.example/e1.jpg', url: 'https://x/p/3' }]);
+    doc.getElementById('catPaste').value = '<table><tr><th>日文原名</th><th>中文名</th><th>类型</th><th>日元价</th></tr>'
+      + '<tr><td>イーブイ ぬいぐるみ</td><td>伊布 毛绒玩偶</td><td>毛绒玩偶</td><td>3,960</td></tr></table>';
+    aoi.catalog.importPaste();
+    expect(aoi.catalog.draft).toHaveLength(1);
+    expect(aoi.catalog.draft[0]).toMatchObject({ name: '伊布 毛绒玩偶', image: 'https://img.example/e1.jpg' });
+    expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('AI 翻译表格'), 'success');
+  });
+
+  it('提示词修正：说明日文原名是对齐键、图片由页面粘贴带入（无需图片列）', () => {
+    expect(aoi.catalog.AI_PROMPT).toContain('按「日文原名」逐行合并');
+    expect(aoi.catalog.AI_PROMPT).toContain('不需要图片列');
+    expect(aoi.catalog.AI_PROMPT).toContain('一字不差');
+  });
+});

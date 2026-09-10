@@ -344,7 +344,7 @@
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">粘贴导入</h3>
-          <p class="text-sm text-gray-500 mb-2">推荐走 ChatGPT 翻译（v3.9.4）：① 在 PCO 商品页整页复制（Ctrl+A → Ctrl+C）；② 点「复制翻译提示词」，与复制的内容一并发给 ChatGPT；③ 把 ChatGPT 回复的表格原样粘贴到下方文本框，中文名/类型直接进草稿。直接粘贴整页复制内容（富文本/纯文本）仍可解析，名称走本地词典翻译。</p>
+          <p class="text-sm text-gray-500 mb-2">两步导入，商品图不丢（v3.9.5）：① 在 PCO 商品页整页复制（Ctrl+A → Ctrl+C）<b>先直接粘贴</b>到下方并解析——自动带出商品图 / 链接 / 价格 / 限购；② 点「复制翻译提示词」，连同整页复制的页面全文发给 ChatGPT，把回复的表格<b>再粘贴</b>到下方解析——系统按「日文原名」逐行合并，中文名 / 类型直接写入草稿，图片保留（两步先后顺序可互换；直接粘贴 ChatGPT 页面上的渲染表格也可以解析）。</p>
           <div class="flex flex-wrap items-center gap-2 mb-2">
             <button onclick="Aoi.catalog.copyPrompt()" class="px-4 py-2 bg-gray-800 text-white rounded text-sm hover:bg-gray-700">复制翻译提示词</button>
             <details class="min-w-0 flex-1">

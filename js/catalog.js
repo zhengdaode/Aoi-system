@@ -1,7 +1,7 @@
 // Aoi.catalog — PCO 商品目录（v3.7.0 F9）
-// 职责：粘贴解析（富文本/纯文本双入口，v3.9.4 起 ChatGPT 翻译表格优先——整页复制 →
-//   复制「翻译提示词」发给 ChatGPT → 回复表格贴回，translateName 词典翻译仍作无 AI 时兜底）→
-//   人工校对 →
+// 职责：粘贴解析（v3.9.5 两步工作流——①整页复制先直接粘贴：富文本商品卡带出商品图/链接/价格/
+//   限购；②ChatGPT 翻译表格后粘贴：按「日文原名」对齐合并，中文译名/类型直入草稿、图片保留，
+//   顺序无关；ChatGPT 渲染表格以 text/html 粘贴亦可解析）→ 人工校对 →
 //   ① 推入活动商品主档（复用 Aoi.orders.registerProduct，price/priceOrig/currency/limit 同构扩展字段）
 //   ② 按小程序模板导出 xlsx（说明 6 行 + 表头行 + 数据，模板结构见 docs/PLAN-F9-CATALOG-IMPORT.md §2）
 //   ③ 保存到 d.pcoItems 目录（aoi-pco-monitor 与本模块共读写的同一结构）
@@ -100,9 +100,10 @@ Aoi.catalog.AI_PROMPT = [
   '',
   '一、输出格式：Markdown 表格，列的顺序固定，不要增删列、不要输出表格以外的解释文字：',
   '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |',
+  '（不需要图片列——商品图片、链接由我们的系统在你把页面内容直接粘贴进导入框时自动带出；本表格之后会按「日文原名」逐行合并进已有商品，所以日文原名列是对齐关键，必须与页面文字完全一致。）',
   '',
   '二、各列要求：',
-  '1. 日文原名：照抄页面上的日文商品名，一字不差，不要翻译、不要改写、不要加序号。',
+  '1. 日文原名：照抄页面上的日文商品名，一字不差，不要翻译、不要改写、不要加序号（它用于与页面粘贴导入的商品行对齐合并）。',
   '2. 中文名：简体中文译名，作为我们系统的商品「型号」，遵循以下命名逻辑：',
   '   - 宝可梦物种名一律用最常见的官方中文译名，例如：ピカチュウ→皮卡丘、リザードン→喷火龙、イーブイ→伊布、カビゴン→卡比兽、ミュウツー→超梦、ゼニガメ→杰尼龟、フシギダネ→妙蛙种子。',
   '   - 地区形态加前缀：アローラ→阿罗拉、ガラル→伽勒尔、ヒスイ→洗翠、パルデア→帕底亚。',
@@ -201,6 +202,23 @@ Aoi.catalog.parseAi = function (text) {
     });
   });
   return items.length ? items : null;
+};
+
+// ChatGPT 页面上直接复制渲染表格（剪贴板带 text/html <table>）→ 还原为管道行交给 parseAi。
+// 表头无 AI 关键字（如普通页面布局表格）时 parseAi 返回 null，调用方继续回落商品卡解析。
+Aoi.catalog.parseAiHtml = function (html) {
+  var doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  var tables = doc.querySelectorAll('table');
+  if (!tables.length) return null;
+  var lines = [];
+  tables.forEach(function (tb) {
+    tb.querySelectorAll('tr').forEach(function (tr) {
+      var cells = [];
+      tr.querySelectorAll('th,td').forEach(function (td) { cells.push((td.textContent || '').trim()); });
+      if (cells.length >= 3) lines.push('| ' + cells.join(' | ') + ' |');
+    });
+  });
+  return lines.length ? Aoi.catalog.parseAi(lines.join('\n')) : null;
 };
 
 // —— 解析 ——
@@ -310,14 +328,17 @@ Aoi.catalog.addToDraft = function (items) {
     var tr = Aoi.catalog.translateName(it.jpName);
     // ChatGPT 工作流直带中文译名/类型：不再依赖词典，未识别高亮也无意义
     var hasCn = !!(it.name && String(it.name).trim());
+    var hasType = !!(it.type && String(it.type).trim());
     var cn = hasCn ? String(it.name).trim() : tr.cn;
-    var type = (it.type && String(it.type).trim())
+    var type = hasType
       ? (Aoi.catalog.matchTypeKey(String(it.type).trim()) || String(it.type).trim())
       : (tr.typeKey || tr.type);
     var existing = null;
     for (var i = 0; i < Aoi.catalog.draft.length; i++) {
       var x = Aoi.catalog.draft[i];
-      if ((it.url && x.url === it.url) || (!it.url && x.jpName === it.jpName)) { existing = x; break; }
+      // 对齐键（v3.9.5）：双方都有链接按链接；任一方缺链接（页面粘贴行有 url、ChatGPT 行没有，
+      // 或反之）按日文原名——「先贴页面带图、后贴 AI 表格补译名」两步导入互相合并不产生重复行
+      if ((it.url && x.url === it.url) || (x.jpName === it.jpName && (!it.url || !x.url))) { existing = x; break; }
     }
     if (existing) {
       updated++;
@@ -325,8 +346,10 @@ Aoi.catalog.addToDraft = function (items) {
         if ((existing[f] == null || existing[f] === '') && it[f] != null && it[f] !== '') existing[f] = it[f];
       });
       if (it.url && !existing.url) existing.url = it.url;
-      if (!existing.name && cn) existing.name = cn;
-      if (!existing.type && type) existing.type = type;
+      // AI 译名/类型覆盖词典草稿（词典结果只是建议）；清掉未识别高亮（名称已人工/AI 化）
+      if (hasCn) { existing.name = cn; existing.unmatched = []; }
+      else if (!existing.name && cn) existing.name = cn;
+      if (hasType || !existing.type) existing.type = type;
     } else {
       Aoi.catalog.draft.push({
         id: Aoi.genId(),
@@ -377,8 +400,10 @@ Aoi.catalog.importPaste = function () {
   var box = document.getElementById('catPaste');
   if (!box || !box.value.trim()) { Aoi.toast('请先粘贴内容（整页复制后粘贴至此）', 'warning'); return; }
   var v = box.value;
-  // v3.9.4：ChatGPT 翻译表格优先（Markdown/TSV）；否则回落富文本商品卡 / 纯文本「名称+价格円」
+  // v3.9.4/v3.9.5：ChatGPT 翻译表格优先（纯文本 Markdown/TSV → 渲染表格 HTML）；
+  // 否则回落富文本商品卡（带出商品图/链接/价格/限购）/ 纯文本「名称+价格円」
   var ai = Aoi.catalog.parseAi(v);
+  if (!ai && /<\s*table\b/i.test(v)) ai = Aoi.catalog.parseAiHtml(v);
   var items = ai || (/<\s*(img|a|div|span|table|li)\b/i.test(v) ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v));
   if (!items.length) {
     Aoi.toast('未解析出商品（AI 翻译表格、「名称 + 价格円」行或商品卡结构均可）', 'error');

@@ -1106,7 +1106,7 @@
         <div id="limResultBox" class="bg-white rounded-lg border border-gray-200 p-6 hidden">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">购买计划结果</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button>
+            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button><button onclick="Aoi.planExport.exportAll((document.getElementById('limActivity')||{}).value)" class="ml-2 px-3 py-1 border border-blue-300 text-blue-600 rounded text-xs hover:bg-blue-50" title="按当前活动已存购买计划，每个账号生成一张大字购买清单图片（账号名 + 商品图 + 数量）">导出购买清单图（每账号一张）</button>
           </div>
           <p id="limResultStat" class="text-sm text-gray-500 mb-2"></p>
           <div class="overflow-x-auto">
@@ -1216,6 +1216,7 @@
   <script src="js/stats.js"></script>
   <script src="js/image-upload.js"></script>
   <script src="js/summary-export.js"></script>
+  <script src="js/plan-export.js"></script>
   <script src="js/species-zh.js"></script>
   <script src="js/catalog-dict.js"></script>
   <script src="js/catalog.js"></script>

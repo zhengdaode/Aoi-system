@@ -39,6 +39,7 @@ const MODULES = [
   'js/stats.js',
   'js/image-upload.js',
   'js/summary-export.js',
+  'js/plan-export.js',
   'js/species-zh.js',
   'js/catalog-dict.js',
   'js/catalog.js'

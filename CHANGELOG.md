@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.9.0 (2026-09-10)
+
+> **购买清单图片导出 + 汇总表参考图内嵌**（限购计划 / 活动管理导出体验升级）。**零 schema 改动**。
+
+### Added
+- **购买清单图片导出（新模块 `js/plan-export.js`）**：限购计划结果区新增「导出购买清单图（每账号一张）」——按已存购买计划逐账号生成大字简洁 PNG（文件名「活动-账号N[-购买人]-购买清单」）：账号名大标题 + 每件商品一行，版式按行高占比 参考图 75% / 商品名称字号 10% / 数量字号 5%；名称显示原语言（按商品主档 refUrl 绝对化回查 `d.pcoItems.jpName`，型号含假名视为原文），无原文回落中文型号。缺失兜底：无参考图或图片拉取失败/跨域不可绘 → 灰底「图片缺失」占位块（只绘 CORS 干净图源——fetch 转 dataURL 或 crossOrigin 直载——避免画布污染令 toDataURL 失败）。购买计划结果表账号列同时新增逐账号「导出清单图」按钮（限购页与活动管理计划弹窗共用，点击事件委托 `data-plan-export`）。
+- **汇总表参考图内嵌 + 链接可点击（`js/summary-export.js`）**：exceljs 通道导出时并行拉取图床参考图转 base64 直接内嵌单元格（复刻《7.8汇总表》内嵌图意图；行高 90pt，图片浮动贴入覆盖链接文字），拉取失败/格式不支持（webp 等）自动保留「图片链接」超链接并在完成提示中报内嵌张数；SheetJS 回退通道为图片链接与商品跳转链接写入单元格 `.l` 超链接，点击直达；新增 `absUrl` 链接绝对化（`//` 协议相对、`/products/*` 回落 PCO 主站、缺协议补 https），目录推入的相对链接在两通道均可点击直达；新增 `cellAddr` / `collectImageCells` / `fetchImageBase64` 供渲染层与单测。
+
+### Tests
+- 主仓库 336+ → 357 例全绿：新增 `tests/v390-plan-export.test.js`（7 例：collect/displayName/fileBase/layout 纯函数 + renderPlan 按钮委托 + 导出兜底提示）与 `tests/v390-summary-embed.test.js`（9 例：absUrl/cellAddr/内嵌图描述符/collectImageCells/fetchImageBase64（stub fetch）/SheetJS `.l` 超链接）；`tests/helpers/aoi.js` MODULES 增补 `js/plan-export.js`（index.html script 顺序同步）。
+
 ## v3.7.0 (2026-09-10)
 
 > **管理端第二轮迭代**（[docs/PLAN-v3.7.0.md](docs/PLAN-v3.7.0.md)，2026-09-10 批准后按 S1–S9 实施）。

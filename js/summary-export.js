@@ -2,9 +2,11 @@
 // 复刻《7.8汇总表》结构：①「采购表」= 商品维度主表（名称/参考图/日元价/人民币价/需求总数/链接
 //   + 购买人×商品分摊矩阵【取限购计划】+ 购入多余部分行【取 plan.remaining】）；
 // ② 每活动一个「【活动名】汇总」= 结算矩阵（图片链接行/种类/人民币单价/每款总件数 + 每购买人一行数量矩阵 + 应付总额）。
-// 与参考文件的预期偏差：参考图行以内嵌 WPS DISPIMG 实现（24MB），浏览器端改为「图片链接」单元格。
+// 参考图（v3.9.0）：exceljs 通道拉取图床图片转 base64 直接内嵌（复刻参考文件的内嵌图意图），
+//   拉取失败/格式不支持（如 webp）→ 回落「图片链接」超链接单元格；SheetJS 回退通道仅超链接。
+// 商品跳转链接（链接行）：写入超链接单元格（exceljs hyperlink / SheetJS .l），点击直达；相对链接自动绝对化。
 // 架构：buildWorkbook(d, onlyActivity) 为纯函数（数据→描述符，供单测）；
-// 渲染层 exceljs（带样式，CDN）优先，SheetJS 回退（仅数值/合并/列宽）。
+// 渲染层 exceljs（带样式，CDN）优先，SheetJS 回退（仅数值/合并/列宽/超链接）。
 window.Aoi = window.Aoi || {};
 Aoi.exportSummary = function (onlyActivity) {
   var d = Aoi.orders.ensure();
@@ -21,8 +23,34 @@ Aoi.exportSummary = function (onlyActivity) {
 };
 
 // —— 纯函数：数据 → 工作簿描述符（单元测试覆盖此层）——
-// sheet = { name, rows: 二维稀疏数组(cell|null), merges: [{r1,c1,r2,c2}], cols: [{w}], freeze: {r,c} }
-// cell = { v: 值, s: { fill, color, bold, fmt, right, center, border, wrap, link } }
+// sheet = { name, rows: 二维稀疏数组(cell|null), merges: [{r1,c1,r2,c2}], cols: [{w}], freeze: {r,c}, rowHeights: {r: pt} }
+// cell = { v: 值, s: { fill, color, bold, fmt, right, center, border, wrap, link, img } }
+// s.link = 超链接（可点击直达）；s.img = 内嵌图片 URL（exceljs 通道拉图转 base64 浮动贴入）
+
+// 相对/协议相对链接绝对化：'//' → https:；'/xxx' → PCO 主站（目录推入来源）；
+// 缺协议但含主机名 → https://；data:image 原样；空 → 空串
+Aoi.exportSummary.absUrl = function (url) {
+  var s = String(url || '').trim();
+  if (!s) return '';
+  if (/^data:image\//i.test(s)) return s;
+  if (/^\/\//.test(s)) return 'https:' + s;
+  if (/^\//.test(s)) return 'https://www.pokemoncenter-online.com' + s;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s) && /\./.test(s)) return 'https://' + s;
+  return s;
+};
+
+// 0 基 (行,列) → Excel 地址（如 2,4 → 'E3'；供 SheetJS 回退通道写超链接）
+Aoi.exportSummary.cellAddr = function (r, c) {
+  var s = '';
+  c++;
+  while (c > 0) {
+    var m = (c - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    c = Math.floor((c - 1) / 26);
+  }
+  return s + (r + 1);
+};
+
 Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
   var R2 = function (n) { return Math.round(n * 100) / 100; };
 
@@ -41,7 +69,7 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
 
   // 稀疏行写入
   function Sheet(name) {
-    this.name = name; this.rows = []; this.merges = []; this.cols = []; this.freeze = null;
+    this.name = name; this.rows = []; this.merges = []; this.cols = []; this.freeze = null; this.rowHeights = {};
     this.put = function (r, col, cell) {
       while (this.rows.length <= r) this.rows.push([]);
       var row = this.rows[r];
@@ -49,6 +77,13 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
       row[col] = cell;
     };
     this.merge = function (r1, c1, r2, c2) { this.merges.push({ r1: r1, c1: c1, r2: r2, c2: c2 }); };
+  }
+
+  // 参考图单元格：内嵌图片 + 超链接双保险（内嵌失败时保留可点击链接），并把该行加高
+  function imgCell(sheet, r, col, url) {
+    var u = Aoi.exportSummary.absUrl(url);
+    sheet.put(r, col, c('图片链接', { link: u, img: u, color: '0000FF' }));
+    sheet.rowHeights[r] = 90;
   }
 
   // 活动筛选：有订单或登记商品的活动才导出
@@ -141,14 +176,14 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
       var colIdx = g.colStart + pi;
       var checker = pi % 2 === 0 ? '595959' : 'D9D9D9';
       pc.put(1, colIdx, c(p.model, { fill: checker, color: pi % 2 === 0 ? 'FFFFFF' : undefined, wrap: true, center: true }));
-      if (p.refImage) pc.put(2, colIdx, c('图片链接', { link: p.refImage, color: '0000FF' }));
+      if (p.refImage) imgCell(pc, 2, colIdx, p.refImage);
       if (p.origAvg != null && p.origCurrency === 'jpy') {
         pc.put(3, colIdx, c(p.origAvg, { right: true }));
         totalJpy += p.origAvg * p.qty;
       }
       if (p.priceAvg != null) pc.put(4, colIdx, c(p.priceAvg, { fmt: '0.00', right: true }));
       pc.put(5, colIdx, c(p.qty, { fill: pi % 2 === 0 ? 'FFCDD2' : 'E2EFDA', right: true }));
-      var link = p.refUrl || g.link;
+      var link = Aoi.exportSummary.absUrl(p.refUrl || g.link);
       if (link) pc.put(6, colIdx, c('点击链接', { link: link, color: '0000FF' }));
       totalQty += p.qty;
     });
@@ -227,9 +262,9 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
     // 标题
     sh.put(0, 0, c('【' + g.name + '】汇总', { fill: 'FFF2CC', bold: true, center: true, size: 16 }));
     sh.merge(0, 0, 0, 1 + n);
-    // 参考图链接行（r1）
+    // 参考图内嵌行（r1）
     g.products.forEach(function (p, pi) {
-      if (p.refImage) sh.put(1, 2 + pi, c('图片链接', { link: p.refImage, color: '0000FF' }));
+      if (p.refImage) imgCell(sh, 1, 2 + pi, p.refImage);
     });
     // 种类 / 单价 / 总数
     sh.put(2, 1, c('种类', FW(HEAD_FILLS[0].label)));
@@ -271,14 +306,56 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
   return { sheets: sheets, notes: anyRemaining };
 };
 
-// —— 渲染层 1：exceljs（带样式）——
+// —— 渲染层 1：exceljs（带样式 + 参考图内嵌）——
+
+// exceljs 支持的图片格式（其余如 webp 不内嵌，保留链接单元格）
+Aoi.exportSummary.IMG_EXT = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/gif': 'gif' };
+
+// 拉取图片转 base64 dataURL（供 wb.addImage）：data: URL 直通；http(s) fetch 后按
+// content-type 识别格式（非 png/jpeg/gif 返回 null）；任何失败返回 null（不阻断导出）
+Aoi.exportSummary.fetchImageBase64 = async function (url) {
+  var s = String(url || '').trim();
+  if (!s) return null;
+  var dm = s.match(/^data:image\/(png|jpe?g|gif)/i);
+  if (dm) return { dataUrl: s, ext: dm[1].toLowerCase() === 'jpg' ? 'jpeg' : dm[1].toLowerCase() };
+  try {
+    var res = await fetch(s, { redirect: 'follow' });
+    if (!res.ok) return null;
+    var ct = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
+    var ext = Aoi.exportSummary.IMG_EXT[ct];
+    if (!ext) return null;
+    var ab = await res.arrayBuffer();
+    if (!ab.byteLength) return null;
+    var u8 = new Uint8Array(ab), bin = '', CH = 8192;
+    for (var i = 0; i < u8.length; i += CH) bin += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    return { dataUrl: 'data:' + ct + ';base64,' + btoa(bin), ext: ext };
+  } catch (e) { return null; }
+};
+
+// 收集描述符中全部内嵌图片单元格 → [{ si, ri, ci, url }]（si: sheet 下标，0 基；供渲染层与单测）
+Aoi.exportSummary.collectImageCells = function (desc) {
+  var jobs = [];
+  (desc.sheets || []).forEach(function (sh, si) {
+    (sh.rows || []).forEach(function (row, ri) {
+      (row || []).forEach(function (cell, ci) {
+        if (cell && cell.s && cell.s.img) jobs.push({ si: si, ri: ri, ci: ci, url: cell.s.img });
+      });
+    });
+  });
+  return jobs;
+};
+
 Aoi.exportSummary.renderExcelJS = function (desc, base) {
   var wb = new window.ExcelJS.Workbook();
+  var wss = [];
   desc.sheets.forEach(function (sh) {
     var ws = wb.addWorksheet(sh.name);
     (sh.cols || []).forEach(function (cfg, i) { if (cfg && cfg.w) ws.getColumn(i + 1).width = cfg.w; });
     if (sh.freeze) ws.views = [{ state: 'frozen', xSplit: sh.freeze.c || 0, ySplit: sh.freeze.r || 0 }];
     (sh.merges || []).forEach(function (m) { ws.mergeCells(m.r1 + 1, m.c1 + 1, m.r2 + 1, m.c2 + 1); });
+    Object.keys(sh.rowHeights || {}).forEach(function (r) {
+      ws.getRow(parseInt(r, 10) + 1).height = sh.rowHeights[r];
+    });
     sh.rows.forEach(function (row, ri) {
       (row || []).forEach(function (cell, ci) {
         if (!cell) return;
@@ -295,16 +372,32 @@ Aoi.exportSummary.renderExcelJS = function (desc, base) {
         if (s.border) rc.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
     });
+    wss.push(ws);
   });
-  wb.xlsx.writeBuffer().then(function (buf) {
+  // 参考图内嵌：拉取成功 → addImage 浮动贴入单元格（覆盖「图片链接」文字）；
+  // 失败/格式不支持 → 保留链接单元格不动。并行拉取，单张失败不阻断。
+  var jobs = Aoi.exportSummary.collectImageCells(desc);
+  var failed = 0;
+  Promise.all(jobs.map(function (j) {
+    return Aoi.exportSummary.fetchImageBase64(j.url).then(function (im) {
+      if (!im) { failed++; return; }
+      var id = wb.addImage({ base64: im.dataUrl, extension: im.ext });
+      wss[j.si].addImage(id, { tl: { col: j.ci, row: j.ri }, ext: { width: 108, height: 82 } });
+    }).catch(function () { failed++; });
+  })).then(function () {
+    return wb.xlsx.writeBuffer();
+  }).then(function (buf) {
     Aoi.exportSummary.download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), base + '.xlsx');
-    Aoi.toast('已导出「' + base + '」.xlsx（含样式）', 'success');
+    var extra = jobs.length
+      ? (failed ? '（' + (jobs.length - failed) + '/' + jobs.length + ' 张参考图已内嵌，其余保留链接）' : '（参考图已全部内嵌）')
+      : '';
+    Aoi.toast('已导出「' + base + '」.xlsx（含样式）' + extra, 'success');
   }).catch(function (e) {
     Aoi.toast('汇总表导出失败：' + (e && e.message ? e.message : e), 'error');
   });
 };
 
-// —— 渲染层 2：SheetJS 回退（数值/合并/列宽，无样式）——
+// —— 渲染层 2：SheetJS 回退（数值/合并/列宽/超链接，无样式与内嵌图）——
 Aoi.exportSummary.renderPlain = function (desc, base) {
   var wb = XLSX.utils.book_new();
   desc.sheets.forEach(function (sh) {
@@ -312,6 +405,17 @@ Aoi.exportSummary.renderPlain = function (desc, base) {
       return row.map(function (cell) { return cell ? cell.v : null; });
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
+    // 超链接写在单元格 .l（图片链接/商品跳转链接保持可点击直达）
+    (sh.rows || []).forEach(function (row, ri) {
+      (row || []).forEach(function (cell, ci) {
+        if (cell && cell.s && cell.s.link) {
+          var addr = XLSX.utils.encode_cell({ r: ri, c: ci });
+          var c0 = ws[addr];
+          if (!c0) c0 = ws[addr] = { t: 's', v: String(cell.v == null ? '' : cell.v) };
+          c0.l = { Target: cell.s.link };
+        }
+      });
+    });
     ws['!merges'] = (sh.merges || []).map(function (m) {
       return { s: { r: m.r1, c: m.c1 }, e: { r: m.r2, c: m.c2 } };
     });
@@ -319,7 +423,7 @@ Aoi.exportSummary.renderPlain = function (desc, base) {
     XLSX.utils.book_append_sheet(wb, ws, sh.name);
   });
   XLSX.writeFile(wb, base + '.xlsx');
-  Aoi.toast('已导出「' + base + '」.xlsx', 'success');
+  Aoi.toast('已导出「' + base + '」.xlsx（参考图以链接形式保留，跳转链接可点击）', 'success');
 };
 
 Aoi.exportSummary.download = function (blob, filename) {

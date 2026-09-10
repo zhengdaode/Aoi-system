@@ -327,6 +327,29 @@ Aoi.exportSummary.imageCandidates = function (url) {
   return candidates;
 };
 
+// webp → JPEG dataURL（图床存储自动转 webp，而 exceljs 仅支持 png/jpeg/gif）：
+// 字节解出后经 <img>+canvas 解码重编码；非浏览器环境（无 canvas）返回 null 回落链接
+Aoi.exportSummary.webpToJpeg = function (blob) {
+  if (typeof document === 'undefined' || !document.createElement) return Promise.resolve(null);
+  var url = URL.createObjectURL(blob);
+  return new Promise(function (resolve) {
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        var ctx = c.getContext && c.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0);
+        resolve(c.toDataURL('image/jpeg', 0.85));
+      } catch (e) { resolve(null); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+};
+
 // 拉取图片转 base64 dataURL（供 wb.addImage）：data: URL 直通；http(s) 按候选通道
 // 依次 fetch，按 content-type 识别格式（非 png/jpeg/gif 视为该通道失败）；全部失败返回 null
 Aoi.exportSummary.fetchImageBase64 = async function (url) {
@@ -340,13 +363,17 @@ Aoi.exportSummary.fetchImageBase64 = async function (url) {
       var res = await fetch(candidates[i], { redirect: 'follow' });
       if (!res.ok) continue;
       var ct = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
-      var ext = Aoi.exportSummary.IMG_EXT[ct];
-      if (!ext) continue;
       var ab = await res.arrayBuffer();
       if (!ab.byteLength) continue;
       var u8 = new Uint8Array(ab), bin = '', CH = 8192;
       for (var j = 0; j < u8.length; j += CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j + CH));
-      return { dataUrl: 'data:' + ct + ';base64,' + btoa(bin), ext: ext };
+      var ext = Aoi.exportSummary.IMG_EXT[ct];
+      if (ext) return { dataUrl: 'data:' + ct + ';base64,' + btoa(bin), ext: ext };
+      if (ct === 'image/webp') {
+        // 图床存储格式：canvas 解码重编码为 JPEG（exceljs 不支持 webp）
+        var jpeg = await Aoi.exportSummary.webpToJpeg(new Blob([ab], { type: 'image/webp' }));
+        if (jpeg) return { dataUrl: jpeg, ext: 'jpeg' };
+      }
     } catch (e) { continue; }
   }
   return null;

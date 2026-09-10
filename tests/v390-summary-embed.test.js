@@ -114,6 +114,8 @@ describe('fetchImageBase64（v3.9.0）', () => {
       '/media-proxy/esaimg.cdn1.vip/images/a.png',
       '/media-relay/esaimg.cdn1.vip/images/a.png'
     ]);
+    // img.cdn1.vip：esaimg 上传后的实际存储主机（webp）
+    expect(aoi.exportSummary.imageCandidates('https://img.cdn1.vip/i/x.webp')).toContain('/media-proxy/img.cdn1.vip/i/x.webp');
     expect(aoi.exportSummary.imageCandidates('https://img.example/a.png')).toEqual(['https://img.example/a.png']);
   });
 

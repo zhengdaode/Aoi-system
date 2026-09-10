@@ -55,6 +55,19 @@
   status = 200
   force = true
 
+# img.cdn1.vip：esaimg 上传后的实际存储主机（返回 URL 形如 https://img.cdn1.vip/i/*.webp）
+[[redirects]]
+  from = "/media-proxy/img.cdn1.vip/*"
+  to = "https://img.cdn1.vip/*"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/media-relay/img.cdn1.vip/*"
+  to = "http://47.101.194.103:8080/fetch/img.cdn1.vip/*"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

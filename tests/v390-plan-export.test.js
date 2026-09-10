@@ -73,6 +73,13 @@ describe('plan-export 纯函数（v3.9.0）', () => {
     expect(aoi.planExport.displayName(d, {})).toBe('');
   });
 
+  it('displayName：商品主档 nameOrig（原名元数据）优先于目录回查与型号', () => {
+    aoi.state.data = fixture();
+    const d = aoi.state.data;
+    expect(aoi.planExport.displayName(d, { model: '皮卡丘', nameOrig: 'ピカチュウ バッジ改' })).toBe('ピカチュウ バッジ改');
+    expect(aoi.planExport.displayName(d, { model: 'L1', nameOrig: 'スイーツフィギュア' })).toBe('スイーツフィギュア');
+  });
+
   it('fileBase：文件名 = 活动-账号N[-购买人]-购买清单，非法字符替换', () => {
     const card = { index: 2, title: 'ks（ks@x.com）' };
     expect(aoi.planExport.fileBase('CP27', card)).toBe('CP27-账号2-ks（ks@x.com）-购买清单');

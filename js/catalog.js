@@ -315,6 +315,7 @@ Aoi.catalog.pushSelected = async function () {
     var r = await Aoi.orders.registerProduct(activity, {
       type: it.type || '未分类',
       model: it.name || it.jpName,
+      nameOrig: it.jpName || '',
       refImage: it.image || '',
       refUrl: it.url || '',
       price: cny != null ? cny : undefined,

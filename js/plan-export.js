@@ -16,10 +16,11 @@ Aoi.planExport.layout = function (h) {
 // 绘制参数
 Aoi.planExport.OPTS = { width: 760, headerH: 110, rowH: 300, pad: 40, titleFont: 44 };
 
-// 原语言名称解析：先按商品主档 refUrl（绝对化后）回查 PCO 目录的 jpName，再按
-// 目录名/译名与型号互查；型号本身含日文假名视为原文原样使用；都没有 → 型号（中文译名）兜底
+// 原语言名称解析：商品主档 nameOrig（原名元数据，v3.9.2）优先 → PCO 目录按 refUrl/
+// 名称互查 jpName → 型号本身含假名视为原文；都没有 → 型号（中文译名）兜底
 Aoi.planExport.displayName = function (d, p) {
   var model = (p && p.model) || '';
+  if (p && p.nameOrig) return p.nameOrig;
   var refUrl = Aoi.exportSummary.absUrl(p && p.refUrl);
   var items = (d && d.pcoItems) || [];
   for (var i = 0; i < items.length; i++) {

@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.9.2 (2026-09-10)
+
+> **商品元数据「原名」+ 参考图转存自有图床 + 万圣节订单统一**（宝可梦万圣节活动数据治理）。**零 schema 改动**（`nameOrig` 为商品主档可选扩展字段）。
+
+### Added
+- **商品元数据「原名」（原语言名称）**：商品主档新增可选 `nameOrig` 字段——`registerProduct` 建档/重复合并两路落库、目录「一键推入」自动携带 `pcoItems.jpName`、活动管理商品卡展示原名行；购买清单图片导出的名称解析链改为 **nameOrig 优先 → pcoItems 回查 → 型号兜底**。
+- **汇总表内嵌支持 webp**：esaimg 图床存储会自动把上传图转 webp（exceljs 不支持），`fetchImageBase64` 对 `image/webp` 经 `<img>`+canvas 解码重编码为 JPEG 后内嵌（非浏览器环境优雅回落链接）；`img.cdn1.vip`（esaimg 实际存储主机）加入 `PROXY_HOSTS`/netlify.toml/relay `FETCH_HOSTS` 三处白名单。
+
+### 数据治理（经 Management API SQL 直写，写前 `source=admin` 快照存档，B1 可恢复）
+- **宝可梦万圣节订单统一**：排谷表 12 件商品与 PCO 目录 40 件对比，11 件高置信匹配（中文名↔日文原名对应 + 价格比 0.90–0.92 一致佐证）——29 笔订单与限购计划 29 项的 type|model 键改写为 PCO 主档键，删除 11 件重复商品条目；「永恒冒险阿罗拉A4文件夹」无目录对应保留独立。
+- **参考图转存自有图床**：PCO 图片 CDN 对数据中心 IP/非浏览器指纹一律 403（volt-adc 反爬，relay/代理通道不可行），改用监控仓同款去自动化 Chromium 抓取 40 张原图字节上传 esaimg（自动转 webp，单张 180KB→35KB），40 件商品 `refImage` 重写为自有图床 URL——任何环境导出汇总表/购买清单均可内嵌，不再依赖 PCO 可达性。
+
+### Tests
+- 359 → 362 例全绿：displayName nameOrig 优先、registerProduct 建档/合并 nameOrig 落库、img.cdn1.vip 代理通道。
+
 ## v3.9.1 (2026-09-10)
 
 > **图片内嵌 CORS 根因修复 + 活动订单补充工具**。**零 schema 改动**。

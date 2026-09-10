@@ -1467,7 +1467,8 @@ Aoi.orders.registerProduct = async function (activity, input) {
   if (existing) {
     var filled = [];
     [['refImage', input.refImage], ['refUrl', input.refUrl], ['price', input.price],
-     ['priceOrig', input.priceOrig], ['currency', input.currency], ['limit', input.limit]].forEach(function (pair) {
+     ['priceOrig', input.priceOrig], ['currency', input.currency], ['limit', input.limit],
+     ['nameOrig', input.nameOrig]].forEach(function (pair) {
       if ((existing[pair[0]] == null || existing[pair[0]] === '') && pair[1] != null && pair[1] !== '') {
         existing[pair[0]] = pair[1];
         filled.push(pair[0]);
@@ -1486,6 +1487,7 @@ Aoi.orders.registerProduct = async function (activity, input) {
   if (input.priceOrig != null && !isNaN(input.priceOrig)) p.priceOrig = input.priceOrig;
   if (input.currency) p.currency = input.currency;
   if (input.limit != null && !isNaN(input.limit)) p.limit = input.limit;
+  if (input.nameOrig) p.nameOrig = String(input.nameOrig).trim();
   m.products.push(p);
   await Aoi.saveTeamData(d);
   return p;
@@ -1573,6 +1575,7 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<div class="flex-1 min-w-0">'
     + '<div class="text-xs text-gray-400">' + Aoi.escapeHtml(p.type) + '</div>'
     + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-full font-semibold text-sm bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
+    + (p.nameOrig ? '<div class="text-[11px] text-gray-400 mt-0.5" title="原语言名称">原名：' + Aoi.escapeHtml(p.nameOrig) + '</div>' : '')
     + '<div class="text-xs text-gray-500 mt-0.5">'
     + (s.priceAvg != null ? '参考单价 ¥' + s.priceAvg : '单价未登记')
     + (p.limit != null ? ' · 限购 ' + p.limit : '')

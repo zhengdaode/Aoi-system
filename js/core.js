@@ -188,6 +188,30 @@ Aoi.exportBaseName = function (btn) {
   return act.replace(/[\\/:*?"<>|]/g, '-') + '-' + name;
 };
 
+// Promise 超时包装（v3.9.3）：p 在 ms 内未落定则 reject——html2canvas 遇到挂起的
+// 外部图片会无限 pending（观感"点了没反应"），此处兜底转为显式错误
+Aoi.promiseTimeout = function (p, ms, msg) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      reject(new Error(msg || '操作超时'));
+    }, ms);
+    p.then(function (v) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(v);
+    }, function (e) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      reject(e);
+    });
+  });
+};
+
 // 导出表格为 PNG 图片（html2canvas）。按钮需带 data-table（表 id）+ data-name（文件名），
 // 可选 data-activity-from（活动下拉 id，文件名自动加活动名前缀）
 // 表内有勾选行时询问：仅导出选中行（确定）/ 导出整表（取消）
@@ -206,16 +230,23 @@ Aoi.exportImage = function (btn) {
   holder.appendChild(Aoi.exportFilterRows(table.cloneNode(true), onlySelected ? selected : []));
   document.body.appendChild(holder);
   var label = onlySelected ? name + '（选中 ' + selected.length + ' 行）' : name;
-  html2canvas(holder, { backgroundColor: '#ffffff', scale: 2 }).then(function (canvas) {
+  Aoi.showLoading('正在生成「' + label + '」图片…');
+  Aoi.promiseTimeout(
+    html2canvas(holder, { backgroundColor: '#ffffff', scale: 2 }),
+    30000,
+    '图片生成超时——表格内可能有加载缓慢或不可达的外部图片，请稍后重试或勾选更少行'
+  ).then(function (canvas) {
+    Aoi.hideLoading();
     document.body.removeChild(holder);
     var a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = label + '.png';
     a.click();
     Aoi.toast('已导出「' + label + '」图片', 'success');
-  }).catch(function () {
+  }).catch(function (e) {
+    Aoi.hideLoading();
     document.body.removeChild(holder);
-    Aoi.toast('导出图片失败', 'error');
+    Aoi.toast('导出图片失败：' + (e && e.message ? e.message : '未知错误'), 'error');
   });
 };
 

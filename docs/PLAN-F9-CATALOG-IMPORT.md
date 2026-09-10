@@ -136,3 +136,9 @@
 **后续实验与挂起记录（2026-09-10，负责人指示「暂时不考虑继续」）**：负责人批准放宽边界（授权对自动化浏览器做去自动化特征处理），已实现于 aoi-pco-monitor `monitor/grab.js`（`navigator.webdriver` 抹除 + 正常 Chrome UA + ja-JP/Asia-Tokyo 环境一致 + `CHANNEL` 可选系统真实浏览器）。追加三轮实验仍全部「Restricted access」：headless Chromium、`CHANNEL=msedge` headless、`CHANNEL=msedge` 有头。
 
 **负责人判断「我的网络环境可能存在问题」，监控整体挂起。** 待验证假设：当前网络直连 PCO 可能本身不可达（日常访问或经代理）。**恢复条件**：①先用日常浏览器直接打开 PCO 搜索页确认可达性；②可达后按上述选项 1–4 择载体，手动触发 grab.yml（或本地 `URLS=… node monitor/grab.js`，`CHANNEL=msedge` 走系统 Edge）即可复验——去自动化版抓取代码已就绪。挂起期间：手动粘贴导入链路不受影响（已上线可用）；monitor 仓 cron 保持暂停。
+
+**终局实测（2026-09-10，负责人关闭代理恢复直连）**：
+1. **粘贴解析根因修复**——负责人反馈粘贴零识别，真实 PCO DOM 解剖：商品卡=`li.product[data-pid]`、链接=`JAN.html`、价格=`385<small>円</small>`（textContent 连写无空格），此前 `/products/` 假设全错；主仓库新增策略 A1 + parseText 分隔符可空（commit `6770ebe`，tests 20 例，真实结构入 fixture）。
+2. **监控本地复验打通**——导航方式修正（质询跳转链上 `domcontentloaded` 卡死，改 `commit`+轮询商品网格）后，本地直连全流程成功：**40 件商品五要素（pid/名称/价格/图/链接）全部抓中**，去自动化版一次通过质询（wr. 约 1 秒放行）。
+3. **Actions 终测否决**——同一代码 `CHANNEL=chrome`（runner 预装 Chrome）仍「Restricted access」。**终局结论：PCO 按 IP 信誉拒绝数据中心段（Azure/阿里云同属），与浏览器形态无关；自动监控唯一可行载体 = 家庭/办公网络的本地机。** Actions/grab 保留为复验工具；cron 停用（除非未来换住宅出口）。
+4. **落地路径（待负责人确认）**：负责人 Windows 机用「任务计划程序」每 30–60 分钟跑 `grab.js`；M2 写库本地化——`SUPABASE_SERVICE_KEY` 放本地 `.env`（不入仓），无需 GitHub secrets；ECS 全程无需操作。

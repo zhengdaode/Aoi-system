@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.9.1 (2026-09-10)
+
+> **图片内嵌 CORS 根因修复 + 活动订单补充工具**。**零 schema 改动**。
+
+### Fixed
+- **汇总表参考图内嵌 / 购买清单图片在无 CORS 图床下全部回落链接（v3.9.0 遗留）**：根因=图床与商品图源站响应无任何 CORS 头（实测 esaimg 连 301 都无 ACAO），浏览器 `fetch` 字节必败 → 全部回落「图片链接」。修复=图片拉取改为候选通道链 **直连 → `/media-proxy`（Netlify 转发）→ `/media-relay`（ECS relay /fetch）**：新增 `Aoi.exportSummary.imageCandidates`，`fetchImageBase64`/`plan-export.loadImage` 按链依次尝试；`Aoi.import.PROXY_HOSTS` 白名单追加 `www.pokemoncenter-online.com`、`esaimg.cdn1.vip`；netlify.toml 同步新增两主机的 proxy/relay 重写（白名单制防开放代理）；`relay/relay.js` `FETCH_HOSTS` 同步追加（**需 ECS 重新部署 relay 后 relay 通道生效**，Netlify proxy 通道推送即生效）。exceljs 对 `data:` 前缀 base64 的处理经本地解包验证：`xl/media/image1.png` 字节与原图一致、drawing 正确挂载，内嵌机制本身无误。
+
+### Added
+- **活动订单补充工具（`scripts/supplement-activity.mjs`）**：排谷表 App 导出的「排表详情」xlsx 与库内指定活动订单对账补充——解析复用本站 `Aoi.import.parse`（jsdom 装载，字段口径与页内链接导入一致）；键=购买人|类型|型号，**新增缺失组合 / 件数对齐排表 / 单价只补缺（不一致仅报告）/ 库内多出保留并列出**；商品主档按 type|model 只补缺；默认 dry-run，`--apply` 写回（乐观锁 + 服务端自动存档 B1 快照可恢复）；admin token 经 `AOI_ADMIN_TOKEN` 环境变量（浏览器 F12 获取），与 `restore-activity.js` 同模式。devDependencies 新增 `xlsx`（脚本解析用）。
+
+### Tests
+- 357 → 359 例全绿：新增 imageCandidates 通道顺序、直连被拒后代理取回字节 2 例。
+
 ## v3.9.0 (2026-09-10)
 
 > **购买清单图片导出 + 汇总表参考图内嵌**（限购计划 / 活动管理导出体验升级）。**零 schema 改动**。

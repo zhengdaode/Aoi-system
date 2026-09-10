@@ -233,7 +233,9 @@ Aoi.import.detectIp = function (records) {
 //   ① /media-proxy —— Netlify 服务端转发（出海→境内，可能超时，公共代理 522 同因）
 //   ② /media-relay —— ECS relay /fetch 国内中转（需 ECS 部署含 /fetch 的 relay.js）
 //   ③ 直连 fetch  —— 仅当源站补 CORS 头或特殊容器环境时可用
-Aoi.import.PROXY_HOSTS = ['static.zwlhome.com'];
+// v3.9.1：白名单追加图床/商品图主机——汇总表参考图内嵌与购买清单图片绘制的浏览器
+// fetch 同样受无 CORS 头源站拦截（实测 esaimg 响应无任何 ACAO 头），经同源代理取回字节。
+Aoi.import.PROXY_HOSTS = ['static.zwlhome.com', 'www.pokemoncenter-online.com', 'esaimg.cdn1.vip'];
 
 // 直链 → 同源代理相对路径；非白名单主机 / file:// 页面返回 null（跳过代理通道）
 Aoi.import.mapProxyUrl = function (url) {

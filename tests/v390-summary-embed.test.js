@@ -106,6 +106,35 @@ describe('fetchImageBase64（v3.9.0）', () => {
     win.fetch = vi.fn(async () => { throw new Error('CORS'); });
     expect(await aoi.exportSummary.fetchImageBase64('https://img.example/x.png')).toBeNull();
   });
+
+  it('imageCandidates：白名单主机 直连→/media-proxy→/media-relay，非白名单仅直连', () => {
+    const c1 = aoi.exportSummary.imageCandidates('https://esaimg.cdn1.vip/images/a.png');
+    expect(c1).toEqual([
+      'https://esaimg.cdn1.vip/images/a.png',
+      '/media-proxy/esaimg.cdn1.vip/images/a.png',
+      '/media-relay/esaimg.cdn1.vip/images/a.png'
+    ]);
+    expect(aoi.exportSummary.imageCandidates('https://img.example/a.png')).toEqual(['https://img.example/a.png']);
+  });
+
+  it('直连被 CORS 拒后经同源代理通道取回字节（v3.9.1 图床无 ACAO 场景）', async () => {
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    win.fetch = vi.fn(async (u) => {
+      if (String(u).indexOf('/media-proxy/') === 0) {
+        return { ok: true, headers: { get: () => 'image/png' }, arrayBuffer: async () => bytes.buffer };
+      }
+      throw new TypeError('Failed to fetch'); // 直连无 CORS 头源站的典型报错
+    });
+    const r = await aoi.exportSummary.fetchImageBase64('https://esaimg.cdn1.vip/images/a.png');
+    expect(r).not.toBeNull();
+    expect(r.ext).toBe('png');
+    expect(r.dataUrl.startsWith('data:image/png;base64,')).toBe(true);
+    // 通道顺序：先直连、失败后走 /media-proxy
+    expect(win.fetch.mock.calls.map((c) => c[0])).toEqual([
+      'https://esaimg.cdn1.vip/images/a.png',
+      '/media-proxy/esaimg.cdn1.vip/images/a.png'
+    ]);
+  });
 });
 
 describe('SheetJS 回退通道超链接（v3.9.0 renderPlain）', () => {

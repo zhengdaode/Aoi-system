@@ -133,8 +133,9 @@ Aoi.planExport.drawCard = function (canvas, card, images) {
 };
 
 // —— 图片装载：只往画布画「干净」图源（否则 toDataURL 会因画布污染抛错）——
-// http(s)：fetch → blob → dataURL 优先；fetch 受限（无 CORS 等）回退 crossOrigin 直载；
-// 两路都失败 → null（绘制占位块）。data: 直载。
+// http(s)：按候选通道依次 fetch 转 dataURL（直连 → /media-proxy → /media-relay，
+// 白名单见 Aoi.import.PROXY_HOSTS，覆盖无 CORS 头的图床）；全失败回退 crossOrigin 直载；
+// 仍失败 → null（绘制占位块）。data: 直载。
 Aoi.planExport.loadImage = function (url) {
   var s = String(url || '');
   if (!s) return Promise.resolve(null);
@@ -147,23 +148,34 @@ Aoi.planExport.loadImage = function (url) {
     });
   };
   if (/^data:image\//i.test(s)) return loadSrc(s);
-  return fetch(s, { redirect: 'follow' }).then(function (res) {
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.blob();
-  }).then(function (blob) {
-    return new Promise(function (resolve, reject) {
-      var fr = new FileReader();
-      fr.onload = function () { resolve(String(fr.result)); };
-      fr.onerror = function () { reject(new Error('读取失败')); };
-      fr.readAsDataURL(blob);
+  var candidates = Aoi.exportSummary.imageCandidates(s);
+  var attempt = function (i) {
+    if (i >= candidates.length) return Promise.resolve(null);
+    return fetch(candidates[i], { redirect: 'follow' }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(String(fr.result)); };
+        fr.onerror = function () { reject(new Error('读取失败')); };
+        fr.readAsDataURL(blob);
+      });
+    }).then(loadSrc).then(function (img) {
+      return img || attempt(i + 1);
+    }).catch(function () {
+      return attempt(i + 1);
     });
-  }).then(loadSrc).catch(function () {
-    var img = new Image();
-    img.crossOrigin = 'anonymous';
+  };
+  return attempt(0).then(function (img) {
+    if (img) return img;
+    // 全通道失败 → crossOrigin 直载兜底（源站带 ACAO 但 fetch 受限的场景）
+    var img2 = new Image();
+    img2.crossOrigin = 'anonymous';
     return new Promise(function (resolve) {
-      img.onload = function () { resolve(img); };
-      img.onerror = function () { resolve(null); };
-      img.src = s;
+      img2.onload = function () { resolve(img2); };
+      img2.onerror = function () { resolve(null); };
+      img2.src = s;
     });
   });
 };

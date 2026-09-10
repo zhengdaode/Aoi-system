@@ -311,25 +311,45 @@ Aoi.exportSummary.buildWorkbook = function (d, onlyActivity) {
 // exceljs 支持的图片格式（其余如 webp 不内嵌，保留链接单元格）
 Aoi.exportSummary.IMG_EXT = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/gif': 'gif' };
 
-// 拉取图片转 base64 dataURL（供 wb.addImage）：data: URL 直通；http(s) fetch 后按
-// content-type 识别格式（非 png/jpeg/gif 返回 null）；任何失败返回 null（不阻断导出）
+// 拉取图片的候选通道（v3.9.1）：白名单主机直连失败（无 CORS 头源站，实测 esaimg 图床）
+// 后回落 /media-proxy（Netlify 转发）→ /media-relay（ECS relay /fetch），复用链接导入同组白名单
+Aoi.exportSummary.imageCandidates = function (url) {
+  var s = String(url || '').trim();
+  var candidates = [s];
+  if (Aoi.import && Aoi.import.mapProxyUrl) {
+    var proxied = Aoi.import.mapProxyUrl(s);
+    if (proxied) {
+      candidates.push(proxied);
+      var relay = Aoi.import.mapRelayUrl(s);
+      if (relay) candidates.push(relay);
+    }
+  }
+  return candidates;
+};
+
+// 拉取图片转 base64 dataURL（供 wb.addImage）：data: URL 直通；http(s) 按候选通道
+// 依次 fetch，按 content-type 识别格式（非 png/jpeg/gif 视为该通道失败）；全部失败返回 null
 Aoi.exportSummary.fetchImageBase64 = async function (url) {
   var s = String(url || '').trim();
   if (!s) return null;
   var dm = s.match(/^data:image\/(png|jpe?g|gif)/i);
   if (dm) return { dataUrl: s, ext: dm[1].toLowerCase() === 'jpg' ? 'jpeg' : dm[1].toLowerCase() };
-  try {
-    var res = await fetch(s, { redirect: 'follow' });
-    if (!res.ok) return null;
-    var ct = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
-    var ext = Aoi.exportSummary.IMG_EXT[ct];
-    if (!ext) return null;
-    var ab = await res.arrayBuffer();
-    if (!ab.byteLength) return null;
-    var u8 = new Uint8Array(ab), bin = '', CH = 8192;
-    for (var i = 0; i < u8.length; i += CH) bin += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
-    return { dataUrl: 'data:' + ct + ';base64,' + btoa(bin), ext: ext };
-  } catch (e) { return null; }
+  var candidates = Aoi.exportSummary.imageCandidates(s);
+  for (var i = 0; i < candidates.length; i++) {
+    try {
+      var res = await fetch(candidates[i], { redirect: 'follow' });
+      if (!res.ok) continue;
+      var ct = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
+      var ext = Aoi.exportSummary.IMG_EXT[ct];
+      if (!ext) continue;
+      var ab = await res.arrayBuffer();
+      if (!ab.byteLength) continue;
+      var u8 = new Uint8Array(ab), bin = '', CH = 8192;
+      for (var j = 0; j < u8.length; j += CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j + CH));
+      return { dataUrl: 'data:' + ct + ';base64,' + btoa(bin), ext: ext };
+    } catch (e) { continue; }
+  }
+  return null;
 };
 
 // 收集描述符中全部内嵌图片单元格 → [{ si, ri, ci, url }]（si: sheet 下标，0 基；供渲染层与单测）

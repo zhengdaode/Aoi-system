@@ -88,7 +88,9 @@ function throttledNapcat(payload) {
 }
 
 // 表格直链拉取：内存中转（文件仅几 KB～MB 级），白名单外的 host 一律 403
-const FETCH_HOSTS = ['static.zwlhome.com'];
+// v3.9.1：追加图床/商品图主机（汇总表参考图内嵌、购买清单图片绘制的图片中转；
+// 需 ECS 重新部署本文件后生效）
+const FETCH_HOSTS = ['static.zwlhome.com', 'www.pokemoncenter-online.com', 'esaimg.cdn1.vip'];
 const FETCH_MAX = 10 * 1024 * 1024;
 async function proxyFetch(res, target) {
   const ctrl = new AbortController();

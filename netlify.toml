@@ -28,6 +28,33 @@
   status = 200
   force = true
 
+# 图片代理（v3.9.1）：汇总表参考图内嵌 / 购买清单图片绘制需在浏览器 fetch 图片字节，
+# 图床与商品图源站无 CORS 头（实测 esaimg 响应无任何 ACAO）时直连必败，经同源代理取回。
+# 白名单制（每主机一组 from/to），避免开放代理。必须放在 SPA catch-all 之前。
+[[redirects]]
+  from = "/media-proxy/www.pokemoncenter-online.com/*"
+  to = "https://www.pokemoncenter-online.com/*"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/media-relay/www.pokemoncenter-online.com/*"
+  to = "http://47.101.194.103:8080/fetch/www.pokemoncenter-online.com/*"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/media-proxy/esaimg.cdn1.vip/*"
+  to = "https://esaimg.cdn1.vip/*"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/media-relay/esaimg.cdn1.vip/*"
+  to = "http://47.101.194.103:8080/fetch/esaimg.cdn1.vip/*"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

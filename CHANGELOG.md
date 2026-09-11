@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.12.0 (2026-09-12)
+
+> **B3 审计日志 + B4 推送链路加固 + B5 迁移机制**（PLAN-NEXT 批准方向的最后一批治理）。
+> schema 已随提交经 sb.js 应用线上 + 逐分支探针；Edge Function v7 已部署并探针验证。
+
+### ⚠️ 修正 v3.10.0 缺陷（线上探针发现）
+- **v3.10.0 的防爆破锁定从未生效**：失败计数是普通 UPDATE，而 RPC 抛错会回滚整个事务——计数永远归零。v3.12.0 改为基线预建序列 `admin_lastfail` 记录最近失败时刻（`setval` 非事务性、回滚免疫），失败后 5 秒内登录直接拒绝（全局冷却，单团部署可接受）——把爆破速率压到 0.2 次/秒、叠加 bcrypt 慢哈希。线上三连探针：失败 → 5 秒内再试被拒 → 序列留存失败时刻 ✓。`failed_attempts`/`locked_until` 列退役删除。同原理修正：登录**失败不留审计行**（insert 随 raise 回滚，属不可为），仅成功操作留痕。
+
+### Added（B3 审计日志——多管理员操作可追责）
+- `admin_audit_log` 表（RLS 无策略）+ `admin_audit` 写入辅助；接线 admin_login / logout / bootstrap / admin_create / admin_delete / admin_reset_password / admin_change_password / admin_regenerate_member_key / admin_rename_team / admin_save_team_data（只记订单条数+体积摘要，不落全文）。
+- `admin_list_audit_log` / `admin_clear_audit_log`（仅 super，90 天保留，登录时顺带清理）。
+- 设置页新增「审计记录」卡（仅 super 可见）：最近 50 条操作 + 手动清理。
+
+### Added（B4 推送链路加固收尾）
+- **Edge Function**：UPSTREAM 移入 function env（`RELAY_UPSTREAM`，经 `deploy-edge.js --secret` 注入，仓库零硬编码 IP）；POST body ≤64KB、/fetch 响应 ≤10MB；/fetch 重定向改 manual 逐跳校验白名单（堵白名单主机 302 → 任意目标的 SSRF 跳板）。已部署 v7 并探针：POST 无凭证透传 relay 401 ×3 稳定 ✓、非白名单 403 ✓。
+- **relay.js**（随 ECS 重部署批次生效）：入站 body ≤64KB + 单条消息 ≤4500 字符 + 每 token 60 次/分限频；GET /audit 推送审计端点（admin 鉴权，内存环形 200 条）；/fetch 同款重定向逐跳校验；注释 pm2 → systemd 修正。
+- **CSP 收紧**（netlify.toml，推送即生效）：connect-src 去掉裸 `https:` 改白名单（supabase + 四个直连图源/表格主机）；script-src/style-src 移除已无引用的 cdn.jsdelivr.net。
+
+### Added（B5 迁移机制）
+- `schema_migrations` 表 + `scripts/sb.js --migrate`（按序执行 `supabase/migrations/` 未应用脚本并登记）；sb.js 对象单元格打印 `[object Object]` 修复（STATUS 列名待办）；`supabase/migrations/README.md` 固化「随提交应用线上 + 逐分支探针」纪律。
+
+### Tests
+- 406 → 415 例全绿：新增 `tests/v312-governance.test.js` 9 例（审计表/RPC 接线/仅 super 守护、auditMgmt 前端挂钩、Edge env 化与上限守护、relay 加固守护、CSP 白名单守护、B5 机制守护）；v310 守护同步序列节流新机制。
+
 ## v3.11.0 (2026-09-12)
 
 > **数据信任 + B6 治理**——管理端保存失败从「静默丢失」变为强提示；通知/blob 治理（B6）落地；

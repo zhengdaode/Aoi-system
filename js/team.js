@@ -21,7 +21,50 @@ Aoi.renderSettings = function () {
   if (amSection) amSection.classList.toggle('hidden', !isSuper);
   if (isSuper) Aoi.adminMgmt.render();
 
+  var auditSection = document.getElementById('auditSection');
+  if (auditSection) auditSection.classList.toggle('hidden', !isSuper);
+  if (isSuper && Aoi.auditMgmt) Aoi.auditMgmt.render(); // v3.12.0 B3：审计记录（仅 super）
+
   if (Aoi.backup) Aoi.backup.renderHistory(); // v3.4.0：服务端历史快照列表（异步，失败在列表内提示）
+};
+
+// —— 审计记录（v3.12.0 B3，仅 super，走 admin_list/clear_audit_log RPC）——
+Aoi.auditMgmt = {};
+
+Aoi.auditMgmt.render = async function () {
+  var el = document.getElementById('auditList');
+  if (!el) return;
+  if (Aoi.state.user && Aoi.state.user.isDebug) {
+    el.innerHTML = '<li class="text-sm text-gray-400 py-1">调试模式数据存本机，无服务端审计</li>';
+    return;
+  }
+  el.innerHTML = '<li class="text-sm text-gray-400 py-1">加载中…</li>';
+  try {
+    var s = Aoi.adminLoadSession() || {};
+    var r = await Aoi.db.rpc('admin_list_audit_log', { p_token: s.token, p_limit: 50 });
+    if (r.error) throw new Error(Aoi.explainRpcError(r.error.message, '审计读取') || r.error.message);
+    var list = r.data || [];
+    el.innerHTML = list.length ? list.map(function (a) {
+      var when = String(a.at || '').slice(0, 19).replace('T', ' ');
+      var detail = a.detail ? Object.keys(a.detail).map(function (k) {
+        return k + '=' + String(a.detail[k]);
+      }).join(' ') : '';
+      return '<li class="border-b border-gray-100 py-1 text-sm">'
+        + '<span class="break-all">' + Aoi.escapeHtml(when + ' · ' + (a.username || '—') + ' · ' + a.action + (detail ? ' · ' + detail : '')) + '</span></li>';
+    }).join('') : '<li class="text-sm text-gray-400 py-1">暂无审计记录（登录 / 保存等操作会自动留痕）</li>';
+  } catch (e) {
+    el.innerHTML = '<li class="text-sm text-red-500 py-1">' + Aoi.escapeHtml(e.message) + '</li>';
+  }
+};
+
+Aoi.auditMgmt.clear = async function () {
+  var ok = await Aoi.confirm('删除 90 天前的审计记录？', { danger: true, okText: '清理' });
+  if (!ok) return;
+  var s = Aoi.adminLoadSession() || {};
+  var r = await Aoi.db.rpc('admin_clear_audit_log', { p_token: s.token });
+  if (r.error) { Aoi.toast(Aoi.explainRpcError(r.error.message, '审计清理') || r.error.message, 'error'); return; }
+  Aoi.toast('已清理 ' + r.data + ' 条', 'success');
+  Aoi.auditMgmt.render();
 };
 
 // —— 管理员账号管理（仅 super，走 admin_* RPC）——

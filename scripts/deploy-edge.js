@@ -6,6 +6,7 @@
 //
 // 用法：
 //   node scripts/deploy-edge.js <slug> <源文件路径>      # 如 qq-relay supabase/functions/qq-relay/index.ts
+//   node scripts/deploy-edge.js --secret <NAME>=<VALUE>  # 仅设置 function env（Supabase secrets）
 //
 // 准备（一次性）：SUPABASE_ACCESS_TOKEN 写入仓库根目录 .env（同 sb.js；该文件已被 .gitignore 忽略）；
 // 项目 ref 自动从 js/config.js 的 SUPABASE_URL 提取，也可显式指定 SUPABASE_PROJECT_REF。
@@ -40,14 +41,29 @@ function projectRef() {
 }
 
 async function main() {
-  const [slug, file] = process.argv.slice(2);
+  const args = process.argv.slice(2);
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   const ref = projectRef();
-  if (!slug || !file) { console.error('用法: node scripts/deploy-edge.js <slug> <源文件路径>'); process.exit(1); }
   if (!token) { console.error('缺少 SUPABASE_ACCESS_TOKEN（写入 .env）'); process.exit(1); }
   if (!ref) { console.error('无法确定项目 ref（检查 js/config.js 或设 SUPABASE_PROJECT_REF）'); process.exit(1); }
-  const content = fs.readFileSync(file, 'utf8');
   const api = 'https://api.supabase.com/v1/projects/' + ref;
+
+  // --secret NAME=VALUE：设置 function 环境变量（qq-relay 的 RELAY_UPSTREAM 等）后退出
+  if (args[0] === '--secret') {
+    const m = String(args[1] || '').match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (!m) { console.error('用法: --secret NAME=VALUE'); process.exit(1); }
+    const r = await fetch(api + '/secrets', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ name: m[1], value: m[2] }]),
+    });
+    console.log('secret ' + m[1] + ':', r.status, await r.text());
+    return;
+  }
+
+  const [slug, file] = args;
+  if (!slug || !file) { console.error('用法: node scripts/deploy-edge.js <slug> <源文件路径> | --secret NAME=VALUE'); process.exit(1); }
+  const content = fs.readFileSync(file, 'utf8');
   const attempts = [];
 
   // 通道一：bundle 部署（supabase CLI 同款接口）

@@ -142,13 +142,14 @@ describe('supabase-schema.sql v3.10.0 守护（p_cn 后门 / 登录防爆破 / v
     expect(schema).toMatch(/raise exception '圈名缺失或不合法[^']*'/);
   });
 
-  it('admin_login 防爆破：失败计数 + 锁定 + 成功清零', () => {
-    expect(schema).toMatch(/alter table admins add column if not exists failed_attempts int not null default 0/);
-    expect(schema).toMatch(/alter table admins add column if not exists locked_until timestamptz/);
-    expect(schema).toMatch(/失败次数过多，账号已临时锁定/);
-    expect(schema).toMatch(/failed_attempts \+ 1 >= 5/);
-    expect(schema).toMatch(/now\(\) \+ interval '15 minutes'/);
-    expect(schema).toMatch(/update admins set failed_attempts = 0, locked_until = null/);
+  it('admin_login 防爆破：序列节流（v3.12.0 修正——v3.10.0 的计数 UPDATE 随 raise 回滚从未生效）', () => {
+    // 序列必须在基线中预先存在（同事务 create 的序列会随回滚消失，setval 也就无从留存）
+    expect(schema).toMatch(/create sequence if not exists admin_lastfail;/);
+    expect(schema).toMatch(/尝试过于频繁，请稍后再试/);
+    expect(schema).toMatch(/setval\('admin_lastfail', extract\(epoch from now\(\)\)::bigint, true\)/);
+    // 事务回滚缺陷防回潮：计数列不得复活（drop 语句与注释提及不受限）
+    expect(schema).not.toMatch(/add column if not exists failed_attempts/);
+    expect(schema).not.toMatch(/add column if not exists locked_until/);
   });
 
   it('admin_bootstrap：首次初始化自动建团（v2 create_my_team 归档后的补位）', () => {

@@ -66,20 +66,50 @@ async function runSql(sql) {
   return body;
 }
 
+function cellStr(v) {
+  if (v == null) return 'NULL';
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+  return String(v);
+}
+
 function printRows(rows) {
   if (!Array.isArray(rows)) { console.log(JSON.stringify(rows, null, 2)); return; }
   if (!rows.length) { console.log('(0 rows)'); return; }
   const cols = Object.keys(rows[0]);
   const w = cols.map(function (c) {
-    return Math.max(c.length, ...rows.map(function (r) { return String(r[c] == null ? 'NULL' : r[c]).length; }));
+    return Math.max(c.length, ...rows.map(function (r) { return cellStr(r[c]).length; }));
   });
-  const line = function (cells) { return cells.map(function (c, i) { return String(c).padEnd(w[i]); }).join(' | '); };
+  const line = function (cells) { return cells.map(function (c, i) { return c.padEnd(w[i]); }).join(' | '); };
   console.log(line(cols));
   console.log(w.map(function (n) { return '-'.repeat(n); }).join('-+-'));
   rows.forEach(function (r) {
-    console.log(line(cols.map(function (c) { return r[c] == null ? 'NULL' : r[c]; })));
+    console.log(line(cols.map(function (c) { return cellStr(r[c]); })));
   });
   console.log('(' + rows.length + ' rows)');
+}
+
+// —— v3.12.0 B5：迁移机制——按文件名序执行 supabase/migrations/ 中未应用的 *.sql，
+//    应用后在 schema_migrations 登记版本。全量基线（supabase-schema.sql）保持可独立重跑。
+async function migrate() {
+  const dir = path.join(__dirname, '..', 'supabase', 'migrations');
+  let files = [];
+  try {
+    files = fs.readdirSync(dir).filter(function (f) { return f.endsWith('.sql'); }).sort();
+  } catch (e) { console.log('[sb] 无 supabase/migrations 目录，无可执行迁移'); return; }
+  const applied = await runSql('select version from schema_migrations');
+  const done = new Set((applied || []).map(function (r) { return r.version; }));
+  let ran = 0;
+  for (const f of files) {
+    if (done.has(f)) { console.log('[sb] 已应用，跳过: ' + f); continue; }
+    console.log('[sb] 应用迁移: ' + f);
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+    await runSql(sql);
+    await runSql('insert into schema_migrations (version) values (\'' + f.replace(/'/g, "''") + '\')');
+    ran++;
+  }
+  console.log('[sb] 迁移完成：本次执行 ' + ran + ' 个，共 ' + files.length + ' 个脚本');
 }
 
 async function main() {
@@ -88,6 +118,7 @@ async function main() {
     const rows = await runSql('select current_database() as db, now() as now');
     console.log('[sb] 连接成功'); printRows(rows); return;
   }
+  if (args[0] === '--migrate') { await migrate(); return; }
   let sql;
   if (args[0] === '-f') {
     if (!args[1]) { console.error('[sb] 用法: node scripts/sb.js -f <file.sql>'); process.exit(2); }
@@ -96,7 +127,7 @@ async function main() {
   } else if (args[0]) {
     sql = args.join(' ');
   } else {
-    console.error('用法:\n  node scripts/sb.js "select 1"\n  node scripts/sb.js -f supabase-schema.sql\n  node scripts/sb.js --check');
+    console.error('用法:\n  node scripts/sb.js "select 1"\n  node scripts/sb.js -f supabase-schema.sql\n  node scripts/sb.js --migrate\n  node scripts/sb.js --check');
     process.exit(2);
   }
   printRows(await runSql(sql));

@@ -666,9 +666,49 @@ create table if not exists admin_sessions (
 alter table admins enable row level security;
 alter table admin_sessions enable row level security;
 
--- v3.10.0 B3 登录防爆破：连续失败 5 次锁 15 分钟（admin_login 内判定）
-alter table admins add column if not exists failed_attempts int not null default 0;
-alter table admins add column if not exists locked_until timestamptz;
+-- v3.12.0 登录防爆破节流序列：记录最近一次登录失败的 epoch（setval 写盘即时生效、
+-- 不随事务回滚——这是它相对普通表列的关键差异；序列本身必须在基线中预先存在，
+-- 若在同事务内 create 则会随回滚消失）。登录失败后 5 秒内的后续登录直接拒绝。
+create sequence if not exists admin_lastfail;
+
+-- v3.12.0：v3.10.0 的 failed_attempts / locked_until 列退役——同事务回滚缺陷使
+-- 「失败计数 + raise」从未生效；登录防爆破改走序列节流（admin_login 内，回滚免疫）
+alter table admins drop column if exists failed_attempts;
+alter table admins drop column if exists locked_until;
+
+-- —— v3.12.0 B3 后半：审计日志 ——
+-- 多管理员共用一份 blob，出事必须能回答「谁在什么时候改了什么」（2026-09-06 取证靠全库人工穷举）。
+-- RLS 开启且无策略：仅经下方 security definer RPC 读写。
+create table if not exists admin_audit_log (
+  id        bigint generated always as identity primary key,
+  admin_id  uuid,
+  username  text,
+  action    text not null,
+  detail    jsonb,
+  at        timestamptz not null default now()
+);
+create index if not exists admin_audit_log_at on admin_audit_log (at desc);
+alter table admin_audit_log enable row level security;
+
+-- 审计写入辅助（各 admin_* RPC 内调用；失败登录传 null id 的合成对象）。
+-- 参数用 jsonb（调用侧 jsonb_build_object 返回 jsonb；json/jsonb 无隐式转换，v3.12.0 线上探针修正）
+create or replace function public.admin_audit(p_admin jsonb, p_action text, p_detail jsonb default null)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into admin_audit_log (admin_id, username, action, detail)
+  values ((p_admin->>'id')::uuid, p_admin->>'username', p_action, p_detail);
+$$;
+
+-- —— v3.12.0 B5：schema 迁移版本表（scripts/sb.js --migrate 按序执行 supabase/migrations/
+--    NNN-xxx.sql 中未应用的脚本并在此登记；本全量文件保持可独立重跑的基线）——
+create table if not exists schema_migrations (
+  version    text primary key,
+  applied_at timestamptz not null default now()
+);
+alter table schema_migrations enable row level security;
 
 -- 会话校验（内部辅助 + relay 鉴权入口）：返回 {id, username, role} 或 null
 create or replace function public.admin_verify_session(p_token text)
@@ -733,6 +773,8 @@ begin
   insert into admin_sessions (token_hash, admin_id, expires_at)
   values (encode(digest(v_token, 'sha256'), 'hex'), v_id, v_expires);
 
+  perform public.admin_audit(jsonb_build_object('id', v_id, 'username', trim(p_username)), 'bootstrap');
+
   return json_build_object('token', v_token, 'role', 'super', 'username', trim(p_username), 'expiresAt', v_expires);
 end;
 $$;
@@ -748,7 +790,9 @@ as $$
   select exists (select 1 from admins limit 1);
 $$;
 
--- 登录（v3.10.0 B3：连续失败 5 次锁 15 分钟）
+-- 登录（v3.10.0 引入防爆破；v3.12.0 修正——原「失败计数 UPDATE + raise」在同一事务内，
+-- 抛错时计数一并回滚、锁定从未生效。现改用序列记录最近失败时刻：setval 非事务性、
+-- 回滚免疫，失败后 5 秒内的新尝试直接拒绝，把爆破速率压到 0.2 次/秒（叠加 bcrypt 慢哈希））
 create or replace function public.admin_login(p_username text, p_password text)
 returns json
 language plpgsql
@@ -760,27 +804,28 @@ declare
   v_admin admins%rowtype;
   v_token text;
   v_expires timestamptz;
+  v_lastfail bigint;
 begin
   if p_username is null or p_password is null then
     raise exception '请输入用户名和密码';
   end if;
   delete from admin_sessions where expires_at < now();
+  delete from admin_audit_log where at < now() - interval '90 days'; -- 审计保留 90 天（v3.12.0）
   select * into v_admin from admins where username = trim(p_username) limit 1;
-  -- 锁定中直接拒绝（anon 可无限尝试密码，此前无任何限制）
-  if v_admin.id is not null and v_admin.locked_until is not null and v_admin.locked_until > now() then
-    raise exception '失败次数过多，账号已临时锁定，请 15 分钟后再试';
+
+  -- 防爆破节流（全局单序列：单团部署仅数名管理员，任一失败后 5 秒冷却可接受）
+  select coalesce(last_value, 0) into v_lastfail from pg_sequences where sequencename = 'admin_lastfail';
+  if v_lastfail > 1 and extract(epoch from now()) - v_lastfail < 5 then
+    raise exception '尝试过于频繁，请稍后再试';
   end if;
+
   if v_admin.id is null or v_admin.password_hash <> crypt(p_password, v_admin.password_hash) then
-    if v_admin.id is not null then
-      update admins
-        set failed_attempts = failed_attempts + 1,
-            locked_until = case when failed_attempts + 1 >= 5
-                                then now() + interval '15 minutes' else locked_until end
-        where id = v_admin.id;
-    end if;
+    -- setval 不随本事务回滚——失败时刻真实留存（审计行会随 raise 回滚，故失败不留审计行）
+    perform setval('admin_lastfail', extract(epoch from now())::bigint, true);
     raise exception '用户名或密码错误';
   end if;
-  update admins set failed_attempts = 0, locked_until = null where id = v_admin.id;
+  perform setval('admin_lastfail', 1, false); -- 登录成功即解除冷却
+  perform public.admin_audit(jsonb_build_object('id', v_admin.id, 'username', v_admin.username), 'login');
   v_token := encode(gen_random_bytes(32), 'hex');
   v_expires := now() + interval '30 days';
   insert into admin_sessions (token_hash, admin_id, expires_at)
@@ -789,15 +834,26 @@ begin
 end;
 $$;
 
--- 退出（删除会话）
+-- 退出（删除会话；v3.12.0 起审计）
 create or replace function public.admin_logout(p_token text)
 returns boolean
-language sql
+language plpgsql
 security definer
 set search_path = public, extensions
 as $$
+#variable_conflict use_variable
+declare
+  v_admin json;
+begin
+  select json_build_object('id', a.id, 'username', a.username)
+    into v_admin
+    from admin_sessions s join admins a on a.id = s.admin_id
+    where s.token_hash = encode(digest(coalesce(p_token,''), 'sha256'), 'hex')
+    limit 1;
   delete from admin_sessions where token_hash = encode(digest(coalesce(p_token,''), 'sha256'), 'hex');
-  select true;
+  perform public.admin_audit(v_admin, 'logout');
+  return true;
+end;
 $$;
 
 -- 管理员列表（仅 super）
@@ -840,6 +896,7 @@ begin
   insert into admins (username, password_hash, role)
   values (trim(p_username), crypt(p_password, gen_salt('bf')), p_role)
   returning id into v_id;
+  perform public.admin_audit(v_admin, 'admin_create', jsonb_build_object('target', trim(p_username), 'role', p_role));
   return json_build_object('id', v_id, 'username', trim(p_username), 'role', p_role);
 end;
 $$;
@@ -868,6 +925,7 @@ begin
     if v_super_count <= 1 then raise exception '不能删除最后一个超级管理员'; end if;
   end if;
   delete from admins where id = p_admin_id;
+  perform public.admin_audit(v_admin, 'admin_delete', jsonb_build_object('target', v_target.username));
   return true;
 end;
 $$;
@@ -889,6 +947,8 @@ begin
   if p_new_password is null or length(p_new_password) < 6 then raise exception '密码至少 6 位'; end if;
   update admins set password_hash = crypt(p_new_password, gen_salt('bf')) where id = p_admin_id;
   delete from admin_sessions where admin_id = p_admin_id;  -- 踢下线
+  perform public.admin_audit(v_admin, 'admin_reset_password',
+    jsonb_build_object('target', (select username from admins where id = p_admin_id)));
   return true;
 end;
 $$;
@@ -909,6 +969,7 @@ begin
   if p_new_password is null or length(p_new_password) < 6 then raise exception '密码至少 6 位'; end if;
   update admins set password_hash = crypt(p_new_password, gen_salt('bf'))
   where id = (v_admin->>'id')::uuid;
+  perform public.admin_audit(v_admin, 'change_password');
   return true;
 end;
 $$;
@@ -981,6 +1042,10 @@ begin
     set data = excluded.data, updated_at = excluded.updated_at
   returning updated_at into new_updated_at;
 
+  -- v3.12.0 B3：保存审计——只记摘要（订单条数/体积），不落全文，控制膨胀
+  perform public.admin_audit(v_admin, 'save_team_data',
+    jsonb_build_object('orders', coalesce(jsonb_array_length(p_data->'orders'), 0), 'bytes', octet_length(p_data::text)));
+
   return new_updated_at;
 end;
 $$;
@@ -1046,6 +1111,7 @@ begin
   if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可重新生成团员密钥'; end if;
   -- v3.4.0 B2：128bit 随机（v2 的 auth.uid 版 regenerate_member_key 已随 v3.10.0 归档）
   update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = public.assert_single_team();
+  perform public.admin_audit(v_admin, 'regenerate_member_key');
   return (select member_key from teams where id = public.assert_single_team());
 end;
 $$;
@@ -1065,6 +1131,54 @@ begin
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
   if p_name is null or length(trim(p_name)) = 0 then raise exception '团名不能为空'; end if;
   update teams set name = trim(p_name) where id = public.assert_single_team();
+  perform public.admin_audit(v_admin, 'rename_team', jsonb_build_object('name', trim(p_name)));
   return trim(p_name);
+end;
+$$;
+
+-- 审计日志列表（仅 super；v3.12.0 B3，设置页「审计记录」卡）
+create or replace function public.admin_list_audit_log(p_token text, p_limit int default 100)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_variable
+declare
+  v_admin json;
+begin
+  v_admin := public.admin_verify_session(p_token);
+  if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
+  if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可查看审计日志'; end if;
+  return coalesce(json_agg(row_to_json(x) order by x."at" desc), '[]'::json)
+  from (
+    select id, admin_id, username, action, detail, at
+    from admin_audit_log
+    limit greatest(coalesce(p_limit, 100), 1)
+  ) x;
+end;
+$$;
+
+-- 审计清理（仅 super；删除 90 天前记录；登录时也会顺带清理同窗口）
+create or replace function public.admin_clear_audit_log(p_token text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_variable
+declare
+  v_admin json;
+  v_deleted bigint;
+begin
+  v_admin := public.admin_verify_session(p_token);
+  if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
+  if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可清理审计日志'; end if;
+  with d as (
+    delete from admin_audit_log where at < now() - interval '90 days' returning 1
+  )
+  select count(*) into v_deleted from d;
+  perform public.admin_audit(v_admin, 'clear_audit_log', jsonb_build_object('deleted', v_deleted));
+  return v_deleted;
 end;
 $$;

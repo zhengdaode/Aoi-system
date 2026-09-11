@@ -97,8 +97,9 @@ describe('supabase-schema.sql B2 守护（读裁剪 / 写白名单 / 密钥强�
 
   it('写 RPC：四参数签名 + 白名单合并 + 状态上限（防自批已交）', () => {
     expect(schema).toMatch(/p_cn text default null\r?\n\)\r?\nreturns timestamptz/);
-    expect(schema).toMatch(/p_cn is null then\r?\n\s*v_merged := new_data/); // 旧客户端兼容桥
-    expect(schema).toMatch(/raise exception '圈名不合法/);
+    // v3.10.0：p_cn 为空的「旧客户端兼容桥」已封堵——缺失圈名一律拒绝（守护见 v310-security）
+    expect(schema).not.toMatch(/v_merged := new_data/);
+    expect(schema).toMatch(/raise exception '圈名缺失或不合法/);
     // 状态上限：只有 待交/待审核 能被团员写入
     expect(schema.match(/in \('待交', '待审核'\)/g) || []).toHaveLength(2);
     // 通知只接受团员产生的两类
@@ -109,6 +110,7 @@ describe('supabase-schema.sql B2 守护（读裁剪 / 写白名单 / 密钥强�
 
   it('辅助函数与密钥强度（128bit 随机）', () => {
     expect(schema).toMatch(/create or replace function public\.jsonb_array_upsert_by_id/);
-    expect(schema.match(/encode\(extensions\.gen_random_bytes\(16\), 'hex'\)/g) || []).toHaveLength(2);
+    // v3.10.0：v2 的 regenerate_member_key(auth.uid 版) 已归档，仅剩 admin_regenerate_member_key 一处
+    expect(schema.match(/encode\(extensions\.gen_random_bytes\(16\), 'hex'\)/g) || []).toHaveLength(1);
   });
 });

@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.10.0 (2026-09-12)
+
+> **安全止血**——全量复审产出的高优漏洞治理：p_cn 空值整份覆盖后门封堵、管理员登录防爆破、
+> escapeHtml 引号转义 + URL 协议白名单（存储型 XSS 双修）、v2 账号体系（邀请码/team_members）
+> 归档移除。**schema 已随提交经 sb.js 应用线上 + 逐分支探针**（写前快照 `team_data_bak_20260912`
+> / `teams_bak_20260912` / `team_members_bak_20260912` / `admins_bak_20260912`）。
+
+### Security
+- **团员写入「空 p_cn 整份覆盖」后门封堵（高）**：`update_team_data_by_member_key` 原「p_cn 为空 = 旧版客户端兼容桥」允许任何持密钥者省略 p_cn 绕过整个白名单、整份覆盖 blob（含他人地址/QQ）——与 2026-09-06 数据事故同模型。现 p_cn 缺失/空/超 64 字符一律拒绝；现役前端写入必带 p_cn，线上探针确认拒绝路径无副作用（版本号/数据/历史表全不变）。`data.js explainRpcError` 新增对应中文映射（旧页面被拒时提示刷新）。
+- **admin_login 防爆破（B3 前半，高）**：`admins` 表新增 `failed_attempts` / `locked_until`；连续失败 5 次锁 15 分钟，成功登录清零——此前 anon 可无限暴力破解管理员口令。
+- **escapeHtml 补引号转义（高）**：原实现经 textNode 只转义 `& < >`，`value="…"/href="…"/title=` 等属性插值点可被含 `"` 输入突破属性边界注入事件；改为字符串替换式五字符转义（文本节点渲染结果不变）。
+- **新增 `Aoi.safeUrl` URL 协议白名单（高）**：仅放行 http/https（含 `//` 协议相对与站内相对路径），`javascript:`/`data:` 等一律空串。写入侧接入：团员付款凭证（`submitReceipt`——此前 `javascript:` 凭证可存库并被团长点击，存储型 XSS 主向量）、商品参考图/跳转链接（`registerProduct` 统一入口 + `saveActProduct` 行内编辑）、活动平台链接（`setActivityField`）、囤货地收款码、发货合照；渲染侧兜底旧数据：团员看板参考图/链接/凭证、审批凭证、发货合照、囤货地收款码、活动商品卡、PCO 目录（`pcoItems` 可被外部监控仓直写，渲染侧必须白名单）。
+
+### Removed（v2 账号体系归档——经核实现役前端零调用）
+- **邀请码方案与 v2 Supabase-Auth 成员体系退役**：`team_members` 表、`create_my_team` / `join_team_by_code` / `regenerate_invite_code` / `regenerate_member_key`(auth.uid 版) / `is_team_member`、`teams.owner_id` / `teams.invite_code` 列、6 条成员 RLS 策略全部移除（线上已收敛删除，历史值在 `*_bak_20260912` 快照表；被归档代码见 git 历史 v3.9.5 及更早 tag）。`teams`/`team_data` 保留 RLS 且无策略 = RPC 之外全拒绝；schema 自此零 Supabase Auth 依赖。
+- **`admin_bootstrap` 首次初始化自动建团**（v2 建团函数归档后的补位）：全新部署此前无任何建团路径（会卡死在「尚未创建团队」）；存量库已有团队不受影响。
+
+### Tests
+- 382 → 396 例全绿：新增 `tests/v310-security.test.js` 14 例（escapeHtml 引号/属性突破失效、safeUrl 白名单放行与拒绝、凭证/商品/活动链接/收款码写入清洗、schema 守护——桥封堵防回潮 + 防爆破列与逻辑 + v2 归档防回退）；`member-pii.test.js` 守护同步（兼容桥断言反转为「不得存在」、128bit 密钥函数计数 2→1）。
+
 ## v3.9.5 (2026-09-11)
 
 > **粘贴导入图片保留**——v3.9.4 ChatGPT 工作流把页面全文交给 AI 后图片/链接丢失的修正。零 schema 改动。

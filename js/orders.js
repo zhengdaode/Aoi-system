@@ -1122,6 +1122,7 @@ document.getElementById('cnChangeTbody').addEventListener('click', function (e) 
 Aoi.orders.setActivityField = async function (name, field, value) {
   var d = Aoi.orders.ensure();
   if (!d.activityMeta[name]) d.activityMeta[name] = {};
+  if (field === 'link') value = Aoi.safeUrl(value); // v3.10.0：平台链接仅接受 http/https
   d.activityMeta[name][field] = value;
   await Aoi.saveTeamData(d);
 };
@@ -1460,6 +1461,9 @@ Aoi.orders.registerProduct = async function (activity, input) {
   if (!activity) { Aoi.toast('请先选择活动', 'warning'); return null; }
   var type = (input.type || '').trim(), model = (input.model || '').trim();
   if (!type || !model) { Aoi.toast('请填写制品类型和型号', 'warning'); return null; }
+  // v3.10.0：参考图/跳转链接仅接受 http/https（统一写入口，覆盖信息录入/展开区/目录推入三路）
+  input.refImage = Aoi.safeUrl(input.refImage);
+  input.refUrl = Aoi.safeUrl(input.refUrl);
   var d = Aoi.orders.ensure();
   var m = Aoi.orders.ensureActMeta(d, activity);
   var existing = null;
@@ -1563,10 +1567,11 @@ Aoi.orders.productStatusBadge = function (activity, p, s) {
 Aoi.orders.actProductCardHtml = function (activity, p) {
   var s = Aoi.orders.productStats(activity, p);
   var imgId = 'apImg_' + p.id;
-  var thumb = p.refImage
-    ? '<a href="' + Aoi.escapeHtml(p.refImage) + '" target="_blank" title="查看大图"><img src="' + Aoi.escapeHtml(p.refImage) + '" alt="参考图" class="w-14 h-14 object-cover rounded border border-gray-200 shrink-0"></a>'
+  var thumbUrl = Aoi.safeUrl(p.refImage); // v3.10.0：渲染侧兜底旧数据中的危险协议
+  var thumb = thumbUrl
+    ? '<a href="' + Aoi.escapeHtml(thumbUrl) + '" target="_blank" title="查看大图"><img src="' + Aoi.escapeHtml(thumbUrl) + '" alt="参考图" class="w-14 h-14 object-cover rounded border border-gray-200 shrink-0"></a>'
     : '<span class="w-14 h-14 flex items-center justify-center text-gray-300 text-xs bg-gray-100 rounded border border-gray-100 shrink-0">无图</span>';
-  var link = Aoi.orders.productLink(activity, p);
+  var link = Aoi.safeUrl(Aoi.orders.productLink(activity, p));
   var chips = s.buyers.slice(0, 6).map(function (b) {
     return '<span class="inline-block bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 text-xs">' + Aoi.escapeHtml(b) + '</span>';
   }).join('');
@@ -1678,9 +1683,16 @@ Aoi.orders.saveActProduct = async function (pid) {
     p.model = model;
   }
   var img = document.getElementById('apImg_' + pid);
-  if (img) p.refImage = img.value.trim();
+  if (img) {
+    var rawImg = img.value.trim();
+    p.refImage = Aoi.safeUrl(rawImg);
+    if (rawImg && !p.refImage) Aoi.toast('参考图 URL 不合法（仅支持 http/https），已按空处理', 'warning');
+  }
   var url = field('[data-purl="' + pid + '"]');
-  if (url != null) p.refUrl = url;
+  if (url != null) {
+    p.refUrl = Aoi.safeUrl(url);
+    if (url && !p.refUrl) Aoi.toast('跳转链接不合法（仅支持 http/https），已按空处理', 'warning');
+  }
   var priceRaw = field('[data-pprice="' + pid + '"]');
   if (priceRaw != null) {
     if (priceRaw === '') delete p.price;

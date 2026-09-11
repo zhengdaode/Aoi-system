@@ -4,7 +4,7 @@ window.Aoi = window.Aoi || {};
 // 全局状态
 Aoi.state = {
   user: null,    // Supabase 登录用户
-  team: null,    // 当前团队 { id, name, invite_code, ... }
+  team: null,    // 当前团队 { id, name, member_key, ... }（v3.10.0：invite_code 随 v2 邀请码方案归档移除）
   role: null,    // 当前用户角色 owner / admin
   data: {}       // 团队业务数据（订单/周边/活动等，登录后填充）
 };
@@ -54,12 +54,29 @@ Aoi.toggleSidebar = function (open) {
   if (bd) bd.classList.toggle('hidden', !open);
 };
 
-// XSS 防护：转义后再插入 DOM
+// XSS 防护：转义后再插入 DOM。引号也转义——value="…"/href="…"/title="…" 等
+// 属性插值点曾可被含 " 的输入突破属性边界注入事件（v3.10.0 修复）
 Aoi.escapeHtml = function (str) {
   if (str == null) return '';
-  var div = document.createElement('div');
-  div.appendChild(document.createTextNode(String(str)));
-  return div.innerHTML;
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+// URL 协议白名单（v3.10.0）：仅放行 http/https（含 // 协议相对与站内相对路径）。
+// 团员凭证、商品参考图/跳转链接、收款码等外部输入的 URL 一律先经此清洗，
+// javascript:/data: 等危险协议返回空串（写入侧拦截 + 渲染侧兜底旧数据）。
+Aoi.safeUrl = function (url) {
+  var s = String(url == null ? '' : url).trim();
+  if (!s) return '';
+  try {
+    var u = new URL(s, 'https://aoi.invalid');
+    if (u.protocol === 'http:' || u.protocol === 'https:') return s;
+  } catch (e) { /* 解析失败按不合法处理 */ }
+  return '';
 };
 
 // Toast 通知（右上角，3 秒自动消失）

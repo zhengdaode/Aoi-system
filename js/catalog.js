@@ -325,6 +325,9 @@ Aoi.catalog.addToDraft = function (items) {
   var added = 0, updated = 0;
   (items || []).forEach(function (it) {
     if (!it.jpName) return;
+    // v3.10.0：目录条目的链接/图片仅接受 http/https（粘贴来源不可全信）
+    it.url = Aoi.safeUrl(it.url);
+    it.image = Aoi.safeUrl(it.image);
     var tr = Aoi.catalog.translateName(it.jpName);
     // ChatGPT 工作流直带中文译名/类型：不再依赖词典，未识别高亮也无意义
     var hasCn = !!(it.name && String(it.name).trim());
@@ -573,7 +576,7 @@ Aoi.catalog.render = function () {
     }).join('');
     return '<tr data-id="' + it.id + '" class="border-b border-gray-100">'
       + '<td class="px-2 py-1 text-center"><input type="checkbox" class="cat-sel"' + (it.select ? ' checked' : '') + '></td>'
-      + '<td class="px-2 py-1">' + (it.image ? '<img src="' + Aoi.escapeHtml(it.image) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
+      + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
       + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + '</td>'
       + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '"></td>'
       + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select></td>'
@@ -581,7 +584,7 @@ Aoi.catalog.render = function () {
       + '<td class="px-2 py-1"><input class="cat-price border border-gray-300 rounded px-2 py-1 text-sm w-16 text-right" value="' + (it.priceCny != null ? it.priceCny : '') + '" placeholder="自动"></td>'
       + '<td class="px-2 py-1"><input class="cat-limit border border-gray-300 rounded px-2 py-1 text-sm w-12 text-right" value="' + Aoi.escapeHtml(it.limit) + '"></td>'
       + '<td class="px-2 py-1 text-sm">' + (it.saleDate ? Aoi.escapeHtml(it.saleDate) : '—') + '</td>'
-      + '<td class="px-2 py-1">' + (it.url ? '<a href="' + Aoi.escapeHtml(it.url) + '" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-xs">打开</a>' : '—') + '</td>'
+      + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.url) ? '<a href="' + Aoi.escapeHtml(Aoi.safeUrl(it.url)) + '" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-xs">打开</a>' : '—') + '</td>'
       + '<td class="px-2 py-1 text-center"><button onclick="Aoi.catalog.removeDraft(\'' + it.id + '\')" class="text-red-500 hover:underline text-xs">删</button></td>'
       + '</tr>';
   }).join('') || '<tr><td colspan="11" class="px-3 py-6 text-center text-sm text-gray-400">暂无草稿——先在上方粘贴解析，或等抓取通道就绪</td></tr>';
@@ -607,7 +610,7 @@ Aoi.catalog.renderCatalogList = function () {
   var items = d.pcoItems || [];
   tbody.innerHTML = items.map(function (it) {
     return '<tr class="border-b border-gray-100">'
-      + '<td class="px-2 py-1">' + (it.image ? '<img src="' + Aoi.escapeHtml(it.image) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
+      + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
       + '<td class="px-2 py-1 text-sm">' + Aoi.escapeHtml(it.name || it.jpName) + '<div class="text-[11px] text-gray-400">' + Aoi.escapeHtml(it.jpName) + '</div></td>'
       + '<td class="px-2 py-1 text-sm">' + Aoi.escapeHtml(it.type || '—') + '</td>'
       + '<td class="px-2 py-1 text-right text-sm">' + (it.priceCny != null ? '¥' + it.priceCny : (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() + '（日元）' : '—')) + '</td>'

@@ -4,28 +4,30 @@
 -- 在 Supabase SQL Editor 中一次性执行。
 -- =====================================================================
 
--- 1. 团队表：一个团一行，owner 为团长（超级管理员）
+-- 1. 团队表：一个团一行。v3.10.0 起移除 v2 遗留的 owner_id（auth.users 外键）
+--    与 invite_code——v3 管理员体系（admins 表）不再依赖 Supabase Auth，邀请码方案已停用。
 create table if not exists teams (
   id          uuid primary key default gen_random_uuid(),
-  owner_id    uuid not null references auth.users(id) on delete cascade,
   name        text not null default '我的团',
-  invite_code text,
   member_key  text,
   created_at  timestamptz not null default now()
 );
 
 -- 迁移：为已存在的团队补充 member_key 字段（新建库已含此列，可安全重复执行）
 alter table teams add column if not exists member_key text;
+-- v3.10.0 归档 v2 账号体系（顺序敏感：teams/team_data 的策略引用 team_members 表、
+-- 其表达式又引用 owner_id 列——必须先删策略，再删表，最后删列；历史值可查 *_bak_20260912 快照表与 git 历史）：
+drop policy if exists "teams_select_member" on teams;
+drop policy if exists "teams_update_owner" on teams;
+drop policy if exists "team_data_select" on team_data;
+drop policy if exists "team_data_insert" on team_data;
+drop policy if exists "team_data_update" on team_data;
+drop table if exists team_members;
+alter table teams drop column if exists owner_id;
+alter table teams drop column if exists invite_code;
 
--- 2. 成员表：团长 + 管理员，user 可属于多个团队（phase 0+1 仅使用首个团队）
-create table if not exists team_members (
-  team_id    uuid not null references teams(id) on delete cascade,
-  user_id    uuid not null references auth.users(id) on delete cascade,
-  role       text not null default 'admin' check (role in ('owner', 'admin')),
-  email      text,
-  created_at timestamptz not null default now(),
-  primary key (team_id, user_id)
-);
+-- 2.（v2 成员表 team_members 已随 v3.10.0 归档移除——v3 的管理员在 admins 表，
+--    团员无账号、凭 member_key 匿名访问。被归档代码见 git 历史 v3.9.5 及更早 tag。）
 
 -- 3. 团队数据表：业务数据 blob，后续阶段（订单/活动/批次等）填充
 create table if not exists team_data (
@@ -53,126 +55,18 @@ alter table team_data_history enable row level security;
 -- RPC（security definer：绕过 RLS，由函数内部校验身份）
 -- =====================================================================
 
--- 创建我的团；已属于某团队则直接返回该团队 id
-create or replace function public.create_my_team(team_name text default '我的团')
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  caller uuid := auth.uid();
-  existing_team_id uuid;
-  new_team_id uuid;
-  caller_email text;
-begin
-  if caller is null then
-    raise exception '未登录';
-  end if;
-
-  select team_id into existing_team_id
-  from team_members where user_id = caller limit 1;
-  if existing_team_id is not null then
-    return existing_team_id;
-  end if;
-
-  insert into teams (owner_id, name)
-  values (caller, team_name)
-  returning id into new_team_id;
-
-  select email into caller_email from auth.users where id = caller;
-
-  insert into team_members (team_id, user_id, role, email)
-  values (new_team_id, caller, 'owner', caller_email);
-
-  insert into team_data (team_id) values (new_team_id);
-
-  return new_team_id;
-end;
-$$;
-
--- 通过邀请码加入团队（成为管理员）
-create or replace function public.join_team_by_code(code text)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  caller uuid := auth.uid();
-  target_team_id uuid;
-  caller_email text;
-begin
-  if caller is null then
-    raise exception '未登录';
-  end if;
-
-  select id into target_team_id from teams where invite_code = code;
-  if target_team_id is null then
-    raise exception '邀请码无效';
-  end if;
-
-  select email into caller_email from auth.users where id = caller;
-
-  insert into team_members (team_id, user_id, role, email)
-  values (target_team_id, caller, 'admin', caller_email)
-  on conflict (team_id, user_id) do nothing;
-
-  return target_team_id;
-end;
-$$;
-
--- 团长重新生成邀请码
-create or replace function public.regenerate_invite_code()
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  caller uuid := auth.uid();
-  team_id uuid;
-  new_code text := substr(md5(random()::text), 1, 8);
-begin
-  if caller is null then
-    raise exception '未登录';
-  end if;
-
-  select id into team_id from teams where owner_id = caller limit 1;
-  if team_id is null then
-    raise exception '仅团长可生成邀请码';
-  end if;
-
-  update teams set invite_code = new_code where id = team_id;
-  return new_code;
-end;
-$$;
-
--- 团长重新生成团员密钥（团员端免登录访问口令）
-create or replace function public.regenerate_member_key()
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  caller uuid := auth.uid();
-  team_id uuid;
-begin
-  if caller is null then
-    raise exception '未登录';
-  end if;
-
-  select id into team_id from teams where owner_id = caller limit 1;
-  if team_id is null then
-    raise exception '仅团长可生成团员密钥';
-  end if;
-
-  -- v3.4.0 B2：8 位 hex（~32bit）可被穷举，升到 128bit 随机；旧密钥在下次重新生成时自然替换
-  update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = team_id;
-  return (select member_key from teams where id = team_id);
-end;
-$$;
+-- =====================================================================
+-- v2 账号体系遗物已归档（v3.10.0）：create_my_team / join_team_by_code /
+-- regenerate_invite_code / regenerate_member_key(auth.uid 版) 随 team_members
+-- 表与邀请码方案一并移除。前端（v3 起即）零调用：
+--   建团 → admin_bootstrap 首次初始化时自动完成（见下）；
+--   密钥重生成 → admin_regenerate_member_key（仅 super）。
+-- 被归档代码可在 git 历史（v3.9.5 及更早 tag）查阅。
+-- =====================================================================
+drop function if exists public.create_my_team(text);
+drop function if exists public.join_team_by_code(text);
+drop function if exists public.regenerate_invite_code();
+drop function if exists public.regenerate_member_key();
 
 -- =====================================================================
 -- 团员端匿名访问（security definer 绕过 RLS，内部校验 member_key）
@@ -301,7 +195,8 @@ $$;
 --               本人 payments（凭证字段 + 状态上限：已交/已驳回只能由管理端写）、
 --               本人 transfers / cnChanges 条目、本人产生的 address/cnchange 通知；
 --        其余字段一律以服务端现值为准。
---      p_cn 为空 = 旧版客户端兼容桥（保持整份覆盖）；p_cn 超 64 字符直接拒绝。
+--      v3.10.0：p_cn 为空的「旧版客户端兼容桥」（整份覆盖）已移除——该桥可被持密钥者
+--      用省略 p_cn 的方式绕过整个白名单；p_cn 缺失/空/超 64 字符一律拒绝写入。
 drop function if exists public.update_team_data_by_member_key(text, jsonb);
 drop function if exists public.update_team_data_by_member_key(text, jsonb, timestamptz);
 drop function if exists public.update_team_data_by_member_key(text, jsonb, timestamptz, text);
@@ -343,88 +238,89 @@ begin
   select team_id, data, 'member' from team_data where team_id = target_team_id;
   perform public.team_data_history_prune(target_team_id);
 
-  if p_cn is null then
-    v_merged := new_data;  -- 旧版客户端兼容桥：整份覆盖
-  elsif length(trim(p_cn)) = 0 or length(p_cn) > 64 then
-    raise exception '圈名不合法（空或超 64 字符）';
-  else
-    select coalesce(data, '{}'::jsonb) into v_old from team_data where team_id = target_team_id;
-    v_merged := v_old;
-
-    -- 本人 addresses / memberMeta 条目
-    if new_data ? 'addresses' and new_data->'addresses' ? p_cn then
-      v_merged := jsonb_set(v_merged, array['addresses', p_cn], new_data#>array['addresses', p_cn], true);
-    end if;
-    if new_data ? 'memberMeta' and new_data->'memberMeta' ? p_cn then
-      v_merged := jsonb_set(v_merged, array['memberMeta', p_cn], new_data#>array['memberMeta', p_cn], true);
-    end if;
-
-    -- 本人 orders（团员端唯一会改的是 received）
-    for v_item in select e from jsonb_array_elements(coalesce(new_data->'orders', '[]'::jsonb)) e
-                  where e->>'buyer' = p_cn and e->>'id' is not null
-    loop
-      v_merged := jsonb_set(v_merged, '{orders}',
-        public.jsonb_array_upsert_by_id(v_merged->'orders', v_item), true);
-    end loop;
-
-    -- 本人 payments：凭证字段可写；状态仅接受 待交/待审核（防自批「已交」）
-    for v_item in select e from jsonb_array_elements(coalesce(new_data->'payments', '[]'::jsonb)) e
-                  where e->>'buyer' = p_cn and e->>'id' is not null
-    loop
-      select exists (
-        select 1 from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o
-        where o->>'id' = v_item->>'id'
-      ) into v_existed;
-      if v_existed then
-        v_merged := jsonb_set(v_merged, '{payments}',
-          (select coalesce(jsonb_agg(
-             case when o->>'id' = v_item->>'id' then
-               jsonb_set(
-                 jsonb_set(jsonb_set(o,
-                   '{receipt}', coalesce(v_item->'receipt', o->'receipt')),
-                   '{receiptDate}', coalesce(v_item->'receiptDate', o->'receiptDate')),
-                 '{status}',
-                   case when coalesce(v_item->>'status', '') in ('待交', '待审核')
-                        then coalesce(v_item->'status', o->'status')
-                        else coalesce(o->'status', '"待交"'::jsonb) end)
-             else o end), '[]'::jsonb)
-           from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o));
-      else
-        v_arr := coalesce(v_merged->'payments', '[]'::jsonb) || jsonb_build_object(
-          'id', v_item->'id',
-          'batchId', v_item->'batchId',
-          'buyer', coalesce(v_item->'buyer', to_jsonb(p_cn)),
-          'status', case when coalesce(v_item->>'status', '') in ('待交', '待审核')
-                         then coalesce(v_item->'status', '"待审核"'::jsonb)
-                         else '"待审核"'::jsonb end,
-          'receipt', v_item->'receipt',
-          'receiptDate', v_item->'receiptDate');
-        v_merged := jsonb_set(v_merged, '{payments}', v_arr, true);
-      end if;
-    end loop;
-
-    -- 本人 transfers / cnChanges 条目（按 id 合并，团长处理的其余条目不受影响）
-    for v_item in select e from jsonb_array_elements(coalesce(new_data->'transfers', '[]'::jsonb)) e
-                  where e->>'buyer' = p_cn and e->>'id' is not null
-    loop
-      v_merged := jsonb_set(v_merged, '{transfers}',
-        public.jsonb_array_upsert_by_id(v_merged->'transfers', v_item), true);
-    end loop;
-    for v_item in select e from jsonb_array_elements(coalesce(new_data->'cnChanges', '[]'::jsonb)) e
-                  where (e->>'oldCn' = p_cn or e->>'newCn' = p_cn) and e->>'id' is not null
-    loop
-      v_merged := jsonb_set(v_merged, '{cnChanges}',
-        public.jsonb_array_upsert_by_id(v_merged->'cnChanges', v_item), true);
-    end loop;
-
-    -- 仅接受团员产生的 address / cnchange 通知（按 id 合并，催缴/发货等管理端通知不可写）
-    for v_item in select e from jsonb_array_elements(coalesce(new_data->'notifications', '[]'::jsonb)) e
-                  where coalesce(e->>'type', '') in ('address', 'cnchange') and e->>'id' is not null
-    loop
-      v_merged := jsonb_set(v_merged, '{notifications}',
-        public.jsonb_array_upsert_by_id(v_merged->'notifications', v_item), true);
-    end loop;
+  -- v3.10.0 安全修复：p_cn 缺失/空/超 64 字符一律拒绝（原「p_cn 为空 = 旧版客户端
+  -- 整份覆盖」兼容桥可被持密钥者绕过下方整个白名单，与 2026-09-06 数据事故同模型）。
+  -- 现役前端写入必带 p_cn（js/data.js saveTeamDataByMemberKey）。
+  if p_cn is null or length(trim(p_cn)) = 0 or length(p_cn) > 64 then
+    raise exception '圈名缺失或不合法，已拒绝写入（客户端版本过旧请刷新页面）';
   end if;
+
+  select coalesce(data, '{}'::jsonb) into v_old from team_data where team_id = target_team_id;
+  v_merged := v_old;
+
+  -- 本人 addresses / memberMeta 条目
+  if new_data ? 'addresses' and new_data->'addresses' ? p_cn then
+    v_merged := jsonb_set(v_merged, array['addresses', p_cn], new_data#>array['addresses', p_cn], true);
+  end if;
+  if new_data ? 'memberMeta' and new_data->'memberMeta' ? p_cn then
+    v_merged := jsonb_set(v_merged, array['memberMeta', p_cn], new_data#>array['memberMeta', p_cn], true);
+  end if;
+
+  -- 本人 orders（团员端唯一会改的是 received）
+  for v_item in select e from jsonb_array_elements(coalesce(new_data->'orders', '[]'::jsonb)) e
+                where e->>'buyer' = p_cn and e->>'id' is not null
+  loop
+    v_merged := jsonb_set(v_merged, '{orders}',
+      public.jsonb_array_upsert_by_id(v_merged->'orders', v_item), true);
+  end loop;
+
+  -- 本人 payments：凭证字段可写；状态仅接受 待交/待审核（防自批「已交」）
+  for v_item in select e from jsonb_array_elements(coalesce(new_data->'payments', '[]'::jsonb)) e
+                where e->>'buyer' = p_cn and e->>'id' is not null
+  loop
+    select exists (
+      select 1 from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o
+      where o->>'id' = v_item->>'id'
+    ) into v_existed;
+    if v_existed then
+      v_merged := jsonb_set(v_merged, '{payments}',
+        (select coalesce(jsonb_agg(
+           case when o->>'id' = v_item->>'id' then
+             jsonb_set(
+               jsonb_set(jsonb_set(o,
+                 '{receipt}', coalesce(v_item->'receipt', o->'receipt')),
+                 '{receiptDate}', coalesce(v_item->'receiptDate', o->'receiptDate')),
+               '{status}',
+                 case when coalesce(v_item->>'status', '') in ('待交', '待审核')
+                      then coalesce(v_item->'status', o->'status')
+                      else coalesce(o->'status', '"待交"'::jsonb) end)
+           else o end), '[]'::jsonb)
+         from jsonb_array_elements(coalesce(v_merged->'payments', '[]'::jsonb)) o));
+    else
+      v_arr := coalesce(v_merged->'payments', '[]'::jsonb) || jsonb_build_object(
+        'id', v_item->'id',
+        'batchId', v_item->'batchId',
+        'buyer', coalesce(v_item->'buyer', to_jsonb(p_cn)),
+        'status', case when coalesce(v_item->>'status', '') in ('待交', '待审核')
+                       then coalesce(v_item->'status', '"待审核"'::jsonb)
+                       else '"待审核"'::jsonb end,
+        'receipt', v_item->'receipt',
+        'receiptDate', v_item->'receiptDate');
+      v_merged := jsonb_set(v_merged, '{payments}', v_arr, true);
+    end if;
+  end loop;
+
+  -- 本人 transfers / cnChanges 条目（按 id 合并，团长处理的其余条目不受影响）
+  for v_item in select e from jsonb_array_elements(coalesce(new_data->'transfers', '[]'::jsonb)) e
+                where e->>'buyer' = p_cn and e->>'id' is not null
+  loop
+    v_merged := jsonb_set(v_merged, '{transfers}',
+      public.jsonb_array_upsert_by_id(v_merged->'transfers', v_item), true);
+  end loop;
+  for v_item in select e from jsonb_array_elements(coalesce(new_data->'cnChanges', '[]'::jsonb)) e
+                where (e->>'oldCn' = p_cn or e->>'newCn' = p_cn) and e->>'id' is not null
+  loop
+    v_merged := jsonb_set(v_merged, '{cnChanges}',
+      public.jsonb_array_upsert_by_id(v_merged->'cnChanges', v_item), true);
+  end loop;
+
+  -- 仅接受团员产生的 address / cnchange 通知（按 id 合并，催缴/发货等管理端通知不可写）
+  for v_item in select e from jsonb_array_elements(coalesce(new_data->'notifications', '[]'::jsonb)) e
+                where coalesce(e->>'type', '') in ('address', 'cnchange') and e->>'id' is not null
+  loop
+    v_merged := jsonb_set(v_merged, '{notifications}',
+      public.jsonb_array_upsert_by_id(v_merged->'notifications', v_item), true);
+  end loop;
 
   insert into team_data (team_id, data, updated_at)
   values (target_team_id, v_merged, now())
@@ -712,78 +608,18 @@ $$;
 -- 行级安全策略（RLS）
 -- =====================================================================
 alter table teams enable row level security;
-alter table team_members enable row level security;
 alter table team_data enable row level security;
 
--- teams：成员可读自己所在团队；owner 可更新（改名 / 邀请码由 RPC 负责）
--- RLS 策略：drop if exists 后重建，保证本文件在老库上可安全重复执行
--- （create policy 不支持 IF NOT EXISTS，不先 drop 会在二次执行时报
---   "policy already exists" 并导致整个脚本回滚）
+-- v3.10.0 归档 v2 账号体系：team_members 表（已 drop）与其 RLS、is_team_member、
+-- teams/team_data 的成员读写策略一并移除。teams / team_data 保留 RLS 且无任何策略
+-- = 拒绝一切匿名/authenticated 直读直写；全部访问只经 security definer RPC
+-- （admin_* 与团员密钥两函数）。drop if exists 保证老库重跑可收敛。
 drop policy if exists "teams_select_member" on teams;
-create policy "teams_select_member" on teams for select
-  using (exists (
-    select 1 from team_members m
-    where m.team_id = teams.id and m.user_id = auth.uid()
-  ));
-
 drop policy if exists "teams_update_owner" on teams;
-create policy "teams_update_owner" on teams for update
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
-
--- team_members：成员可读本团队全部成员；owner 可删除成员。
--- 插入只经 join_team_by_code / create_my_team RPC，故无需 insert 策略。
--- 成员身份判断（security definer 绕过 RLS，避免 members_select 自引用递归）
-create or replace function public.is_team_member(t uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  return exists (
-    select 1 from team_members m
-    where m.team_id = t and m.user_id = auth.uid()
-  );
-end;
-$$;
-
-drop policy if exists "members_select" on team_members;
-create policy "members_select" on team_members for select
-  using (public.is_team_member(team_members.team_id));
-
-drop policy if exists "members_delete_owner" on team_members;
-create policy "members_delete_owner" on team_members for delete
-  using (exists (
-    select 1 from teams t
-    where t.id = team_members.team_id and t.owner_id = auth.uid()
-  ));
-
--- team_data：成员可读写本团队数据
 drop policy if exists "team_data_select" on team_data;
-create policy "team_data_select" on team_data for select
-  using (exists (
-    select 1 from team_members m
-    where m.team_id = team_data.team_id and m.user_id = auth.uid()
-  ));
-
 drop policy if exists "team_data_insert" on team_data;
-create policy "team_data_insert" on team_data for insert
-  with check (exists (
-    select 1 from team_members m
-    where m.team_id = team_data.team_id and m.user_id = auth.uid()
-  ));
-
 drop policy if exists "team_data_update" on team_data;
-create policy "team_data_update" on team_data for update
-  using (exists (
-    select 1 from team_members m
-    where m.team_id = team_data.team_id and m.user_id = auth.uid()
-  ))
-  with check (exists (
-    select 1 from team_members m
-    where m.team_id = team_data.team_id and m.user_id = auth.uid()
-  ));
+drop function if exists public.is_team_member(uuid);
 
 -- =====================================================================
 -- v3 管理员账号体系（用户名+密码自持凭据，脱离 Supabase Auth）
@@ -812,6 +648,10 @@ create table if not exists admin_sessions (
 
 alter table admins enable row level security;
 alter table admin_sessions enable row level security;
+
+-- v3.10.0 B3 登录防爆破：连续失败 5 次锁 15 分钟（admin_login 内判定）
+alter table admins add column if not exists failed_attempts int not null default 0;
+alter table admins add column if not exists locked_until timestamptz;
 
 -- 会话校验（内部辅助 + relay 鉴权入口）：返回 {id, username, role} 或 null
 create or replace function public.admin_verify_session(p_token text)
@@ -864,6 +704,13 @@ begin
   values (trim(p_username), crypt(p_password, gen_salt('bf')), 'super')
   returning id into v_id;
 
+  -- v3.10.0：首次初始化时顺带建团（v2 的 create_my_team 已归档，v3 前端无建团入口——
+  -- 全新部署此前会卡死在「尚未创建团队」）。存量库已有团队行，此分支不触发。
+  if not exists (select 1 from teams limit 1) then
+    insert into teams (name) values ('我的团');
+    insert into team_data (team_id) select id from teams order by created_at limit 1;
+  end if;
+
   v_token := encode(gen_random_bytes(32), 'hex');
   v_expires := now() + interval '30 days';
   insert into admin_sessions (token_hash, admin_id, expires_at)
@@ -884,7 +731,7 @@ as $$
   select exists (select 1 from admins limit 1);
 $$;
 
--- 登录
+-- 登录（v3.10.0 B3：连续失败 5 次锁 15 分钟）
 create or replace function public.admin_login(p_username text, p_password text)
 returns json
 language plpgsql
@@ -902,9 +749,21 @@ begin
   end if;
   delete from admin_sessions where expires_at < now();
   select * into v_admin from admins where username = trim(p_username) limit 1;
+  -- 锁定中直接拒绝（anon 可无限尝试密码，此前无任何限制）
+  if v_admin.id is not null and v_admin.locked_until is not null and v_admin.locked_until > now() then
+    raise exception '失败次数过多，账号已临时锁定，请 15 分钟后再试';
+  end if;
   if v_admin.id is null or v_admin.password_hash <> crypt(p_password, v_admin.password_hash) then
+    if v_admin.id is not null then
+      update admins
+        set failed_attempts = failed_attempts + 1,
+            locked_until = case when failed_attempts + 1 >= 5
+                                then now() + interval '15 minutes' else locked_until end
+        where id = v_admin.id;
+    end if;
     raise exception '用户名或密码错误';
   end if;
+  update admins set failed_attempts = 0, locked_until = null where id = v_admin.id;
   v_token := encode(gen_random_bytes(32), 'hex');
   v_expires := now() + interval '30 days';
   insert into admin_sessions (token_hash, admin_id, expires_at)
@@ -1168,7 +1027,7 @@ begin
   v_admin := public.admin_verify_session(p_token);
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
   if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可重新生成团员密钥'; end if;
-  -- v3.4.0 B2：与 regenerate_member_key 同步升级为 128bit 随机
+  -- v3.4.0 B2：128bit 随机（v2 的 auth.uid 版 regenerate_member_key 已随 v3.10.0 归档）
   update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = (select id from teams limit 1);
   return (select member_key from teams where id = (select id from teams limit 1));
 end;

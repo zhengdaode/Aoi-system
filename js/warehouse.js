@@ -18,8 +18,10 @@ Aoi.warehouse.name = function (id) {
 // 团长：新增囤货地
 Aoi.warehouse.add = async function () {
   var name = document.getElementById('whName').value.trim();
-  var qr = document.getElementById('whQr').value.trim();
+  var qrRaw = document.getElementById('whQr').value.trim();
+  var qr = Aoi.safeUrl(qrRaw); // v3.10.0：收款码仅接受 http/https
   if (!name) { Aoi.toast('请输入囤货地名称', 'warning'); return; }
+  if (qrRaw && !qr) { Aoi.toast('收款码 URL 不合法（仅支持 http/https 链接）', 'warning'); return; }
   var d = Aoi.warehouse.ensure();
   d.warehouses.push({ id: Aoi.genId(), name: name, qrCode: qr });
   await Aoi.saveTeamData(d);
@@ -44,7 +46,8 @@ Aoi.warehouse.render = function () {
   var ul = document.getElementById('whList');
   if (!ul) return;
   ul.innerHTML = d.warehouses.length ? d.warehouses.map(function (w) {
-    var qr = w.qrCode ? '<a href="' + Aoi.escapeHtml(w.qrCode) + '" target="_blank" class="text-blue-500 hover:underline text-xs ml-2">收款码</a>' : '';
+    var qrUrl = Aoi.safeUrl(w.qrCode); // v3.10.0：协议白名单兜底旧数据
+    var qr = qrUrl ? '<a href="' + Aoi.escapeHtml(qrUrl) + '" target="_blank" class="text-blue-500 hover:underline text-xs ml-2">收款码</a>' : '';
     return '<li class="flex items-center justify-between border-b border-gray-200 py-2">'
       + '<span>' + Aoi.escapeHtml(w.name) + qr + '</span>'
       + '<button class="text-red-500 text-sm hover:underline" data-wh-del="' + w.id + '">删</button>'

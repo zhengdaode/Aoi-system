@@ -71,8 +71,9 @@ Aoi.approval.render = function () {
     if (r.status === '已交') paid++;
     if (r.status === '待审核') pending++;
     var b = Aoi.escapeHtml(r.buyer);
-    var receipt = r.receipt
-      ? ' <a href="' + Aoi.escapeHtml(r.receipt) + '" target="_blank" class="text-blue-500 hover:underline text-xs">凭证</a>'
+    var receiptUrl = Aoi.safeUrl(r.receipt); // v3.10.0：协议白名单兜底旧数据
+    var receipt = receiptUrl
+      ? ' <a href="' + Aoi.escapeHtml(receiptUrl) + '" target="_blank" class="text-blue-500 hover:underline text-xs">凭证</a>'
       : '';
     var actions = '';
     if (r.status !== '已交') actions += '<button data-buyer="' + b + '" data-status="已交" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">标记已交</button>';

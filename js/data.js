@@ -22,6 +22,9 @@ Aoi.explainRpcError = function (msg, context) {
   if (/已被他人修改/.test(msg)) {
     return '数据已被他人修改，请刷新页面重新进入后重试';
   }
+  if (/圈名缺失或不合法/.test(msg)) {
+    return '保存被拒绝：本页版本过旧（缺少圈名标识）。为防止旧页面覆盖新数据，请刷新页面重新进入后再试';
+  }
   if (/会话已过期/.test(msg)) {
     return '登录会话已过期，请重新登录';
   }

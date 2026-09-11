@@ -132,8 +132,8 @@ Aoi.member.renderFees = function (cn) {
       action = '<input id="receipt_' + batchId + '" type="text" data-img-paste placeholder="付款凭证 URL（可上传/粘贴）" class="w-40 border border-gray-300 rounded px-2 py-1 text-xs">'
         + '<button type="button" data-imgpicker="receipt_' + batchId + '" class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>'
         + '<button data-batch="' + batchId + '" class="ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">提交凭证</button>';
-    } else if (receipt) {
-      action = '<a href="' + Aoi.escapeHtml(receipt) + '" target="_blank" class="text-blue-500 hover:underline text-xs">查看凭证</a>';
+    } else if (receipt && Aoi.safeUrl(receipt)) {
+      action = '<a href="' + Aoi.escapeHtml(Aoi.safeUrl(receipt)) + '" target="_blank" class="text-blue-500 hover:underline text-xs">查看凭证</a>';
     } else {
       action = '<span class="text-gray-400 text-xs">已交</span>';
     }
@@ -195,11 +195,12 @@ Aoi.member.renderOrders = function (cn) {
     var tracking = o.tracking || '—';
     // v3.6.0 S2：参考列——命中商品登记显示参考图缩略图 + 商品链接（跳转链接空则回落活动平台链接）
     var prod = Aoi.orders.activityProduct(o.activity, o.type, o.model);
-    var link = Aoi.orders.productLink(o.activity, prod);
+    var link = Aoi.safeUrl(Aoi.orders.productLink(o.activity, prod)); // v3.10.0：协议白名单兜底
+    var refImg = prod ? Aoi.safeUrl(prod.refImage) : '';
     var ref = '';
-    if (prod && prod.refImage) {
-      ref += '<a href="' + Aoi.escapeHtml(prod.refImage) + '" target="_blank" class="mr-1" title="查看参考图">'
-        + '<img src="' + Aoi.escapeHtml(prod.refImage) + '" alt="参考图" class="w-9 h-9 object-cover rounded border border-gray-200 align-middle inline-block"></a>';
+    if (refImg) {
+      ref += '<a href="' + Aoi.escapeHtml(refImg) + '" target="_blank" class="mr-1" title="查看参考图">'
+        + '<img src="' + Aoi.escapeHtml(refImg) + '" alt="参考图" class="w-9 h-9 object-cover rounded border border-gray-200 align-middle inline-block"></a>';
     }
     if (link) {
       ref += '<a href="' + Aoi.escapeHtml(link) + '" target="_blank" class="text-blue-500 hover:underline text-xs whitespace-nowrap">' + (prod && prod.refUrl ? '商品链接' : '平台链接') + '</a>';
@@ -401,9 +402,12 @@ Aoi.member.submitCnChange = async function () {
   }
 };
 
-// 提交付款凭证：写 payments，状态置为待审核
+// 提交付款凭证：写 payments，状态置为待审核。
+// v3.10.0：凭证 URL 仅接受 http/https——此前任意字符串（含 javascript:）都会被
+// 存库并渲染为可点链接，构成存储型 XSS（团员提交 → 团长点击触发）。
 Aoi.member.submitReceipt = async function (batchId, receiptUrl) {
-  if (!receiptUrl) { Aoi.toast('请填写付款凭证 URL', 'warning'); return; }
+  receiptUrl = Aoi.safeUrl(receiptUrl);
+  if (!receiptUrl) { Aoi.toast('请填写付款凭证 URL（仅支持 http/https 链接）', 'warning'); return; }
   var cn = Aoi.member.state.cn;
   try {
     var d = Aoi.approval.ensure();

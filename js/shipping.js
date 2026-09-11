@@ -32,9 +32,10 @@ Aoi.ship.render = function () {
   var shipped = 0;
   tbody.innerHTML = rows.map(function (o, i) {
     if ((o.shipped || '未发') === '已发') shipped++;
-    // v3.7.0 S8：合照列由文字链接升级为缩略图（点击原窗口打开大图）
-    var photo = o.photo
-      ? '<a href="' + Aoi.escapeHtml(o.photo) + '" target="_blank" title="查看合照大图"><img src="' + Aoi.escapeHtml(o.photo) + '" alt="合照" class="w-10 h-10 object-cover rounded border border-gray-200"></a>'
+    // v3.7.0 S8：合照列由文字链接升级为缩略图（点击原窗口打开大图）；v3.10.0 渲染经协议白名单
+    var photoUrl = Aoi.safeUrl(o.photo);
+    var photo = photoUrl
+      ? '<a href="' + Aoi.escapeHtml(photoUrl) + '" target="_blank" title="查看合照大图"><img src="' + Aoi.escapeHtml(photoUrl) + '" alt="合照" class="w-10 h-10 object-cover rounded border border-gray-200"></a>'
       : '<span class="text-gray-400">—</span>';
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
@@ -83,8 +84,9 @@ Aoi.ship.setWarehouse = async function (orderId, warehouseId) {
 Aoi.ship.setPhoto = async function () {
   var ids = Aoi.ship.selectedIds();
   if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
-  var url = document.getElementById('shipPhoto').value.trim();
-  if (!url) { Aoi.toast('请输入合照 URL', 'warning'); return; }
+  var urlRaw = document.getElementById('shipPhoto').value.trim();
+  var url = Aoi.safeUrl(urlRaw); // v3.10.0：合照仅接受 http/https
+  if (!url) { Aoi.toast('请输入合照 URL（仅支持 http/https 链接）', 'warning'); return; }
   var idSet = {}; ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
   d.orders.forEach(function (o) { if (idSet[o.id]) o.photo = url; });

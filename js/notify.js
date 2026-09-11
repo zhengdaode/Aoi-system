@@ -19,6 +19,30 @@ Aoi.notify.ensure = function () {
   return d;
 };
 
+// —— 通知治理（v3.11.0 B6）：此前只增不减，blob 无限膨胀、整包下发变慢 ——
+Aoi.notify.MAX_KEEP = 500;
+
+// 清理：①已发超 30 天的删除；②总量超 MAX_KEEP 时按「已发优先、组内最旧优先」裁剪。
+// 返回删除条数（sync 落库时用）。date 为 YYYY-MM-DD 字符串，可直接字典序比较。
+Aoi.notify.prune = function (d) {
+  var before = d.notifications.length;
+  var cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  d.notifications = d.notifications.filter(function (n) {
+    return !(n.sent && (n.date || '') < cutoff);
+  });
+  if (d.notifications.length > Aoi.notify.MAX_KEEP) {
+    var ordered = d.notifications.slice().sort(function (a, b) {
+      var ga = a.sent ? 0 : 1, gb = b.sent ? 0 : 1; // 已发组排前 = 先丢
+      if (ga !== gb) return ga - gb;
+      return (a.date || '') < (b.date || '') ? -1 : 1;
+    });
+    var dropIds = {};
+    for (var i = 0; i < ordered.length - Aoi.notify.MAX_KEEP; i++) dropIds[ordered[i].id] = 1;
+    d.notifications = d.notifications.filter(function (n) { return !dropIds[n.id]; });
+  }
+  return before - d.notifications.length;
+};
+
 // 去重键：同类型 × 买家 × 批次只自动提醒一次
 Aoi.notify.keyOf = function (n) {
   return n.type + '|' + (n.buyer || '') + '|' + (n.batchId || '');
@@ -98,8 +122,19 @@ Aoi.notify.sync = async function () {
     });
 
     if (added || pruned) await Aoi.saveTeamData(d);
+    // v3.11.0 B6：顺带清理（已发超 30 天 / 超 500 条），有删除时一并落库
+    var removed = Aoi.notify.prune(d);
+    if (removed) await Aoi.saveTeamData(d);
     Aoi.notify.render();
-  } catch (e) { /* 自动同步失败不打断主流程 */ }
+  } catch (e) {
+    // v3.11.0：不再完全静默——控制台留痕 + 每会话一次轻提示
+    // （自动同步在登录/操作后高频触发，固定只提醒一次避免刷屏）
+    if (typeof console !== 'undefined' && console.warn) console.warn('[aoi] 自动通知同步失败：', e);
+    if (!Aoi.notify._syncWarned) {
+      Aoi.notify._syncWarned = true;
+      Aoi.toast('自动通知同步失败（不影响本次操作），可稍后在通知页手动生成', 'warning');
+    }
+  }
 };
 
 // 手动补发（按批次显式生成，不去重）

@@ -164,6 +164,23 @@ as $$
          ));
 $$;
 
+-- 单团模型守卫（v3.11.0 B6）：团队行数 >1 时显式报错，防 admin_* 与 F5 RPC
+-- 「select ... from teams limit 1」在误建第二团时静默操作错团。
+-- 返回唯一团队的 id（无团队时返回 null，由调用方各自处理）。
+create or replace function public.assert_single_team()
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from teams) > 1 then
+    raise exception '检测到多个团队行——本系统为单团模型，请清理多余 teams 行后重试';
+  end if;
+  return (select id from teams order by created_at limit 1);
+end;
+$$;
+
 -- jsonb 数组按 id 合并单条（v3.4.0 B2 辅助）：存在同 id 则整条替换，不存在则追加
 create or replace function public.jsonb_array_upsert_by_id(p_array jsonb, p_item jsonb)
 returns jsonb
@@ -376,7 +393,7 @@ begin
     into v_team, v_data
     from teams t
     left join team_data d on d.team_id = t.id
-    limit 1;
+    where t.id = public.assert_single_team();
   if v_team is null or v_data->'memberMeta' is null then
     return null;
   end if;
@@ -448,7 +465,7 @@ begin
     into v_team, v_data
     from teams t
     left join team_data d on d.team_id = t.id
-    limit 1;
+    where t.id = public.assert_single_team();
   if v_team is null then
     return null;
   end if;
@@ -532,7 +549,7 @@ begin
     into v_team, v_data
     from teams t
     left join team_data d on d.team_id = t.id
-    limit 1;
+    where t.id = public.assert_single_team();
   if v_team is null then
     return null;
   end if;
@@ -913,7 +930,7 @@ begin
   select t.name, t.member_key, d.data, d.updated_at
     into v_row
     from teams t left join team_data d on d.team_id = t.id
-    limit 1;
+    where t.id = public.assert_single_team();
   if v_row is null then raise exception '尚未创建团队'; end if;
   return json_build_object(
     'name', v_row.name,
@@ -943,7 +960,7 @@ declare
 begin
   v_admin := public.admin_verify_session(p_token);
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
-  select t.id into target_team_id from teams t limit 1;
+  target_team_id := public.assert_single_team(); -- v3.11.0 B6：单团守卫（原 limit 1 硬编码）
   if target_team_id is null then raise exception '尚未创建团队'; end if;
 
   if p_expected_updated_at is not null then
@@ -987,7 +1004,7 @@ begin
            coalesce(jsonb_array_length(h.data -> 'orders'), 0) as "ordersCount",
            octet_length(h.data::text) as "bytes"
     from team_data_history h
-    where h.team_id = (select id from teams order by created_at limit 1)
+    where h.team_id = public.assert_single_team()
     limit greatest(coalesce(p_limit, 20), 1)
   ) x;
 end;
@@ -1028,8 +1045,8 @@ begin
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
   if v_admin->>'role' <> 'super' then raise exception '仅超级管理员可重新生成团员密钥'; end if;
   -- v3.4.0 B2：128bit 随机（v2 的 auth.uid 版 regenerate_member_key 已随 v3.10.0 归档）
-  update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = (select id from teams limit 1);
-  return (select member_key from teams where id = (select id from teams limit 1));
+  update teams set member_key = encode(extensions.gen_random_bytes(16), 'hex') where id = public.assert_single_team();
+  return (select member_key from teams where id = public.assert_single_team());
 end;
 $$;
 
@@ -1047,7 +1064,7 @@ begin
   v_admin := public.admin_verify_session(p_token);
   if v_admin is null then raise exception '会话已过期，请重新登录'; end if;
   if p_name is null or length(trim(p_name)) = 0 then raise exception '团名不能为空'; end if;
-  update teams set name = trim(p_name) where id = (select id from teams limit 1);
+  update teams set name = trim(p_name) where id = public.assert_single_team();
   return trim(p_name);
 end;
 $$;

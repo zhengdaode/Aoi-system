@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.11.0 (2026-09-12)
+
+> **数据信任 + B6 治理**——管理端保存失败从「静默丢失」变为强提示；通知/blob 治理（B6）落地；
+> 单团硬编码显式化。schema 改动已随提交经 sb.js 应用线上 + 探针。
+
+### Fixed（数据信任）
+- **管理端保存失败强提示**：`saveTeamData` 此前失败只抛错，orders 29 处调用仅 3 处 try（且非保存用途）——断网/乐观锁冲突/会话过期时是无提示的 unhandled rejection，「以为存了其实没存」（与 09-06 事故同体验黑洞）。现保存失败在 data.js 统一 toast（网络异常明确提示「本次改动未上传」）后照旧抛错，全部调用方一次修复；已有 catch 的调用方最多双重提示、可接受。
+- **`notify.sync` 不再完全静默**：异常 console.warn 留痕 + 每会话一次轻提示（自动同步高频触发，避免刷屏）。
+
+### Added（B6 blob 治理）
+- **通知治理**：`notify.prune`——已发超 30 天自动清理 + 总量上限 500 条（超限按「已发优先、组内最旧优先」裁剪）；sync 时顺带执行并落库。此前 notifications 只增不减，blob 无限膨胀。
+- **blob 体积预警**：保存时检测整包 >2MB toast 警告（每会话一次），提示清理数据。
+- **单团显式化（schema）**：新增 `assert_single_team()` 守卫（teams >1 行时显式报错），替换 admin_get/save_team_data、admin_list_team_data_history、admin_regenerate_member_key、admin_rename_team 与 F5 三个 RPC 共 9 处 `limit 1` 硬编码——误建第二团不再静默操作错团。线上探针：守卫返回唯一团 id、F5 RPC 走守卫后正常。
+
+### Tests
+- 396 → 406 例全绿：新增 `tests/v311-trust.test.js` 10 例（保存失败 toast/抛错/成功无噪音、2MB 预警一次性、sync 失败标记与单次提示、prune 三态：30 天清理/上限裁剪/正常保留、schema 守卫：守卫函数 + 10 处引用 + 硬编码防回潮）。
+
 ## v3.10.0 (2026-09-12)
 
 > **安全止血**——全量复审产出的高优漏洞治理：p_cn 空值整份覆盖后门封堵、管理员登录防爆破、

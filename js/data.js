@@ -38,7 +38,10 @@ Aoi.explainRpcError = function (msg, context) {
 };
 
 // 保存团队业务数据 blob（管理端唯一写入口）
-// 携带 admin token + 上次读到的数据版本（乐观锁）；成功返回并记录新版本
+// 携带 admin token + 上次读到的数据版本（乐观锁）；成功返回并记录新版本。
+// v3.11.0：保存失败在此统一 toast——此前 orders 29 处调用仅 3 处 try（且非保存用途），
+// 断网/乐观锁冲突/会话过期时成为无提示的 unhandled rejection，「以为存了其实没存」；
+// 抛错行为不变（调用方后续流程照旧跳过），已有 catch 的调用方最多双重提示、可接受。
 Aoi.saveTeamData = async function (data) {
   if (Aoi.state.user && Aoi.state.user.isDebug) {
     localStorage.setItem('aoi_debug_data', JSON.stringify(data));
@@ -46,13 +49,28 @@ Aoi.saveTeamData = async function (data) {
   }
   var s = Aoi.adminLoadSession();
   if (!s) throw new Error('登录会话已失效，请重新登录');
+  // v3.11.0 B6：blob 体积预警（>2MB 提示一次；整包上传会越来越慢）
+  var bytes = 0;
+  try { bytes = JSON.stringify(data).length; } catch (e) { /* 不可序列化按 0 处理 */ }
+  if (bytes > 2 * 1024 * 1024 && !Aoi._blobWarned) {
+    Aoi._blobWarned = true;
+    Aoi.toast('警告：团队数据已超过 2MB，保存会变慢；建议到通知页清理旧通知或精简数据', 'warning');
+  }
   var params = { p_token: s.token, p_data: data, p_expected_updated_at: Aoi.adminUpdatedAt || null };
-  var r = await Aoi.db.rpc('admin_save_team_data', params);
+  var r;
+  try {
+    r = await Aoi.db.rpc('admin_save_team_data', params);
+  } catch (e) {
+    Aoi.toast('数据保存失败：网络异常或服务不可用，本次改动未上传——请检查网络后重试', 'error');
+    throw e;
+  }
   if (r.error) {
     var hint = Aoi.explainRpcError(r.error.message, '数据保存');
     if (/会话已过期/.test(hint || '')) Aoi.adminClearSession();
     if (/已被他人修改/.test(hint || '')) Aoi.adminUpdatedAt = null;
-    throw new Error(hint || ('保存失败：' + r.error.message));
+    var msg = hint || ('保存失败：' + r.error.message);
+    Aoi.toast('数据保存失败：' + msg, 'error');
+    throw new Error(msg);
   }
   Aoi.adminUpdatedAt = r.data; // 记录新版本，供下次写入
   return r.data;

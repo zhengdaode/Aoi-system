@@ -102,7 +102,7 @@
       <div class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex items-center mb-2"><h3 class="font-bold">我的国际费</h3><button onclick="Aoi.exportImage(this)" data-table="memberFeeTable" data-name="我的国际费" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="memberFeeTable" data-name="我的国际费" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
         <div class="overflow-x-auto">
-          <table id="memberFeeTable" class="w-full text-sm data-table">
+          <table id="memberFeeTable" class="w-full text-sm data-table responsive-cards">
             <thead><tr class="text-left text-gray-500 border-b border-gray-200">
               <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">到货批次</th><th class="px-3 py-2 text-right">应付国际费</th>
               <th class="px-3 py-2">状态</th><th class="px-3 py-2">操作</th>
@@ -116,7 +116,7 @@
       <div class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex items-center mb-2"><h3 class="font-bold">我的订单</h3><button onclick="Aoi.exportImage(this)" data-table="memberOrderTable" data-name="我的订单" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="memberOrderTable" data-name="我的订单" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
         <div class="overflow-x-auto">
-          <table id="memberOrderTable" class="w-full text-sm data-table">
+          <table id="memberOrderTable" class="w-full text-sm data-table responsive-cards">
             <thead><tr class="text-left text-gray-500 border-b border-gray-200">
               <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">活动</th><th class="px-3 py-2">制品</th>
               <th class="px-3 py-2">参考</th>
@@ -432,6 +432,7 @@
         <div id="backupSection" class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">数据备份与恢复</h3>
           <p class="text-sm text-gray-500 mb-3">每次保存数据时服务端自动存档旧版本（保留近 30 天 / 最多 100 份）；也可下载备份文件到本地，或从备份文件 / 历史快照恢复</p>
+          <p id="backupReminder" class="text-xs text-amber-600 mb-3"></p>
           <div class="flex flex-wrap gap-3 mb-3">
             <button onclick="Aoi.backup.download()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">下载全量备份（JSON）</button>
             <button onclick="document.getElementById('backupImportFile').click()" class="px-4 py-2 bg-white border border-gray-300 text-sm font-bold rounded hover:bg-gray-50">从备份文件恢复…</button>
@@ -439,6 +440,17 @@
           </div>
           <p class="text-xs text-gray-500 mb-1">服务端历史快照（新→旧，「恢复此版」回滚到该时刻）：</p>
           <ul id="backupHistoryList"></ul>
+        </div>
+
+        <!-- 审计记录（v3.12.0 B3，仅 super 可见；renderSettings 控制显隐） -->
+        <div id="auditSection" class="bg-white rounded-lg border border-gray-200 p-6 hidden">
+          <h3 class="font-bold mb-2">审计记录</h3>
+          <p class="text-sm text-gray-500 mb-3">管理员关键操作留痕（登录 / 保存 / 账号变更 / 密钥重生成等，保留 90 天），回答「谁在什么时候改了什么」</p>
+          <div class="flex items-center gap-3 mb-2">
+            <button onclick="Aoi.auditMgmt.render()" class="px-3 py-1.5 bg-white border border-gray-300 text-xs font-bold rounded hover:bg-gray-50">刷新</button>
+            <button onclick="Aoi.auditMgmt.clear()" class="px-3 py-1.5 bg-white border border-gray-300 text-xs font-bold rounded hover:bg-gray-50">清理 90 天前记录</button>
+          </div>
+          <ul id="auditList"></ul>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -1031,6 +1043,10 @@
             <button onclick="Aoi.notify.pushBot('group')" class="px-4 py-2 bg-indigo-300 text-gray-800 text-sm font-bold rounded hover:bg-indigo-400">推送·仅群发(@)</button>
             <button onclick="Aoi.notify.pushBot('private')" class="px-4 py-2 bg-purple-600 text-white text-sm font-bold rounded hover:bg-purple-700">推送·仅私聊</button>
             <button onclick="Aoi.notify.clearSent()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">清除已发送</button>
+            <span class="ml-auto flex items-center gap-1 text-xs">
+              <button data-notify-filter="all" class="px-3 py-1.5 rounded font-bold">全部</button>
+              <button data-notify-filter="unsent" class="px-3 py-1.5 rounded font-bold">仅未发</button>
+            </span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">

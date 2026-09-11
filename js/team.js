@@ -256,10 +256,26 @@ Aoi.backup.download = function () {
   document.body.appendChild(a);
   a.click();
   a.remove();
+  // v3.13.0：记录下载时刻，设置页显示「距上次备份 N 天」提醒
+  try { localStorage.setItem('aoi_last_backup_download', String(Date.now())); } catch (e) { /* 隐私模式等 */ }
+  Aoi.backup.renderReminder();
   URL.revokeObjectURL(a.href);
   Aoi.toast('备份已下载（' + a.download + '）', 'success');
 };
 
+// 备份提醒（v3.13.0 F4 收尾）：显示距上次下载全量备份的天数
+Aoi.backup.renderReminder = function () {
+  var el = document.getElementById('backupReminder');
+  if (!el) return;
+  var last = Number(localStorage.getItem('aoi_last_backup_download') || 0);
+  if (!last) {
+    el.textContent = '尚未下载过全量备份——服务端快照只保留 30 天，建议每周下载一份存本地/网盘';
+    return;
+  }
+  var days = Math.floor((Date.now() - last) / 86400000);
+  el.textContent = days === 0 ? '今天已下载过全量备份 ✓'
+    : '距上次下载全量备份已 ' + days + ' 天（建议每周一次；服务端快照只保留 30 天）';
+};
 // 「从备份文件恢复」入口：读取 <input type=file>，校验后走统一恢复流程
 Aoi.backup.onImportFile = async function (ev) {
   var file = ev.target.files && ev.target.files[0];

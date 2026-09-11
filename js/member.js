@@ -139,11 +139,11 @@ Aoi.member.renderFees = function (cn) {
     }
 
     return '<tr class="border-b border-gray-100">'
-      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(batch.date || '') + '</td>'
-      + '<td class="px-3 py-2 text-right font-semibold">¥' + fee.toFixed(2) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.approval.statusBadge(status) + '</td>'
-      + '<td class="px-3 py-2">' + action + '</td>'
+      + '<td data-label="序号" class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
+      + '<td data-label="到货日期" class="px-3 py-2">' + Aoi.escapeHtml(batch.date || '') + '</td>'
+      + '<td data-label="应付国际费" class="px-3 py-2 text-right font-semibold">¥' + fee.toFixed(2) + '</td>'
+      + '<td data-label="状态" class="px-3 py-2">' + Aoi.approval.statusBadge(status) + '</td>'
+      + '<td data-label="操作" class="px-3 py-2">' + action + '</td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无到货批次（该圈名还没有已到货的订单）</td></tr>';
 
@@ -207,17 +207,17 @@ Aoi.member.renderOrders = function (cn) {
     }
     if (!ref) ref = '<span class="text-gray-300 text-xs">—</span>';
     return '<tr class="border-b border-gray-100">'
-      + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.activity) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
-      + '<td class="px-3 py-2 whitespace-nowrap">' + ref + '</td>'
-      + '<td class="px-3 py-2 text-right">' + priceCell + '</td>'
-      + '<td class="px-3 py-2 text-right">' + o.count + '</td>'
-      + '<td class="px-3 py-2 text-right">' + ((o.price != null) ? sum.toFixed(2) : '—') + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(o.batchId ? Aoi.orders.batchDate(o.batchId) : '—') + '</td>'
+      + '<td data-label="序号" class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
+      + '<td data-label="活动" class="px-3 py-2">' + Aoi.escapeHtml(o.activity) + '</td>'
+      + '<td data-label="制品" class="px-3 py-2">' + Aoi.escapeHtml(o.type + ' - ' + o.model) + '</td>'
+      + '<td data-label="参考" class="px-3 py-2 whitespace-nowrap">' + ref + '</td>'
+      + '<td data-label="单价" class="px-3 py-2 text-right">' + priceCell + '</td>'
+      + '<td data-label="数量" class="px-3 py-2 text-right">' + o.count + '</td>'
+      + '<td data-label="小计" class="px-3 py-2 text-right">' + ((o.price != null) ? sum.toFixed(2) : '—') + '</td>'
+      + '<td data-label="批次" class="px-3 py-2">' + Aoi.escapeHtml(o.batchId ? Aoi.orders.batchDate(o.batchId) : '—') + '</td>'
       + '<td data-label="进度" class="px-3 py-2 text-xs whitespace-nowrap">' + Aoi.member.progressChain(o, cn) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(tracking) + '</td>'
-      + '<td class="px-3 py-2">' + confirm + '</td>'
+      + '<td data-label="快递单号" class="px-3 py-2">' + Aoi.escapeHtml(tracking) + '</td>'
+      + '<td data-label="收货" class="px-3 py-2">' + confirm + '</td>'
       + '</tr>';
   }).join('') : '<tr><td colspan="11" class="px-3 py-2 text-gray-400">没有找到该圈名的订单，请确认 CN 是否正确</td></tr>';
 };

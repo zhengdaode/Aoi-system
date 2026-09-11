@@ -162,12 +162,27 @@ Aoi.notify.generate = async function (type) {
   Aoi.toast(created ? '已生成 ' + created + ' 条通知' : '没有需要通知的对象', created ? 'success' : 'info');
 };
 
-// 渲染通知列表（新→旧）
+// 渲染通知列表（新→旧；v3.13.0 支持全部/仅未发筛选）
+Aoi.notify.filter = 'all';
+
+Aoi.notify.setFilter = function (f) {
+  Aoi.notify.filter = f === 'unsent' ? 'unsent' : 'all';
+  Aoi.notify.render();
+  document.querySelectorAll('[data-notify-filter]').forEach(function (b) {
+    var on = b.getAttribute('data-notify-filter') === Aoi.notify.filter;
+    b.classList.toggle('bg-gray-800', on);
+    b.classList.toggle('text-white', on);
+    b.classList.toggle('bg-gray-100', !on);
+    b.classList.toggle('text-gray-600', !on);
+  });
+};
+
 Aoi.notify.render = function () {
   var d = Aoi.notify.ensure();
   var tbody = document.getElementById('notifyTbody');
   if (!tbody) return;
   var list = d.notifications.slice().sort(function (a, b) { return (b.date || '') < (a.date || '') ? -1 : 1; });
+  if (Aoi.notify.filter === 'unsent') list = list.filter(function (n) { return !n.sent; });
   tbody.innerHTML = list.length ? list.map(function (n) {
     var t = Aoi.notify.TYPES[n.type] || { label: n.type, color: 'text-gray-500' };
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
@@ -180,10 +195,15 @@ Aoi.notify.render = function () {
       + '<button data-toggle="' + n.id + '" class="px-2 py-1 ' + (n.sent ? 'bg-green-600' : 'bg-gray-400') + ' text-white text-xs rounded hover:opacity-90">' + (n.sent ? '已发' : '未发') + '</button> '
       + '<button data-del="' + n.id + '" class="px-2 py-1 text-red-500 text-xs hover:underline">删</button>'
       + '</td></tr>';
-  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无通知（点「同步生成」或上方按钮生成）</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">' + (Aoi.notify.filter === 'unsent' ? '没有未发送的通知' : '暂无通知（点「同步生成」或上方按钮生成）') + '</td></tr>';
   var stat = document.getElementById('notifyStat');
-  if (stat) stat.textContent = list.length ? '共 ' + list.length + ' 条 · 未发 ' + list.filter(function (n) { return !n.sent; }).length : '';
+  if (stat) stat.textContent = d.notifications.length ? '共 ' + d.notifications.length + ' 条 · 未发 ' + d.notifications.filter(function (n) { return !n.sent; }).length : '';
 };
+
+// 筛选切换（事件委托，v3.13.0）
+document.querySelectorAll('[data-notify-filter]').forEach(function (b) {
+  b.addEventListener('click', function () { Aoi.notify.setFilter(b.getAttribute('data-notify-filter')); });
+});
 
 // 刷新批次下拉（通用实现见 orders.refillBatchSelect）
 Aoi.notify.refillBatches = function () {

@@ -1,29 +1,50 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-09-10 · 版本 **v3.7.0 / v3.6.3**（v3.7.0：管理端第二轮 S1–S8 已实施上线（商品主档聚合/活动展开区/购买人体系/登记活动商品/汇总表导出/复盘并入总览/流式宽度/合照缩略图）；v3.6.3：F10 QQ 机器人用户交互迭代——绑定唯一性校验（两端）/ bot 解绑·我是谁·查单筛选·我的快递 / 网页端解绑与复制绑定指令（见 `docs/PLAN-F10-BOT-INTERACTION.md`）。F5 的 3 个机器人 RPC 已于 2026-09-10 经 sb.js 应用线上并探针验证；QQ 侧功能上线仅剩 relay 真机部署批次。v3.5：①F6 团期复盘统计并入主系统——「工具 → 复盘统计」页（js/stats.js，只读统计）+ 发货时间戳埋点 `orders.shippedAt`，demo 路线按用户决策取消（迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`）；②从链接导入订单——排谷表/汇总表分享直链经 `/media-proxy` 同源代理一键导入。v3.4：数据安全兜底 + 团员感知增强（B1/F4、B2 Phase 1、F1、F2）；F5 QQ 机器人双向移出为独立项目并于 2026-09-09 实施（aoi-qqbot 仓库 M1–M7，主仓库接入 3 RPC + 设置页 + 排发钩子）；F7/F8 取消。v3.3：冗余清理与重构；v3.2：第二批实测反馈；v3.1：QQ 推送双通道；v3：管理员账号体系重设计（详见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；v1.7.0–v2.0.0：十项问题迭代。变更明细见 CHANGELOG.md，路线见 PLAN-NEXT.md）
+> 更新日期：2026-09-12 · 版本 **v3.14.0**（v3.10.0 安全止血：p_cn 空值整份覆盖后门封堵 / admin_login 防爆破 /
+> escapeHtml 引号 + safeUrl 协议白名单 / v2 账号体系（邀请码·team_members）归档；v3.11.0 数据信任：管理端保存
+> 失败强提示 / notify.sync 不吞错 / B6 通知·blob 治理 + assert_single_team 单团守卫；v3.12.0 B3 审计日志 +
+> B4 推送链路加固（Edge UPSTREAM env 化 / 长度上限 / 重定向逐跳校验 / CSP 收紧）+ B5 迁移机制
+> （schema_migrations + sb.js --migrate），⚠️ 修正 v3.10.0 锁定因事务回滚从未生效的缺陷 → 序列节流；
+> v3.13.0 团员端移动卡片化 / 通知筛选 / 备份提醒。v3.9.x：导出链路与 PCO 粘贴导入迭代（详单见 CHANGELOG）。
+> 历史里程碑：v3.7.0 管理端第二轮 S1–S8；v3.6.3 F10 机器人交互；v3.5 复盘统计并入 + 链接导入；
+> v3.4 数据安全兜底；v3.0 账号体系重设计；v1.7.0–v2.0.0 十项问题迭代）
 
-## 当前状态速览（2026-09-10 v3.7.0 / v3.6.3 后）
+## 当前状态速览（2026-09-12 v3.14.0 后）
 
-- **代码层**：**v3.7.0 管理端第二轮已实施完成**（2026-09-10 凌晨，S1 商品主档聚合 / S2 活动展开区 / S3 购买人体系 / S4 登记活动商品 / S5 汇总表导出 / S6 复盘并入总览 / S7 流式宽度 / S8 合照缩略图，见归档计划与 CHANGELOG）；**v3.6.3 F10 QQ 机器人用户交互迭代已实施**（绑定唯一性校验 / bot 解绑·我是谁·查单筛选·我的快递）；vitest 全套 **336 例全绿**，aoi-qqbot node:test **68 例全绿**。前端两通道（GitHub Pages / Netlify）已随推送自动部署上线（CI 全绿）。
-- **✅ 线上库已再升级并验证（2026-09-10，经 `scripts/sb.js`）**：先建快照表（`team_data_bak_20260910` / `teams_bak_20260910`）→ 重跑全量 `supabase-schema.sql`（补齐 F5 的 3 个机器人 RPC）→ 探针全过：①三 RPC anon EXECUTE 均 true；②`team_summary_for_group` 阶段/计数正确、`deadline` 恒 null；③`unpaid_members_by_group` 名单与 `settings(qrUrl/adminQq)` 白名单出参正常；④`member_lookup_by_qq` 未绑定返回 null；⑤业务数据完好（orders 74 条）。
+- **代码层**：文档一致性轮；vitest 全套 **422 例全绿**，aoi-qqbot node:test **68 例全绿**。前端两通道
+  （GitHub Pages / Netlify）随推送自动部署（CI 全绿）。Edge Function `qq-relay` 已部署 v7（UPSTREAM 走
+  env `RELAY_UPSTREAM`，经 `scripts/deploy-edge.js --secret` 注入）。
+- **✅ 线上库已应用并探针验证（2026-09-12，v3.10.0–v3.12.0 schema，写前快照 `*_bak_20260912`）**：
+  p_cn 空值写入拒绝、admin_login 序列节流（失败→5 秒冷却）、审计表/RPC 权限、F5 RPC 走单团守卫、
+  v2 函数/表/列收敛删除、orders 104 条完好。
 - **⚠️ 待用户操作（按优先级）**：
-  1. **QQ 机器人真机部署批次（唯一阻塞 QQ 侧全部功能的事，F5+F10 同批）**：ECS 上 `git pull` aoi-qqbot（已是 F10 版）+ `pm2 restart qq-relay`；NapCat WebUI 开 HTTP POST 上报（`http://127.0.0.1:8080/onebot/event?token=<EVENT_TOKEN>`）；Caddy TLS 反代（`Caddyfile` 已附）；网页设置页 relay 改 https 域名 + 填 `botConfig.adminQq/qrUrl` 并保存。验收：QQ 私聊「帮助/查单/我的进度/我的快递/我是谁」+ 群内 @「团况」+ 绑定/解绑全链路（README 冒烟 curl 可先行）。**前置：47.101.194.103 SSH 密钥不可达，需负责人授权公钥或由负责人本人执行。**
-  2. **F9 监控载体拍板**：PCO 风控实测否决自动化浏览器（Actions/本地、headless/有头全拒，3 轮实验记录见 PLAN-F9 §9）；恢复条件=日常浏览器可达性确认→择载体复验；「只粘贴链接一键抓取」入口已预留（`d.catalogConfig.dispatchUrl`）。
-  3. （建议）设置页「下载全量备份」存本地/网盘一份；线上另有 `*_bak_20260908` / `*_bak_20260910` 快照表可随时查。
-- **下一步目标（2026-09-10 复盘定稿）**：
-  1. **完成 relay 真机部署批次**并做 F5/F10 全功能真机验收（见待用户操作 1）——这是当前唯一的大阻塞项。
-  2. **v3.8.0：F9 商品目录模块点亮**——`js/catalog.js` / `catalog-dict.js` / `species-zh.js` 已随 F9 交付入库但未接入（待登记进 `tests/helpers/aoi.js` MODULES + 工具菜单入口 + 粘贴导入/校对工作台/小程序模板导出联调）；`dispatchUrl` 通道就绪即点亮一键抓取。
-  3. **流程纪律固化**（2026-09-10 当夜两个教训）：①改 `supabase-schema.sql` 的提交应**随提交即经 sb.js 应用线上 + 探针**，不再积压（本次 F5 RPC 积压一日余才补）；②每个里程碑提交后 `git status` 必须干净再进下一项（S7 曾漏提交 index.html，靠复盘补正）。
-  4. 小改进待办：`scripts/sb.js` 对象单元格打印 `[object Object]`，改 JSON.stringify 展开。
-- **F5 / F6 / F7 / F8（2026-09-08 用户决策）**：F5 移出为独立项目并**已实施（2026-09-09，[aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot) M1–M7）**：relay v4 双向；主仓库接入见 CHANGELOG v3.5.3；3 个 RPC 已入库（2026-09-10 sb.js 重跑+探针），**QQ 侧待真机部署**（NapCat 上报 / Caddy TLS / ECS relay 更新）；**F6 已并入主系统（v3.5.0）**——demo 路线取消，`demo/stats-demo/` 与 `demo/F6-团期复盘统计-demo.zip` 保留为历史产物（可另行删除），迭代结论与实现方案见 `docs/PLAN-F6-STATS.md`；F7/F8 取消，v4.0.0 商用化路线不再排期。
-- **F10 QQ 机器人用户交互迭代（2026-09-10，v3.6.3）已实施**：绑定唯一性校验（relay 冲突暂拒/幂等，网页冲突拒绝/异常放行）、bot「解绑 <密钥> <圈名>」「我是谁」「查单 <活动名>」「我的快递」、网页端解绑按钮与复制绑定指令；aoi-qqbot 54→68 测试、主仓库新增 member-qq-bind 11 例；上线与 F5 同一真机部署批次（ECS relay git pull + pm2 restart 即含新指令）。
-- **已知限制（v3.4.0 后）**：
-  - member_key 仍为团队级凭证（一个团一把），但读已按 CN 裁剪 PII、写已白名单合并（防整份覆盖与自批「已交」）、密钥已升 128bit；设置页重新生成即作废旧密钥。
-  - 服务端历史快照保留近 30 天 / 每团 100 份；更早的版本依赖手动「下载全量备份」文件。
-  - 默认图床 SSL 过期问题（P14）未处理（B7 Storage 方案随商用化路线一并暂缓）。
-  - v3 主线不包含旧部署线的 P15 自定义背景 / P6 黑夜模式全局切换 / P16 图床 UI（保留在 `backup-before-cleanup` 分支）。
-- **测试**：`tests/`（vitest + jsdom），harness 加载 index.html + js 模块；新增 js 模块需加入 `tests/helpers/aoi.js` 的 MODULES 列表。
-- **⚠️ 2026-09-06 数据事故记录**：生产站旧前端陈旧内存覆盖曾清空 cyberbutter 团 blob（orders 34→0），当日经备份还原至 32 条（**经与部署者确认为测试数据**）。取证结论：使用者真实数据 = 旧表 `leader_data` 中 `ICGPClick` 键 12 条订单（归属 2360690621@qq.com，已导出 `backups/`）；团员地址/QQ/凭证及 8/16 后录入的数据因当时保存缺陷从未落库，不可恢复。完整过程见 `docs/ITERATION_LOG.md` 第 6 轮。**v3.4.0 B1 即针对此类事故的系统性兜底**（每次保存自动存档 + 一键备份/恢复）。
+  1. **QQ 机器人真机部署批次（唯一阻塞 QQ 侧全部功能的事，F5+F10+relay v5 加固同批）**：ECS 上
+     `git pull` aoi-qqbot + 主仓库 relay/relay.js（v3.12.0 加固：body/消息上限、限频、/audit）+
+     `systemctl restart qq-relay`；NapCat WebUI 开 HTTP POST 上报；Caddy TLS 反代（顺带消除明文 http
+     token 链路）；网页设置页 relay 改 https 域名 + botConfig。**前置：47.101.194.103 SSH 密钥不可达，
+     需负责人授权公钥或由负责人本人执行。**
+  2. **F9 监控载体拍板**：PCO 风控实测否决自动化浏览器；唯一可行载体=负责人本地 Windows 机；
+     「只粘贴链接一键抓取」入口已预留（`d.catalogConfig.dispatchUrl`）。
+  3. （建议）设置页「下载全量备份」每周一份（卡片顶部有距上次备份天数提醒）；线上另有 `*_bak_*`
+     快照表可随时查。
+- **下一轮方向（2026-09-12 复审定稿）**：v3.10.0–v3.13.0 已消化 PLAN-NEXT 的 B3/B4/B5/B6 与高优安全项；
+  剩余遗留为「relay 真机批次（上 1）」与「F9 载体拍板（上 2）」；F3 汇率自动同步经用户决策**暂缓**；
+  F6 demo 产物已随 v3.14.0 清理。后续新需求按 AGENTS.md 流程立项。
+- **F5 / F6 / F7 / F8**：F5 独立项目已实施（QQ 侧待真机部署）；F6 已并入主系统（v3.5.0）；
+  F7/F8 取消，v4.0.0 商用化不再排期。
+- **已知限制（v3.12.0 后）**：
+  - member_key 仍为团队级凭证；读已按 CN 裁剪 PII、写白名单合并且**空 p_cn 整份覆盖桥已封堵**
+    （v3.10.0）——但 member_key 本体泄露仍可读他人订单与全员名单，商用前需拆表（设计保留）。
+  - 服务端历史快照保留近 30 天 / 每团 100 份；审计日志保留 90 天。
+  - 登录防爆破为「失败后 5 秒全局冷却」（序列节流）——比逐账号锁定弱，但回滚免疫、单团部署够用。
+  - relay 与 Netlify→ECS 一跳仍为明文 http（token 过网）——Caddy TLS 在真机部署批次解决。
+  - 团员端密钥 + CN 免登录模型不变；debug/debug123 后门账户生产常开（数据仅本机）。
+  - v3 主线不包含旧部署线的 P15/P6/P16（保留在 `backup-before-cleanup` 分支）。
+- **测试**：`tests/`（vitest + jsdom），harness 加载 index.html + 22 个 js 模块；新增 js 模块需加入
+  `tests/helpers/aoi.js` 的 MODULES 列表。
+- **⚠️ 2026-09-06 数据事故记录**：生产站旧前端陈旧内存覆盖曾清空 cyberbutter 团 blob（orders 34→0），
+  当日经备份还原。完整过程见 `docs/ITERATION_LOG.md` 第 6 轮；v3.4.0 B1 为系统性兜底，v3.10.0 封堵
+  同模型的恶意利用面（空 p_cn 整份覆盖），v3.11.0 修复「保存静默失败」体验黑洞。
 
 ## 项目定位
 

@@ -2,7 +2,7 @@
 
 > **原作者：秋洛 (QiuLuo)** · 原项目：[mossasari/Group-Buy-Management-System](https://github.com/mossasari/Group-Buy-Management-System)
 > **当前维护者：郑 (zhengdaode)** · [GitHub](https://github.com/zhengdaode)
-> **当前版本：v3.4.0**（2026-09-08）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
+> **当前版本：v3.14.0**（2026-09-12）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/zhengdaode/Aoi-system)
 
@@ -13,7 +13,7 @@
 
 ---
 
-## 功能全景（v3.5.0）
+## 功能全景（v3.13.0）
 
 | 模块 | 能力 |
 |------|------|
@@ -39,7 +39,7 @@
 
 ## 技术架构
 
-- **前端**：`index.html` + 17 个原生 JS 模块（全局 `window.Aoi` 命名空间），Tailwind CSS CDN。无框架、无构建。
+- **前端**：`index.html` + 22 个原生 JS 模块（全局 `window.Aoi` 命名空间），Tailwind CSS CDN（运行时 JIT 无法自托管）；Supabase/xlsx/exceljs/html2canvas 已自托管 `js/vendor/`（v3.9.3，jsDelivr 大陆不可达）。无框架、无构建。
 - **管理员体系（v3）**：部署时初始化超级管理员，应用内添加管理员（用户名/密码，bcrypt + token 会话）；不依赖 Supabase Auth，无自助注册。
 - **存储**：Supabase（PostgreSQL）三表 `teams` / `team_members` / `team_data`——全部业务数据存于 `team_data.data` 一个 JSONB blob；schema 与 RPC 见 [`supabase-schema.sql`](supabase-schema.sql)。
 - **QQ 机器人**：前端 `js/bot.js` → ECS 上的 [`relay/relay.js`](relay/relay.js)（校验登录态与 owner/admin 角色，NapCat 转发 ≥1s 节流）→ NapCat（OneBot v11）。token 只存服务端。
@@ -89,7 +89,7 @@
 ```
 ├── index.html              # 页面骨架 + 全部视图（无框架 SPA）
 ├── css/styles.css          # 自定义样式（editorial 设计系统）+ 响应式表格/卡片
-├── js/                     # 16 个功能模块（window.Aoi 命名空间）
+├── js/                     # 22 个功能模块（window.Aoi 命名空间）+ vendor/ 自托管库
 │   ├── core.js             # 路由/通用工具/撤销/总览
 │   ├── config.js           # 部署时生成（gitignore），模板 config.example.js
 │   ├── data.js             # Supabase 读写 + RPC 错误分类
@@ -129,7 +129,7 @@
 
 ```bash
 npm install        # 安装 vitest + jsdom（仅测试用，前端本体零依赖）
-npm test           # 170 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
+npm test           # 422 个用例（harness 把 index.html 装入 jsdom 再加载 js 模块）
 npm run test:watch # 监听模式
 ```
 

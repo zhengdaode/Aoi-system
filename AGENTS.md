@@ -1,6 +1,6 @@
 # AGENTS.md — Aoi-system 工作规范与项目计划入口
 
-> 谷圈团购排单系统（团长管理端 + 团员自助看板）。纯 HTML/CSS/原生 JS 单页应用 + Supabase（无框架、无构建、无 package.json）。
+> 谷圈团购排单系统（团长管理端 + 团员自助看板）。纯 HTML/CSS/原生 JS 单页应用 + Supabase（无框架、无构建；package.json 仅为测试工具链）。
 > 业务概念沿用原作者（秋洛，CC BY-NC-SA 4.0）；代码与数据模型全量重写为原创。
 
 ## 注意事项（每次改动必须遵守）
@@ -13,7 +13,7 @@
 
 ## 当前项目计划
 
-**见 [docs/ROADMAP.md](docs/ROADMAP.md)** —— 2026-09 用户实测 10 项问题的迭代计划
+**现状以 [docs/STATUS.md](docs/STATUS.md)「当前状态速览」为准**（2026-09-12 起；ROADMAP 已转为历史文档）——2026-09 用户实测 10 项问题的迭代计划
 （v1.7.0 团员侧修复/QQ 机器人/测试基建 → v1.8.0 订单改版 → v1.9.0 国际计算/活动管理 → v2.0.0 限购计算器/导出/响应式），
 **四个版本已全部实施完成**（2026-09-06，详见 CHANGELOG）；v3.0.0 账号体系重设计亦已实施（见 `docs/archive/PLAN-AUTH-REDESIGN.md`）；
 **v3.2.0 第二批实测反馈迭代已实施完成**（2026-09-06，见 `docs/archive/PLAN-v3.2.0.md`）；
@@ -38,7 +38,7 @@
 
 ## 技术栈与架构速览
 
-- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 18 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
+- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 22 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
   核心模块：`core.js`（路由/通用）、`data.js`（Supabase 读写）、`auth.js`、`team.js`、`member.js`（团员端）、
   `orders.js`（订单/活动/批次/类型/商品主档）、`calc.js`（汇率换算）、`intl.js`（国际运费分摊）、`approval.js`（交费审批）、
   `shipping.js`、`warehouse.js`、`notify.js`（通知 + QQ 推送入口）、`bot.js`（OneBot v11 客户端）、`import.js`、

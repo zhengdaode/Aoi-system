@@ -34,7 +34,7 @@
 
 - 本项目部署到公网静态站，`js/config.js` 运行时对任何访客可见。
 - 若把 `httpApi` + `token` 写进前端，任何访客可读到 token、冒充机器人发任意消息。
-- 必须加一层服务端 relay，token 只存服务端。两种选法：
+- 必须加一层服务端 relay，token 只存服务端。**已定型双通道并存（v3.12.0 起）**：① ECS relay `relay/relay.js`（http://47.101.194.103:8080，v4 双向 + `/fetch` 白名单代理 + v3.12.0 加固：body/消息上限、限频、`/audit` 推送审计；部署用 systemd `qq-relay.service`）；② Supabase Edge Function `supabase/functions/qq-relay/index.ts`（https 入口，UPSTREAM 经 env `RELAY_UPSTREAM` 注入，经 `scripts/deploy-edge.js` 部署/`--secret` 设置 env）。历史方案备查：
   1. **Supabase Edge Function**（项目已用 Supabase，零新增基建）——token 存 Edge Function env，暴露最小鉴权端点（团长登录态或共享 secret），校验后转发 NapCat。
   2. **NapCat 同机小 relay**——NapCat 不公网开放时，在它所在的 VPS 上放个几行的转发服务，前端打这个服务。
 - 浏览器 `fetch` → relay → NapCat，顺带解决 CORS。

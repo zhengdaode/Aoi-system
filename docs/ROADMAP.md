@@ -2,7 +2,7 @@
 
 > 来源：2026-09-06 用户实测反馈的 10 项问题，经代码探查后整理为可执行任务。
 > 本文档是当前唯一有效的路线图；v1.4.0 时期历史归档见 `docs/archive/IMPROVEMENT_PLAN.md`。
-> 当前基线版本：v3.3.0（CHANGELOG）。v1.7.0–v2.0.0、v3.0.0、v3.2.0 均已实施完成；下方 P0 修复任务 checkbox 已按实际完成情况勾选（溯源见 ITERATION_LOG）。
+> 当前基线版本：v3.3.0（CHANGELOG）。**⚠️ 历史文档（2026-09-12 起）**：本路线图的十项问题迭代已全部完成，后续演进见 CHANGELOG 与 docs/STATUS.md「当前状态速览」；「当前唯一有效路线图」指针已在 AGENTS.md 更新为 STATUS.md。下方 P0 修复任务 checkbox 已按实际完成情况勾选（溯源见 ITERATION_LOG）。
 
 ---
 

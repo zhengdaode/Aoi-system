@@ -1,14 +1,14 @@
-// Aoi.catalog — PCO 商品目录（v3.7.0 F9）
-// 职责：粘贴解析（v3.9.5 两步工作流——①整页复制先直接粘贴：富文本商品卡带出商品图/链接/价格/
-//   限购；②ChatGPT 翻译表格后粘贴：按「日文原名」对齐合并，中文译名/类型直入草稿、图片保留，
-//   顺序无关；ChatGPT 渲染表格以 text/html 粘贴亦可解析）→ 人工校对 →
-//   ① 推入活动商品主档（复用 Aoi.orders.registerProduct，price/priceOrig/currency/limit 同构扩展字段）
-//   ② 按小程序模板导出 xlsx（说明 6 行 + 表头行 + 数据，模板结构见 docs/PLAN-F9-CATALOG-IMPORT.md §2）
-//   ③ 保存到 d.pcoItems 目录（aoi-pco-monitor 与本模块共读写的同一结构）
-// 链接抓取通道（aoi-pco-monitor 按需抓取）为预留入口：d.catalogConfig.dispatchUrl 配置后点亮。
+// Aoi.catalog — PCO 商品目录（v3.7.0 F9；v3.15.0 瘦身）
+// 职责：粘贴解析（两步工作流——①整页复制先直接粘贴：富文本商品卡带出商品图/链接/价格/
+//   限购；②ChatGPT 翻译表格后粘贴：按「日文原名」对齐合并，中文译名/类型直入草稿；
+//   v3.15.0 起表格可含 商品链接/图片链接 两列，配合优化后的提示词支持一次性导入，
+//   图片链接缺失时仍可用两步流程补图）→ 人工校对 → 推入活动商品主档
+//   （复用 Aoi.orders.registerProduct；人民币价默认不生成，由活动管理「生成人民币价」统一计算）。
+// v3.15.0（D1 已批准）：「已存目录」d.pcoItems 停写与下线——补货监控已否决，草稿不再持久化，
+//   请及时「推入活动商品」；历史数据可用 scripts/archive-pco.mjs（--apply 删除 / --restore 恢复）。
 window.Aoi = window.Aoi || {};
 Aoi.catalog = {
-  draft: [],      // 本次会话校对草稿（保存后并入 d.pcoItems）
+  draft: [],      // 本次会话校对草稿（会话结束即清空，推入活动商品为唯一持久化路径）
   matchers: null, // 词典+种名合并匹配表（jp 长度降序）
   phrases: null   // 短语替换表（长度降序）
 };
@@ -92,15 +92,17 @@ Aoi.catalog.matchTypeKey = function (zhType) {
   return '';
 };
 
-// —— ChatGPT 翻译工作流（v3.9.4：整页复制 → 贴给 ChatGPT 按下方提示词翻译 → 表格贴回本页）——
-// 提示词：输出固定列表格，命名遵循本系统「型号=简短中文名 + 类型独立成列」的商品命名逻辑；
-// 宝可梦物种名用常见官方译名，品类词表与 Aoi.catalogDict.categories 同源（节选高频项）。
+// —— ChatGPT 翻译工作流（v3.9.4 引入；v3.15.0 S9 优化：目标一次性导入中文版）——
+// 提示词：输出固定列表格（含 商品链接/图片链接 两列），命名遵循本系统「型号=简短中文名 +
+// 类型独立成列」的商品命名逻辑；宝可梦物种名用常见官方译名，品类词表与
+// Aoi.catalogDict.categories 同源（节选高频项）。预期管理（D3）：粘贴进 ChatGPT 输入框的
+// 富文本会剥离 <img> 的 src，「图片链接」列尽力而为、常为空——缺图时仍可用两步流程补图。
 Aoi.catalog.AI_PROMPT = [
   '你是宝可梦中心 online（pokemoncenter-online.com）商品目录整理助手。我下面粘贴的是 PCO 商品页面的全文，请把其中每一件商品整理成一张表格，严格遵守以下要求：',
   '',
   '一、输出格式：Markdown 表格，列的顺序固定，不要增删列、不要输出表格以外的解释文字：',
-  '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 |',
-  '（不需要图片列——商品图片、链接由我们的系统在你把页面内容直接粘贴进导入框时自动带出；本表格之后会按「日文原名」逐行合并进已有商品，所以日文原名列是对齐关键，必须与页面文字完全一致。）',
+  '| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 | 商品链接 | 图片链接 |',
+  '（本表格之后会按「日文原名」逐行合并进已有商品，所以日文原名列是对齐关键，必须与页面文字完全一致。商品链接/图片链接取自粘贴内容中真实出现的 URL，绝不允许编造或拼写；页面文本里看不到的地址就留空。）',
   '',
   '二、各列要求：',
   '1. 日文原名：照抄页面上的日文商品名，一字不差，不要翻译、不要改写、不要加序号（它用于与页面粘贴导入的商品行对齐合并）。',
@@ -113,6 +115,8 @@ Aoi.catalog.AI_PROMPT = [
   '4. 日元价：只填数字，去掉「円」和千位逗号（如 385）。',
   '5. 限购：页面标注「お一人様○個」时填数字 ○，未标注留空。',
   '6. 発売日：形如「11月8日発売」照抄，没有就留空。',
+  '7. 商品链接：粘贴内容中该商品对应的 pokemoncenter-online.com 链接（/products/… 形态），原样完整照抄；一条商品一个链接，找不到就留空。',
+  '8. 图片链接：仅当你确实能在粘贴内容中看到图片地址（https://… 的图片 URL）时照抄，否则一律留空。如果你具备联网浏览能力，也可以直接访问粘贴内容里的商品链接，从商品页读取图片地址填入本列；访问失败就留空。',
   '',
   '三、不要遗漏任何商品，也不要虚构页面上不存在的商品；同系列不同款式照页面逐条列出。',
   '',
@@ -325,6 +329,13 @@ Aoi.catalog.addToDraft = function (items) {
   var added = 0, updated = 0;
   (items || []).forEach(function (it) {
     if (!it.jpName) return;
+    // v3.15.0 S9：AI 表格可能给出站内相对链接（/products/… 等），先补全为 PCO 绝对地址
+    if (it.url && !/^https?:\/\//i.test(String(it.url))) {
+      it.url = 'https://www.pokemoncenter-online.com' + (String(it.url).charAt(0) === '/' ? '' : '/') + it.url;
+    }
+    if (it.image && !/^https?:\/\//i.test(String(it.image))) {
+      it.image = 'https://www.pokemoncenter-online.com' + (String(it.image).charAt(0) === '/' ? '' : '/') + it.image;
+    }
     // v3.10.0：目录条目的链接/图片仅接受 http/https（粘贴来源不可全信）
     it.url = Aoi.safeUrl(it.url);
     it.image = Aoi.safeUrl(it.image);
@@ -377,13 +388,7 @@ Aoi.catalog.addToDraft = function (items) {
   return { added: added, updated: updated };
 };
 
-Aoi.catalog.priceCnyOf = function (it) {
-  if (it.priceCny != null) return it.priceCny;
-  if (it.priceJpy == null) return null;
-  return (Aoi.calc && Aoi.calc.toRmb) ? Aoi.calc.toRmb(it.priceJpy, 'jpy') : null;
-};
-
-// 界面输入回读草稿（保存/推入/导出前调用）
+// 界面输入回读草稿（推入前调用）
 Aoi.catalog.collectEdits = function () {
   var tbody = document.getElementById('catDraftTbody');
   if (!tbody) return;
@@ -427,28 +432,11 @@ Aoi.catalog.onPaste = function (e) {
   Aoi.catalog.importPaste();
 };
 
-// —— 保存 / 推入 / 导出 ——
+// —— 推入（v3.15.0：保存目录/小程序导出/抓取通道已随「已存目录」下线移除，见文件头注释）——
 
-Aoi.catalog.save = async function () {
-  Aoi.catalog.collectEdits();
-  var d = Aoi.orders.ensure();
-  if (!Array.isArray(d.pcoItems)) d.pcoItems = [];
-  Aoi.catalog.draft.forEach(function (it) {
-    var cur = d.pcoItems.find(function (x) { return x.id === it.id || (it.url && x.url === it.url) || x.jpName === it.jpName; });
-    if (cur) {
-      ['url', 'jpName', 'name', 'type', 'priceJpy', 'priceCny', 'limit', 'image', 'status', 'saleDate', 'watched'].forEach(function (f) {
-        if (it[f] != null) cur[f] = it[f];
-      });
-    } else {
-      d.pcoItems.push(Object.assign({}, it));
-    }
-  });
-  await Aoi.saveTeamData(d);
-  Aoi.toast('目录已保存（' + d.pcoItems.length + ' 件）', 'success');
-  Aoi.catalog.renderCatalogList();
-};
-
-// 一键推入活动商品主档（复用 registerProduct；type+model 去重，价格/限购为可选扩展字段）
+// 一键推入活动商品主档（复用 registerProduct；type+model 去重，价格/限购为可选扩展字段）。
+// v3.15.0 S4：人民币价不再自动按汇率生成——仅当校对表里人工填写了价格才推入；
+// 外币原价/币种/限购照常入库，价格由活动管理「生成人民币价」统一计算。
 Aoi.catalog.pushSelected = async function () {
   Aoi.catalog.collectEdits();
   var sel = Aoi.catalog.draft.filter(function (x) { return x.select; });
@@ -463,14 +451,13 @@ Aoi.catalog.pushSelected = async function () {
   var ok = 0;
   for (var i = 0; i < sel.length; i++) {
     var it = sel[i];
-    var cny = Aoi.catalog.priceCnyOf(it);
     var r = await Aoi.orders.registerProduct(activity, {
       type: it.type || '未分类',
       model: it.name || it.jpName,
       nameOrig: it.jpName || '',
       refImage: it.image || '',
       refUrl: it.url || '',
-      price: cny != null ? cny : undefined,
+      price: it.priceCny != null ? it.priceCny : undefined,
       priceOrig: it.priceJpy != null ? it.priceJpy : undefined,
       currency: it.priceJpy != null ? 'jpy' : undefined,
       limit: (it.limit !== '' && it.limit != null) ? parseInt(it.limit, 10) : undefined
@@ -487,72 +474,6 @@ Aoi.catalog.pushSelected = async function () {
   if (ok && Aoi.orders.render) Aoi.orders.render();
 };
 
-// 小程序导入模板导出：说明 6 行（模板注明勿删）+ 表头行 + 数据（自带示例行绝不带入）
-Aoi.catalog.TEMPLATE_NOTES = [
-  ['【使用说明】请在电脑或者手机上使用Excel软件编辑，并按照数据格式要求导入谷子商品。'],
-  ['【注意事项】本模版的使用说明部分的文字请勿删除。'],
-  ['【谷子分类】[选填] 谷子分类，不填则分类为：默认分类'],
-  ['【谷子价格】[必填] 谷子的价格，最多只支持2位小数点'],
-  ['【谷子库存】[选填] 不填表示不限库存 '],
-  ['【是否冻结】[选填] 默认为否，冻结的话表示该谷子暂不可购买']
-];
-Aoi.catalog.TEMPLATE_HEADER = ['谷子分类（选填）', '谷子名称（必填）', '价格（必填）', '库存（选填）', '冻结（选填：是或否）', '采购状态（选填）'];
-
-Aoi.catalog.exportTemplate = function (btn) {
-  var X = window.XLSX;
-  if (!X || !X.utils) { Aoi.toast('表格组件（XLSX）未加载', 'error'); return; }
-  Aoi.catalog.collectEdits();
-  var sel = Aoi.catalog.draft.filter(function (x) { return x.select && (x.name || x.jpName); });
-  if (!sel.length) { Aoi.toast('请勾选要导出的商品', 'warning'); return; }
-  var aoa = Aoi.catalog.TEMPLATE_NOTES.slice();
-  aoa.push(Aoi.catalog.TEMPLATE_HEADER);
-  sel.forEach(function (it) {
-    var cny = Aoi.catalog.priceCnyOf(it);
-    aoa.push([it.type || '', it.name || it.jpName, cny != null ? cny : '', '', '', '备货中']);
-  });
-  var ws = X.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 18 }, { wch: 46 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }];
-  var wb = X.utils.book_new();
-  X.utils.book_append_sheet(wb, ws, 'Sheet1');
-  var name = (Aoi.exportBaseName && Aoi.exportBaseName(btn)) || 'PCO目录';
-  X.writeFile(wb, name + '.xlsx');
-};
-
-// —— 链接抓取通道（aoi-pco-monitor 按需抓取；未配置 dispatch 地址时引导粘贴导入） ——
-
-Aoi.catalog.grab = async function () {
-  var input = document.getElementById('catGrabUrl');
-  var url = input ? input.value.trim() : '';
-  if (!url) { Aoi.toast('请粘贴 PCO 活动链接', 'warning'); return; }
-  var d = Aoi.orders.ensure();
-  var cfg = d.catalogConfig || {};
-  if (!cfg.dispatchUrl) {
-    Aoi.toast('抓取通道未就绪（需 aoi-pco-monitor 部署并配置 dispatch 地址）——请使用下方「解析粘贴内容」', 'warning');
-    return;
-  }
-  try {
-    var res = await fetch(cfg.dispatchUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls: [url] })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    Aoi.toast('已提交抓取，约 1–2 分钟后刷新本页查看', 'success');
-    input.value = '';
-  } catch (e) {
-    Aoi.toast('抓取通道异常：' + e.message + '（可改用粘贴导入）', 'error');
-  }
-};
-
-Aoi.catalog.saveDispatch = async function () {
-  var input = document.getElementById('catDispatch');
-  var d = Aoi.orders.ensure();
-  d.catalogConfig = d.catalogConfig || {};
-  d.catalogConfig.dispatchUrl = input ? input.value.trim() : '';
-  await Aoi.saveTeamData(d);
-  Aoi.toast('抓取通道配置已保存', 'success');
-};
-
 // —— 渲染 ——
 
 // 导航进入本页时的一次性全量渲染（index.html nav 项 onclick 调用）
@@ -560,7 +481,6 @@ Aoi.catalog.renderAll = function () {
   var pre = document.getElementById('catAiPrompt');
   if (pre && !pre.textContent) pre.textContent = Aoi.catalog.AI_PROMPT;
   Aoi.catalog.render();
-  Aoi.catalog.renderCatalogList();
 };
 
 Aoi.catalog.render = function () {
@@ -581,60 +501,22 @@ Aoi.catalog.render = function () {
       + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '"></td>'
       + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select></td>'
       + '<td class="px-2 py-1 text-right text-sm text-gray-500">' + (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() : '—') + '</td>'
-      + '<td class="px-2 py-1"><input class="cat-price border border-gray-300 rounded px-2 py-1 text-sm w-16 text-right" value="' + (it.priceCny != null ? it.priceCny : '') + '" placeholder="自动"></td>'
+      + '<td class="px-2 py-1"><input class="cat-price border border-gray-300 rounded px-2 py-1 text-sm w-16 text-right" value="' + (it.priceCny != null ? it.priceCny : '') + '" placeholder="选填"></td>'
       + '<td class="px-2 py-1"><input class="cat-limit border border-gray-300 rounded px-2 py-1 text-sm w-12 text-right" value="' + Aoi.escapeHtml(it.limit) + '"></td>'
       + '<td class="px-2 py-1 text-sm">' + (it.saleDate ? Aoi.escapeHtml(it.saleDate) : '—') + '</td>'
       + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.url) ? '<a href="' + Aoi.escapeHtml(Aoi.safeUrl(it.url)) + '" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-xs">打开</a>' : '—') + '</td>'
       + '<td class="px-2 py-1 text-center"><button onclick="Aoi.catalog.removeDraft(\'' + it.id + '\')" class="text-red-500 hover:underline text-xs">删</button></td>'
       + '</tr>';
-  }).join('') || '<tr><td colspan="11" class="px-3 py-6 text-center text-sm text-gray-400">暂无草稿——先在上方粘贴解析，或等抓取通道就绪</td></tr>';
+  }).join('') || '<tr><td colspan="11" class="px-3 py-6 text-center text-sm text-gray-400">暂无草稿——先在上方粘贴解析</td></tr>';
   var sel2 = document.getElementById('catPushActivity');
   if (sel2 && !sel2.options.length) {
     sel2.innerHTML = '<option value="">— 选择已有活动 —</option>' + (d.activities || []).slice().sort().map(function (a) {
       return '<option value="' + Aoi.escapeHtml(a) + '">' + Aoi.escapeHtml(a) + '</option>';
     }).join('');
   }
-  var dis = document.getElementById('catDispatch');
-  if (dis && document.activeElement !== dis) dis.value = (d.catalogConfig && d.catalogConfig.dispatchUrl) || '';
 };
 
 Aoi.catalog.removeDraft = function (id) {
   Aoi.catalog.draft = Aoi.catalog.draft.filter(function (x) { return x.id !== id; });
   Aoi.catalog.render();
-};
-
-Aoi.catalog.renderCatalogList = function () {
-  var tbody = document.getElementById('catTableTbody');
-  if (!tbody) return;
-  var d = Aoi.orders.ensure();
-  var items = d.pcoItems || [];
-  tbody.innerHTML = items.map(function (it) {
-    return '<tr class="border-b border-gray-100">'
-      + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
-      + '<td class="px-2 py-1 text-sm">' + Aoi.escapeHtml(it.name || it.jpName) + '<div class="text-[11px] text-gray-400">' + Aoi.escapeHtml(it.jpName) + '</div></td>'
-      + '<td class="px-2 py-1 text-sm">' + Aoi.escapeHtml(it.type || '—') + '</td>'
-      + '<td class="px-2 py-1 text-right text-sm">' + (it.priceCny != null ? '¥' + it.priceCny : (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() + '（日元）' : '—')) + '</td>'
-      + '<td class="px-2 py-1 text-center text-sm">' + (it.limit != null && it.limit !== '' ? it.limit : '—') + '</td>'
-      + '<td class="px-2 py-1 text-sm">' + Aoi.escapeHtml(it.status || '未知') + '</td>'
-      + '<td class="px-2 py-1 text-sm">' + (it.saleDate ? Aoi.escapeHtml(it.saleDate) : '—') + '</td>'
-      + '<td class="px-2 py-1 text-center"><input type="checkbox"' + (it.watched ? ' checked' : '') + ' onchange="Aoi.catalog.toggleWatch(\'' + it.id + '\')"></td>'
-      + '<td class="px-2 py-1 text-center"><button onclick="Aoi.catalog.removeSaved(\'' + it.id + '\')" class="text-red-500 hover:underline text-xs">删</button></td>'
-      + '</tr>';
-  }).join('') || '<tr><td colspan="9" class="px-3 py-6 text-center text-sm text-gray-400">目录为空——保存草稿或由 aoi-pco-monitor 同步后显示</td></tr>';
-};
-
-Aoi.catalog.toggleWatch = async function (id) {
-  var d = Aoi.orders.ensure();
-  var it = (d.pcoItems || []).find(function (x) { return x.id === id; });
-  if (!it) return;
-  it.watched = !it.watched;
-  await Aoi.saveTeamData(d);
-};
-
-Aoi.catalog.removeSaved = async function (id) {
-  if (!confirm('从目录删除该商品？（不影响已推入活动的商品）')) return;
-  var d = Aoi.orders.ensure();
-  d.pcoItems = (d.pcoItems || []).filter(function (x) { return x.id !== id; });
-  await Aoi.saveTeamData(d);
-  Aoi.catalog.renderCatalogList();
 };

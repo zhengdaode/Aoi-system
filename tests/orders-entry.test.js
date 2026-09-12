@@ -108,24 +108,26 @@ describe('Aoi.orders 订单管理：渲染 / 批量生成 / 编辑（v1.8.0）',
     expect(doc.getElementById('orderStat').textContent).toContain('待生成');
   });
 
-  it('applyGenRmb：按公式回填人民币价并计入 undo', async () => {
-    aoi.orders.render();
-    doc.querySelector('.row-check[data-id="o2"]').checked = true;
-    aoi.orders.showGenRmb();
-    setValue('genRate', '0.05');
-    setValue('genMarkup', '0.01');
-    await aoi.orders.applyGenRmb();
+  it('applyActGenRmb：整个活动按公式回填人民币价并计入 undo（v3.15.0 S5，D2 迁入活动管理）', async () => {
+    aoi.state.data.activityMeta = { A: { products: [{ id: 'p1', type: '吧唧', model: 'M3', priceOrig: 2000, currency: 'jpy' }] } };
+    aoi.orders.showActGenRmb('A');
+    setValue('agRate', '0.05');
+    setValue('agMarkup', '0.01');
+    await aoi.orders.applyActGenRmb();
     const o2 = aoi.state.data.orders[1];
     expect(o2.price).toBe(aoi.calc.roundHalf(1000 * 0.06));
+    // 商品主档同步按同一公式生成
+    expect(aoi.state.data.activityMeta.A.products[0].price).toBe(aoi.calc.roundHalf(2000 * 0.06));
     expect(aoi.undo.snapshot).not.toBeNull(); // 可撤销
   });
 
-  it('applyGenRmb 对人民币订单不改动', async () => {
-    aoi.orders.render();
-    doc.querySelector('.row-check[data-id="o1"]').checked = true;
-    aoi.orders.showGenRmb();
-    await aoi.orders.applyGenRmb();
-    expect(aoi.state.data.orders[0].price).toBe(10);
+  it('applyActGenRmb：仅补空缺模式不动已有人民币价，临时公式不写回计算器设置', async () => {
+    aoi.state.data.calc = { jpyRate: 0.048, jpyMarkup: 0.005 };
+    aoi.orders.showActGenRmb('A');
+    setValue('agRate', '0.99');
+    await aoi.orders.applyActGenRmb();
+    expect(aoi.state.data.orders[0].price).toBe(10); // cny 订单不改动
+    expect(aoi.calc.get().jpy.rate).toBe(0.048); // 公式只作用于本次生成，不写回计算器设置
   });
 
   it('openEdit / saveEdit：编辑字段与备注写回', async () => {

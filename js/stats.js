@@ -192,9 +192,10 @@ Aoi.stats.shipAgingRows = function (d, term) {
 };
 
 // KPI：订单/件数、折合金额、买家、人均、应收/已收/未收国际费、发货时效、到货比例
-Aoi.stats.kpis = function (d, term, ip) {
+// v3.15.0 S8：summaries/aging 可由调用方传入（单次渲染内只算一遍），缺省时自行计算（向后兼容）
+Aoi.stats.kpis = function (d, term, ip, summaries, aging) {
   var orders = Aoi.stats.ordersInIp(Aoi.stats.ordersInTerm(d, term), ip);
-  var summaries = Aoi.stats.batchSummaries(d, term);
+  summaries = summaries || Aoi.stats.batchSummaries(d, term);
   var pay = Aoi.stats.payRows(d, term, summaries);
   var amount = 0, est = false, qty = 0, buyers = {}, arrived = 0;
   orders.forEach(function (o) {
@@ -207,7 +208,7 @@ Aoi.stats.kpis = function (d, term, ip) {
   });
   var buyerCount = Object.keys(buyers).length;
   var receivable = pay['已交'].fee + pay['待审核'].fee + pay['待交'].fee + pay['已驳回'].fee;
-  var aging = Aoi.stats.shipAgingRows(d, term);
+  aging = aging || Aoi.stats.shipAgingRows(d, term);
   var agingSum = 0, agingN = 0;
   aging.forEach(function (b) { agingSum += b.sum; agingN += b.n; });
   return {
@@ -282,8 +283,26 @@ Aoi.stats.render = function () {
   var d = Aoi.orders.ensure();
   var term = document.getElementById('statsTermSel').value || 'all';
   var ip = document.getElementById('statsIpSel').value || '';
-  var summaries = Aoi.stats.batchSummaries(d, term);
-  var k = Aoi.stats.kpis(d, term, ip);
+  // v3.15.0 S8：聚合结果按（数据信号+团期+IP+口径）记忆化——重复进入总览不再全量重算，
+  // DOM 渲染每次照常执行（字符串拼装开销可忽略）。此前单次渲染内 batchSummaries/shipAging
+  // 各算两遍、且与 overview/notify 三方重复，是「总览常需一段时间加载」的视图级根因。
+  var key = Aoi.dataSig(d) + '|' + term + '|' + ip + '|' + Aoi.stats.ipMetric + '|' + Aoi.stats.buyerMetric;
+  var c = Aoi.stats._renderCache;
+  if (!c || c.key !== key) {
+    var summaries = Aoi.stats.batchSummaries(d, term);
+    var aging = Aoi.stats.shipAgingRows(d, term);
+    c = Aoi.stats._renderCache = {
+      key: key,
+      k: Aoi.stats.kpis(d, term, ip, summaries, aging),
+      acts: Aoi.stats.activityRows(d, term, ip),
+      ips: Aoi.stats.ipRows(d, term, ip),
+      buyers: Aoi.stats.buyerRows(d, term, ip, summaries),
+      curs: Aoi.stats.currencyRows(d, term, ip),
+      pay: Aoi.stats.payRows(d, term, summaries),
+      aging: aging
+    };
+  }
+  var k = c.k;
 
   kpiBox.innerHTML =
     Aoi.stats.kpiHtml('订单总数', Aoi.stats.fmtInt(k.orderCount) + ' 条', '共 ' + Aoi.stats.fmtInt(k.qty) + ' 件') +
@@ -297,7 +316,7 @@ Aoi.stats.render = function () {
     Aoi.stats.kpiHtml('到货比例', k.arrivedPct == null ? '—' : Math.round(k.arrivedPct) + '%', '已到货 ' + k.arrived + ' / ' + k.orderCount + ' 条');
 
   // 按活动聚合
-  var acts = Aoi.stats.activityRows(d, term, ip);
+  var acts = c.acts;
   var actTbody = document.getElementById('statsActTbody');
   if (actTbody) {
     actTbody.innerHTML = acts.length ? acts.map(function (a, i) {
@@ -320,7 +339,7 @@ Aoi.stats.render = function () {
   }
 
   // IP 排行（口径切换）
-  var ips = Aoi.stats.ipRows(d, term, ip);
+  var ips = c.ips;
   var ipSw = document.getElementById('statsIpSw');
   if (ipSw) {
     ipSw.innerHTML =
@@ -339,7 +358,7 @@ Aoi.stats.render = function () {
   }
 
   // 买家排行（口径切换 + 交费状态下钻）
-  var buyers = Aoi.stats.buyerRows(d, term, ip, summaries);
+  var buyers = c.buyers;
   var buyerSw = document.getElementById('statsBuyerSw');
   if (buyerSw) {
     buyerSw.innerHTML =
@@ -364,7 +383,7 @@ Aoi.stats.render = function () {
   }
 
   // 币种分布（条形长度按折合金额）
-  var curs = Aoi.stats.currencyRows(d, term, ip);
+  var curs = c.curs;
   var curBox = document.getElementById('statsCurBars');
   if (curBox) {
     var curMax = curs.length ? Math.max.apply(null, curs.map(function (r) { return r.rmb; })) : 0;
@@ -376,7 +395,7 @@ Aoi.stats.render = function () {
   }
 
   // 交费回收（金额口径）
-  var pay = Aoi.stats.payRows(d, term, summaries);
+  var pay = c.pay;
   var payBox = document.getElementById('statsPayBars');
   if (payBox) {
     var payMax = Math.max(pay['已交'].fee, pay['待审核'].fee, pay['待交'].fee, pay['已驳回'].fee);
@@ -389,7 +408,7 @@ Aoi.stats.render = function () {
   }
 
   // 发货时效
-  var aging = Aoi.stats.shipAgingRows(d, term);
+  var aging = c.aging;
   var agingTbody = document.getElementById('statsAgingTbody');
   if (agingTbody) {
     agingTbody.innerHTML = aging.length ? aging.map(function (b, i) {

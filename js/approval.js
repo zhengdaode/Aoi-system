@@ -19,7 +19,27 @@ Aoi.approval.getRecord = function (batchId, buyer) {
 };
 
 // 每人应付汇总：货款（订单小计）+ 国际费（复用 intl 分摊）
+// v3.15.0 S8：按数据信号记忆化——总览/复盘/通知三方对同一批次重复调用只算一次；
+// 失效依据 = Aoi.dataSig（版本/数据代数/行数）+ 同 tick 自动过期（行内原地改动场景兜底）。
+// 返回数组为共享只读结果，调用方不得原地修改（现有调用方均只读或 filter/sort 拷贝）。
+Aoi.approval._summaryMemo = null;
+Aoi.approval._summaryTick = 0;
+
+Aoi.approval.clearSummaryCache = function () {
+  Aoi.approval._summaryMemo = null;
+};
+
 Aoi.approval.buyerSummary = function (batchId) {
+  var sig = Aoi.dataSig();
+  var memo = Aoi.approval._summaryMemo;
+  if (!memo || memo._sig !== sig) {
+    memo = Aoi.approval._summaryMemo = { _sig: sig };
+    var tick = ++Aoi.approval._summaryTick;
+    setTimeout(function () {
+      if (Aoi.approval._summaryTick === tick) Aoi.approval._summaryMemo = null;
+    }, 0);
+  }
+  if (memo[batchId]) return memo[batchId];
   var d = Aoi.orders.ensure();
   var batch = Aoi.intl.getBatch(batchId);
   var intlTotals = batch ? Aoi.intl.buyerTotals(batchId, Aoi.intl.buildItems(batch)) : {};
@@ -29,7 +49,7 @@ Aoi.approval.buyerSummary = function (batchId) {
     if (!map[o.buyer]) map[o.buyer] = { buyer: o.buyer, goods: 0 };
     map[o.buyer].goods += (o.price != null) ? o.price * o.count : 0;
   });
-  return Object.keys(map).map(function (buyer) {
+  var rows = Object.keys(map).map(function (buyer) {
     var m = map[buyer];
     var rec = Aoi.approval.getRecord(batchId, buyer);
     m.intlFee = (rec && rec.intlFee != null) ? rec.intlFee : (intlTotals[buyer] || 0);
@@ -37,6 +57,8 @@ Aoi.approval.buyerSummary = function (batchId) {
     m.receipt = rec ? rec.receipt : null;
     return m;
   }).sort(function (a, b) { return a.buyer < b.buyer ? -1 : 1; });
+  memo[batchId] = rows;
+  return rows;
 };
 
 Aoi.approval.statusBadge = function (status) {

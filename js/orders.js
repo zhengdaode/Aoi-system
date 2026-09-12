@@ -19,8 +19,6 @@ Aoi.orders.ensure = function () {
   if (!d.addresses) d.addresses = {};
   if (!d.memberMeta) d.memberMeta = {};
   if (!Array.isArray(d.cnChanges)) d.cnChanges = [];
-  // v3.7.0 F9 接口预留：PCO 商品目录（aoi-pco-monitor 直写 / 书签脚本导入的目标结构，本期无 UI）
-  if (!Array.isArray(d.pcoItems)) d.pcoItems = [];
   // v1.8.0 迁移：外币原价 / 币种 / 备注（旧数据视为人民币已换算）
   d.orders.forEach(function (o) {
     if (o.currency == null) o.currency = 'cny';
@@ -91,7 +89,9 @@ Aoi.orders.openImportModal = function (records) {
   document.getElementById('importModal').classList.remove('hidden');
 };
 
-// 确认导入：应用确认后的活动/IP，入库
+// 确认导入：应用确认后的活动/IP，入库。
+// v3.15.0 S2：写入前按「活动+型号」识别已有商品——缺失字段（类型/外币原价/人民币价）回填、
+// 已有值不覆盖；未识别的新商品自动登记商品主档骨架（弹窗可关），保证后续导入/录入可识别。
 Aoi.orders.confirmImport = async function () {
   var activity = document.getElementById('importActivity').value.trim();
   var ip = document.getElementById('importIp').value.trim();
@@ -99,7 +99,38 @@ Aoi.orders.confirmImport = async function () {
   document.getElementById('importModal').classList.add('hidden');
   if (!records.length) return;
   records.forEach(function (r) { if (activity) r.activity = activity; if (ip) r.ip = ip; });
+  var autoReg = true;
+  var cb = document.getElementById('importAutoRegister');
+  if (cb && !cb.checked) autoReg = false;
   var d = Aoi.orders.ensure();
+  var filled = 0, registered = 0;
+  for (var i = 0; i < records.length; i++) {
+    var r = records[i];
+    var p = Aoi.orders.productFillFor(r.activity, r.model);
+    if (p) {
+      var touched = false;
+      if ((!r.type || r.type === '默认类型') && p.type) { r.type = p.type; touched = true; }
+      if ((r.price == null || r.price === 0) && p.price != null) { r.price = p.price; touched = true; }
+      if (r.priceOrig == null && p.priceOrig != null) {
+        r.priceOrig = p.priceOrig;
+        r.currency = p.currency || 'jpy';
+        touched = true;
+      }
+      if (touched) filled++;
+    } else if (autoReg && r.activity && r.model && r.type) {
+      // 直接登记骨架（不走 registerProduct：避免逐条 toast/逐条整包保存，导入末尾统一落库一次）
+      var actName = r.activity;
+      if (!d.activityMeta[actName]) d.activityMeta[actName] = {};
+      if (!Array.isArray(d.activityMeta[actName].products)) d.activityMeta[actName].products = [];
+      var meta = d.activityMeta[actName];
+      var dup = meta.products.some(function (x) { return x.type === r.type && x.model === r.model; });
+      if (!dup) {
+        meta.products.push({ id: Aoi.genId(), type: r.type, model: r.model, refImage: '', refUrl: '' });
+        registered++;
+        if (d.activities.indexOf(actName) < 0) d.activities.push(actName);
+      }
+    }
+  }
   d.orders = d.orders.concat(records);
   if (activity && d.activities.indexOf(activity) < 0) d.activities.push(activity);
   if (ip && d.ips.indexOf(ip) < 0) d.ips.push(ip);
@@ -111,7 +142,9 @@ Aoi.orders.confirmImport = async function () {
   Aoi.import.pending = [];
   Aoi.orders.render();
   Aoi.orders.refillDatalists();
-  Aoi.toast('导入 ' + records.length + ' 条订单', 'success');
+  Aoi.toast('导入 ' + records.length + ' 条订单'
+    + (filled ? '，按商品主档回填 ' + filled + ' 条' : '')
+    + (registered ? '，新登记 ' + registered + ' 个商品' : ''), 'success');
 };
 
 Aoi.orders.cancelImport = function () {
@@ -182,6 +215,59 @@ Aoi.orders.parseEntryOrder = function (currency, mode, priceForeign, priceRmb) {
   if (currency === 'cny') return { price: priceForeign, priceOrig: null };
   if (mode === 'direct') return { price: null, priceOrig: priceForeign };
   return { price: (priceRmb != null ? priceRmb : Aoi.calc.toRmb(priceForeign, currency)), priceOrig: priceForeign };
+};
+
+// —— 手动录入商品联动（v3.15.0 S1）：选活动带出已登记商品，选中即回填类型/币种/单价 ——
+
+// 活动输入变化 → 商品候选 datalist（活动商品主档型号 + 原名；仍可自由输入非主档商品）
+Aoi.orders.onActivityInput = function () {
+  var dl = document.getElementById('oModelOptions');
+  if (!dl) return;
+  var activity = ((document.getElementById('oActivity') || {}).value || '').trim();
+  var meta = activity ? (Aoi.orders.ensure().activityMeta || {})[activity] : null;
+  var ps = (meta && meta.products) || [];
+  dl.innerHTML = ps.map(function (p) {
+    return '<option value="' + Aoi.escapeHtml(p.model) + '">' + Aoi.escapeHtml(p.nameOrig || p.type || '') + '</option>';
+  }).join('');
+};
+
+// 按型号（或原语言名，忽略大小写）在该活动商品主档中精确匹配，命中返回商品对象
+Aoi.orders.productFillFor = function (activity, model) {
+  var d = Aoi.orders.ensure();
+  var meta = activity ? (d.activityMeta || {})[activity] : null;
+  var ps = (meta && meta.products) || [];
+  var m = String(model || '').trim().toLowerCase();
+  if (!m) return null;
+  for (var i = 0; i < ps.length; i++) {
+    var p = ps[i];
+    if (String(p.model || '').trim().toLowerCase() === m) return p;
+    if (p.nameOrig && String(p.nameOrig).trim().toLowerCase() === m) return p;
+  }
+  return null;
+};
+
+// 型号输入变化：命中主档商品 → 一次性回填（类型/币种/单价），手改不覆盖
+// 外币商品按主档币种走对应录入形态：主档已有人民币价 → 计算器模式同时带出；
+// 只有外币原价 → 直接输入模式（人民币价留待活动管理统一生成，与 v3.15.0 价格策略一致）
+Aoi.orders.onModelInput = function () {
+  var activity = ((document.getElementById('oActivity') || {}).value || '').trim();
+  var model = ((document.getElementById('oModel') || {}).value || '').trim();
+  var p = Aoi.orders.productFillFor(activity, model);
+  if (!p) return;
+  var set = function (id, v) { var el = document.getElementById(id); if (el != null) el.value = v; };
+  if (p.type) set('oType', p.type);
+  var currency = p.currency || (p.priceOrig != null ? 'jpy' : 'cny');
+  set('oCurrency', currency);
+  Aoi.orders.onEntryCurrencyChange();
+  if (currency === 'cny') {
+    if (p.price != null) set('oPrice', p.price);
+    return;
+  }
+  if (p.priceOrig != null) set('oPrice', p.priceOrig);
+  var radio = document.querySelector('input[name="oPriceMode"][value="' + (p.price != null ? 'calc' : 'direct') + '"]');
+  if (radio) { radio.checked = true; Aoi.orders.onEntryModeChange(); }
+  if (p.price != null) set('oPriceRmb', p.price);
+  else set('oPriceRmb', ''); // 直接输入模式：清掉上次残留的人民币价
 };
 
 // 手动新增订单（v1.8.0）：
@@ -629,62 +715,95 @@ Aoi.orders.render = function () {
   Aoi.orders.syncSortUi();
 };
 
-// —— 批量生成人民币价（v1.8.0：替代录入时自动转换，与批量删除同排）——
+// —— 活动级批量生成人民币价（v3.15.0 S5，D2：自订单管理勾选版迁入活动管理）——
+// 公式与 v1.8.0 订单版一致：roundHalf(外币原价 × (汇率+加价))；弹窗内可临时调整且不写回 d.calc；
+// 作用对象可选：该活动商品主档 / 该活动外币订单；模式可选：仅补空缺 / 全部覆盖。
 
-Aoi.orders.showGenRmb = function () {
-  var ids = Aoi.orders.selectedIds();
-  if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
-  var box = document.getElementById('genRmbBox');
-  if (!box) return;
-  // 预填汇率：取勾选订单中最常见的外币币种
+Aoi.orders.actGenActivity = null;
+
+Aoi.orders.showActGenRmb = function (activity) {
   var d = Aoi.orders.ensure();
-  var idSet = {};
-  ids.forEach(function (id) { idSet[id] = 1; });
-  var counter = {};
-  d.orders.forEach(function (o) {
-    if (idSet[o.id] && o.currency && o.currency !== 'cny') counter[o.currency] = (counter[o.currency] || 0) + 1;
+  var ps = (((d.activityMeta || {})[activity] || {}).products || []).filter(function (p) {
+    return p.priceOrig != null && p.currency && p.currency !== 'cny';
   });
+  var os = (d.orders || []).filter(function (o) {
+    return o.activity === activity && o.currency !== 'cny' && o.priceOrig != null;
+  });
+  if (!ps.length && !os.length) { Aoi.toast('该活动没有含外币原价的商品或订单', 'warning'); return; }
+  Aoi.orders.actGenActivity = activity;
+  var t = document.getElementById('agTitle');
+  if (t) t.textContent = '生成人民币价——' + activity;
+  var lp = document.getElementById('agProductsLabel');
+  if (lp) lp.textContent = '商品主档（' + ps.length + ' 件含外币原价）';
+  var lo = document.getElementById('agOrdersLabel');
+  if (lo) lo.textContent = '该活动外币订单（' + os.length + ' 条含外币原价）';
+  var cbP = document.getElementById('agScopeProducts');
+  if (cbP) { cbP.checked = ps.length > 0; cbP.disabled = !ps.length; }
+  var cbO = document.getElementById('agScopeOrders');
+  if (cbO) { cbO.checked = os.length > 0; cbO.disabled = !os.length; }
+  // 预填最常见外币币种的计算器汇率（可临时改）
+  var counter = {};
+  ps.forEach(function (p) { counter[p.currency] = (counter[p.currency] || 0) + 1; });
+  os.forEach(function (o) { counter[o.currency] = (counter[o.currency] || 0) + 1; });
   var best = null, bestN = 0;
   Object.keys(counter).forEach(function (c) { if (counter[c] > bestN) { best = c; bestN = counter[c]; } });
-  if (!best) Aoi.toast('勾选中没有外币订单，生成不会改动任何订单', 'info');
-  document.getElementById('genCurrency').value = best || 'jpy';
-  Aoi.orders.onGenCurrencyChange();
-  box.classList.remove('hidden');
+  document.getElementById('agCurrency').value = best || 'jpy';
+  Aoi.orders.onAgCurrencyChange();
+  var modal = document.getElementById('actGenRmbModal');
+  if (modal) modal.classList.remove('hidden');
 };
 
-// 币种切换 → 回填计算器配置的汇率/加价（可在此基础上修改）
-Aoi.orders.onGenCurrencyChange = function () {
-  var cfg = Aoi.calc.get()[document.getElementById('genCurrency').value];
+// 币种切换 → 回填计算器配置的汇率/加价（可在此基础上修改，仅本次生效）
+Aoi.orders.onAgCurrencyChange = function () {
+  var cfg = Aoi.calc.get()[document.getElementById('agCurrency').value];
   if (!cfg) return;
-  document.getElementById('genRate').value = cfg.rate;
-  document.getElementById('genMarkup').value = cfg.markup;
+  document.getElementById('agRate').value = cfg.rate;
+  document.getElementById('agMarkup').value = cfg.markup;
 };
 
-Aoi.orders.hideGenRmb = function () {
-  var box = document.getElementById('genRmbBox');
-  if (box) box.classList.add('hidden');
+Aoi.orders.hideActGenRmb = function () {
+  var modal = document.getElementById('actGenRmbModal');
+  if (modal) modal.classList.add('hidden');
 };
 
-Aoi.orders.applyGenRmb = async function () {
-  var ids = Aoi.orders.selectedIds();
-  if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
-  var rate = parseFloat(document.getElementById('genRate').value);
-  var markup = parseFloat(document.getElementById('genMarkup').value) || 0;
+Aoi.orders.applyActGenRmb = async function () {
+  var activity = Aoi.orders.actGenActivity;
+  if (!activity) return;
+  var rate = parseFloat(document.getElementById('agRate').value);
+  var markup = parseFloat(document.getElementById('agMarkup').value) || 0;
   if (isNaN(rate) || rate <= 0) { Aoi.toast('请填写汇率', 'warning'); return; }
-  var idSet = {};
-  ids.forEach(function (id) { idSet[id] = 1; });
+  var scopeP = document.getElementById('agScopeProducts');
+  var scopeO = document.getElementById('agScopeOrders');
+  var cover = ((document.querySelector('input[name="agCover"]:checked') || {}).value === 'all');
   var d = Aoi.orders.ensure();
-  var n = 0;
-  Aoi.undo.arm('批量生成人民币价', d);
-  d.orders.forEach(function (o) {
-    if (!idSet[o.id] || o.currency === 'cny' || o.priceOrig == null) return;
-    o.price = Aoi.calc.convert(o.priceOrig, rate, markup);
-    n++;
-  });
+  Aoi.undo.arm('生成人民币价（' + activity + '）', d);
+  var nP = 0, nO = 0;
+  if (scopeP && scopeP.checked) {
+    (((d.activityMeta || {})[activity] || {}).products || []).forEach(function (p) {
+      if (p.priceOrig == null || !p.currency || p.currency === 'cny') return;
+      if (!cover && p.price != null) return;
+      p.price = Aoi.calc.convert(p.priceOrig, rate, markup);
+      nP++;
+    });
+  }
+  if (scopeO && scopeO.checked) {
+    (d.orders || []).forEach(function (o) {
+      if (o.activity !== activity || o.currency === 'cny' || o.priceOrig == null) return;
+      if (!cover && o.price != null) return;
+      o.price = Aoi.calc.convert(o.priceOrig, rate, markup);
+      nO++;
+    });
+  }
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
-  Aoi.orders.hideGenRmb();
-  Aoi.toast(n ? ('已为 ' + n + ' 条订单生成人民币价（30 秒内可撤销）') : '没有可生成的订单（需含外币原价）', n ? 'success' : 'warning');
+  Aoi.orders.renderActivities();
+  Aoi.orders.hideActGenRmb();
+  var msg = [];
+  if (nP) msg.push('商品 ' + nP + ' 件');
+  if (nO) msg.push('订单 ' + nO + ' 条');
+  Aoi.toast(msg.length
+    ? '已为 ' + msg.join('、') + ' 生成人民币价（30 秒内可撤销）'
+    : '没有可生成的对象（仅补空缺模式下已有人民币价的不动）', msg.length ? 'success' : 'warning');
 };
 
 // —— 订单编辑（v1.8.0）——
@@ -1162,6 +1281,12 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (pl) { Aoi.limits.openActPlan(pl.getAttribute('data-act-plan')); return; }
   var pe = e.target.closest('button[data-act-planexport]');
   if (pe && window.Aoi.planExport) { Aoi.planExport.exportAll(pe.getAttribute('data-act-planexport')); return; }
+  var gp = e.target.closest('button[data-act-genprice]');
+  if (gp) { Aoi.orders.showActGenRmb(gp.getAttribute('data-act-genprice')); return; }
+  var ep = e.target.closest('button[data-act-exportproducts]');
+  if (ep) { Aoi.orders.exportProductList(ep.getAttribute('data-act-exportproducts')); return; }
+  var mx = e.target.closest('button[data-act-miniexport]');
+  if (mx) { Aoi.orders.exportMiniProgram(mx.getAttribute('data-act-miniexport')); return; }
   var t = e.target.closest('button[data-act-track]');
   if (t) Aoi.orders.openActTrack(t.getAttribute('data-act-track'));
 });
@@ -1618,6 +1743,9 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
     + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
     + '<button data-act-planexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="按已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>'
+    + '<button data-act-genprice="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="整个活动批量生成人民币价：商品主档 + 外币订单，公式（汇率/加价）可临时调整">生成人民币价</button>'
+    + '<button data-act-exportproducts="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap" title="导出该活动商品主档 xlsx（类型/型号/原名/价格/限购/参考图/链接）">导出商品列表</button>'
+    + '<button data-act-miniexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="按小程序模板导出该活动全部商品（说明 6 行 + 表头 + 数据）">导出到小程序</button>'
     + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
     + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap">导出汇总表</button>'
     + '</div>';
@@ -1718,6 +1846,80 @@ Aoi.orders.removeActProduct = async function (pid) {
   await Aoi.saveTeamData(d);
   Aoi.orders.renderActivities();
   Aoi.toast('已删除商品', 'success');
+};
+
+// —— 活动级导出（v3.15.0 S3/S6）——
+
+// 导出该活动商品主档列表：点下即取当前数据（商品名/原名/价格/限购/参考图/链接天然同步）
+Aoi.orders.exportProductList = function (activity) {
+  var X = window.XLSX;
+  if (!X || !X.utils) { Aoi.toast('表格组件（XLSX）未加载', 'error'); return; }
+  var d = Aoi.orders.ensure();
+  var ps = ((d.activityMeta || {})[activity] || {}).products || [];
+  if (!ps.length) { Aoi.toast('该活动还没有登记商品——可先「从订单同步商品」或手工添加', 'warning'); return; }
+  var aoa = [['类型', '型号', '原语言名', '币种', '外币原价', '人民币价', '限购', '参考图', '商品链接']];
+  ps.forEach(function (p) {
+    var cur = (p.currency && p.currency !== 'cny') ? Aoi.currencySymbol(p.currency) : '¥';
+    aoa.push([
+      p.type || '', p.model || '', p.nameOrig || '', cur,
+      p.priceOrig != null ? p.priceOrig : '',
+      p.price != null ? p.price : '',
+      p.limit != null ? p.limit : '',
+      Aoi.safeUrl(p.refImage) || '', Aoi.safeUrl(p.refUrl) || ''
+    ]);
+  });
+  var ws = X.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 14 }, { wch: 42 }, { wch: 42 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 6 }, { wch: 44 }, { wch: 44 }];
+  var wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, ws, 'Sheet1');
+  var name = activity.replace(/[\\/:*?"<>|]/g, '-') + '-商品列表';
+  X.writeFile(wb, name + '.xlsx');
+  Aoi.toast('已导出「' + activity + '」商品列表（' + ps.length + ' 件）', 'success');
+};
+
+// 导出到小程序（v3.15.0 S6 自 PCO 页迁入，适用所有活动）：模板 = 说明 6 行 + 表头 + 数据（Sheet1）。
+// 价格必填：商品缺人民币价时确认后按计算器当前汇率临时换算写入导出表（不改商品数据）；
+// 要把价格固化到主档请先用「生成人民币价」。
+Aoi.orders.TEMPLATE_NOTES = [
+  ['【使用说明】请在电脑或者手机上使用Excel软件编辑，并按照数据格式要求导入谷子商品。'],
+  ['【注意事项】本模版的使用说明部分的文字请勿删除。'],
+  ['【谷子分类】[选填] 谷子分类，不填则分类为：默认分类'],
+  ['【谷子价格】[必填] 谷子的价格，最多只支持2位小数点'],
+  ['【谷子库存】[选填] 不填表示不限库存 '],
+  ['【是否冻结】[选填] 默认为否，冻结的话表示该谷子暂不可购买']
+];
+Aoi.orders.TEMPLATE_HEADER = ['谷子分类（选填）', '谷子名称（必填）', '价格（必填）', '库存（选填）', '冻结（选填：是或否）', '采购状态（选填）'];
+
+Aoi.orders.exportMiniProgram = async function (activity) {
+  var X = window.XLSX;
+  if (!X || !X.utils) { Aoi.toast('表格组件（XLSX）未加载', 'error'); return; }
+  var d = Aoi.orders.ensure();
+  var ps = ((d.activityMeta || {})[activity] || {}).products || [];
+  if (!ps.length) { Aoi.toast('该活动还没有登记商品——可先「从订单同步商品」或手工添加', 'warning'); return; }
+  var missing = ps.filter(function (p) { return p.price == null; }).length;
+  if (missing && !(await Aoi.confirm(
+    '有 ' + missing + ' 件商品缺人民币价（小程序模板价格必填）。\n'
+    + '确定 = 按计算器当前汇率临时换算写入导出表（不修改商品数据）；\n'
+    + '取消 = 中止导出（可先点「生成人民币价」把价格固化到主档）。',
+    { title: '缺人民币价', okText: '临时换算导出' }
+  ))) {
+    Aoi.toast('已中止导出——可先「生成人民币价」后再导出', 'info');
+    return;
+  }
+  var aoa = Aoi.orders.TEMPLATE_NOTES.slice();
+  aoa.push(Aoi.orders.TEMPLATE_HEADER);
+  ps.forEach(function (p) {
+    var price = p.price;
+    if (price == null && p.priceOrig != null) price = Aoi.calc.toRmb(p.priceOrig, p.currency || 'jpy');
+    aoa.push([p.type || '', p.model || p.nameOrig || '', price != null ? price : '', '', '', '备货中']);
+  });
+  var ws = X.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 18 }, { wch: 46 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }];
+  var wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, ws, 'Sheet1');
+  var name = activity.replace(/[\\/:*?"<>|]/g, '-') + '-小程序商品导入表';
+  X.writeFile(wb, name + '.xlsx');
+  Aoi.toast('已导出「' + activity + '」小程序商品表（' + ps.length + ' 件' + (missing ? '，其中 ' + missing + ' 件按当前汇率临时换算' : '') + '）', 'success');
 };
 
 // 依据商品筛选购买者：跳订单管理，按活动 + 型号过滤

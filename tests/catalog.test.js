@@ -136,11 +136,12 @@ describe('草稿：去重合并 + 汇率换算', () => {
     expect(aoi.catalog.draft[0].priceJpy).toBe(3960);
     expect(aoi.catalog.draft[0].limit).toBe(2);
   });
-  it('日元价按计算器汇率换算人民币（roundHalf）', () => {
+  it('日元价不再自动换算人民币（v3.15.0 S4：价格策略移交活动管理）', () => {
     aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 }]);
-    expect(aoi.catalog.priceCnyOf(aoi.catalog.draft[0])).toBe(210); // 3960 × 0.053 = 209.88 → 210
+    expect(aoi.catalog.draft[0].priceCny).toBeUndefined();
+    expect(aoi.catalog.priceCnyOf).toBeUndefined();
   });
-  it('推入活动商品主档走 registerProduct 同构字段', async () => {
+  it('推入活动商品主档走 registerProduct 同构字段（人民币价仅人工填写时才推）', async () => {
     const pushed = [];
     const orig = aoi.orders.registerProduct;
     aoi.orders.registerProduct = async (activity, input) => { pushed.push({ activity, input }); return { id: 'x' }; };
@@ -148,21 +149,28 @@ describe('草稿：去重合并 + 汇率换算', () => {
       aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960, limit: 2, url: 'https://x/p/1', image: 'https://img.example/1.jpg' }]);
       doc.getElementById('catPushActivity').innerHTML = '<option value="测试活动" selected>测试活动</option>';
       await aoi.catalog.pushSelected();
+      expect(pushed).toHaveLength(1);
+      expect(pushed[0].activity).toBe('测试活动');
+      expect(pushed[0].input).toMatchObject({
+        type: '毛绒玩偶', model: '毛绒玩偶 皮卡丘', currency: 'jpy',
+        priceOrig: 3960, limit: 2,
+        refUrl: 'https://x/p/1', refImage: 'https://img.example/1.jpg'
+      });
+      expect(pushed[0].input.price).toBeUndefined(); // 不再自动生成人民币价
+      // 人工在校对表里填写了人民币价（经 collectEdits 读回）→ 才随主档推入
+      doc.querySelector('#catDraftTbody tr[data-id] .cat-price').value = '210';
+      pushed.length = 0;
+      doc.getElementById('catPushActivity').innerHTML = '<option value="测试活动" selected>测试活动</option>';
+      await aoi.catalog.pushSelected();
+      expect(pushed[0].input.price).toBe(210);
     } finally {
       aoi.orders.registerProduct = orig;
     }
-    expect(pushed).toHaveLength(1);
-    expect(pushed[0].activity).toBe('测试活动');
-    expect(pushed[0].input).toMatchObject({
-      type: '毛绒玩偶', model: '毛绒玩偶 皮卡丘', currency: 'jpy',
-      price: 210, priceOrig: 3960, limit: 2,
-      refUrl: 'https://x/p/1', refImage: 'https://img.example/1.jpg'
-    });
   });
 });
 
-describe('小程序模板导出', () => {
-  it('结构：说明 6 行 + 表头第 7 行 + 数据自第 8 行；Sheet 名 Sheet1', () => {
+describe('导出到小程序（v3.15.0 S6：迁入活动管理，数据源=活动商品主档）', () => {
+  function stubXlsx() {
     const captured = {};
     win.XLSX = {
       utils: {
@@ -172,29 +180,53 @@ describe('小程序模板导出', () => {
       },
       writeFile: (wb, fname) => { captured.fname = fname; captured.aoa = wb.Sheets[wb.SheetNames[0]].aoa; }
     };
-    aoi.catalog.addToDraft([
-      { jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 },
-      { jpName: 'マスコット ゾロア', priceJpy: 1980 }
+    return captured;
+  }
+  function seedProducts(products) {
+    aoi.state.data.activityMeta = { '测试活动': { products, buyers: [], trackings: [] } };
+    aoi.state.data.activities = ['测试活动'];
+  }
+
+  it('结构：说明 6 行 + 表头第 7 行 + 数据自第 8 行；价格取主档人民币价；文件名带活动名', async () => {
+    const captured = stubXlsx();
+    seedProducts([
+      { id: 'p1', type: '毛绒玩偶', model: '皮卡丘', price: 210 },
+      { id: 'p2', type: '挂件', model: '索罗亚', price: 105 }
     ]);
-    const btn = doc.createElement('button');
-    btn.setAttribute('data-name', '小程序商品导入表');
-    aoi.catalog.exportTemplate(btn);
+    await aoi.orders.exportMiniProgram('测试活动');
     const aoa = captured.aoa;
     expect(captured.sheetName).toBe('Sheet1');
-    expect(captured.fname).toBe('小程序商品导入表.xlsx');
+    expect(captured.fname).toBe('测试活动-小程序商品导入表.xlsx');
     expect(aoa).toHaveLength(6 + 1 + 2);
     expect(aoa[0][0]).toContain('【使用说明】');
-    expect(aoa[1][0]).toContain('【注意事项】');
     expect(aoa[5][0]).toContain('【是否冻结】');
     expect(aoa[6]).toEqual(['谷子分类（选填）', '谷子名称（必填）', '价格（必填）', '库存（选填）', '冻结（选填：是或否）', '采购状态（选填）']);
-    expect(aoa[7]).toEqual(['毛绒玩偶', '毛绒玩偶 皮卡丘', 210, '', '', '备货中']);
-    expect(aoa[8][1]).toBe('挂件 索罗亚');
+    expect(aoa[7]).toEqual(['毛绒玩偶', '皮卡丘', 210, '', '', '备货中']);
     delete win.XLSX;
   });
-  it('缺 XLSX 组件时报错不抛异常', () => {
+  it('缺价商品：确认后按计算器汇率临时换算写入导出表，不改商品主档', async () => {
+    const captured = stubXlsx();
+    aoi.state.data.calc = { jpyRate: 0.048, jpyMarkup: 0.005 };
+    aoi.confirm = async () => true;
+    seedProducts([{ id: 'p1', type: '挂件', model: '索罗亚', priceOrig: 1000, currency: 'jpy' }]);
+    await aoi.orders.exportMiniProgram('测试活动');
+    expect(captured.aoa[7][2]).toBe(53); // 1000 × 0.053
+    expect(aoi.state.data.activityMeta['测试活动'].products[0].price).toBeUndefined();
     delete win.XLSX;
-    aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 }]);
-    expect(() => aoi.catalog.exportTemplate(doc.createElement('button'))).not.toThrow();
+  });
+  it('缺价商品：取消确认则中止导出', async () => {
+    let written = false;
+    win.XLSX = { utils: { aoa_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: () => {} }, writeFile: () => { written = true; } };
+    aoi.confirm = async () => false;
+    seedProducts([{ id: 'p1', type: '挂件', model: '索罗亚', priceOrig: 1000, currency: 'jpy' }]);
+    await aoi.orders.exportMiniProgram('测试活动');
+    expect(written).toBe(false);
+    delete win.XLSX;
+  });
+  it('缺 XLSX 组件时报错不抛异常', async () => {
+    delete win.XLSX;
+    seedProducts([]);
+    await expect(aoi.orders.exportMiniProgram('测试活动')).resolves.toBeUndefined();
   });
 });
 
@@ -253,22 +285,10 @@ describe('v3.8.0 修复：推入新活动 / 重复回填 / 删活动级联删订
   });
 });
 
-describe('保存到目录 + 渲染', () => {
-  it('save 并入 d.pcoItems（同构结构），渲染目录表', async () => {
-    aoi.catalog.addToDraft([{ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960, url: 'https://x/p/1' }]);
-    await aoi.catalog.save();
-    expect(aoi.state.data.pcoItems).toHaveLength(1);
-    expect(aoi.state.data.pcoItems[0]).toMatchObject({ jpName: 'ぬいぐるみ ピカチュウ', name: '毛绒玩偶 皮卡丘', type: '毛绒玩偶', priceJpy: 3960, watched: true });
-    aoi.catalog.renderCatalogList();
-    const tbody = doc.getElementById('catTableTbody');
-    expect(tbody.querySelectorAll('tr')).toHaveLength(1);
-  });
-  it('抓取通道未配置时引导粘贴导入（不发起请求）', async () => {
-    doc.getElementById('catGrabUrl').value = 'https://www.pokemoncenter-online.com/search/?q=test';
-    let fetched = false;
-    win.fetch = async () => { fetched = true; return { ok: true }; };
-    await aoi.catalog.grab();
-    expect(fetched).toBe(false);
+describe('v3.15.0 S7：已存目录下线（pcoItems 停写）', () => {
+  it('save/renderCatalogList/toggleWatch/removeSaved/grab/saveDispatch/exportTemplate 不复存在', () => {
+    ['save', 'renderCatalogList', 'toggleWatch', 'removeSaved', 'grab', 'saveDispatch', 'exportTemplate', 'TEMPLATE_NOTES']
+      .forEach(function (k) { expect(aoi.catalog[k]).toBeUndefined(); });
   });
 });
 
@@ -417,9 +437,10 @@ describe('v3.9.5 两步导入：页面粘贴带图 + AI 表格按日文原名合
     expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('AI 翻译表格'), 'success');
   });
 
-  it('提示词修正：说明日文原名是对齐键、图片由页面粘贴带入（无需图片列）', () => {
+  it('提示词（v3.15.0 S9）：日文原名是对齐键，商品链接/图片链接两列可输出且禁止编造', () => {
     expect(aoi.catalog.AI_PROMPT).toContain('按「日文原名」逐行合并');
-    expect(aoi.catalog.AI_PROMPT).toContain('不需要图片列');
+    expect(aoi.catalog.AI_PROMPT).toContain('| 日文原名 | 中文名 | 类型 | 日元价 | 限购 | 発売日 | 商品链接 | 图片链接 |');
     expect(aoi.catalog.AI_PROMPT).toContain('一字不差');
+    expect(aoi.catalog.AI_PROMPT).toContain('绝不允许编造');
   });
 });

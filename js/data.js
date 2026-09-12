@@ -45,6 +45,7 @@ Aoi.explainRpcError = function (msg, context) {
 Aoi.saveTeamData = async function (data) {
   if (Aoi.state.user && Aoi.state.user.isDebug) {
     localStorage.setItem('aoi_debug_data', JSON.stringify(data));
+    Aoi.bumpDataVersion(); // v3.15.0 S8：记忆化失效信号（调试通道同样生效）
     return;
   }
   var s = Aoi.adminLoadSession();
@@ -73,6 +74,7 @@ Aoi.saveTeamData = async function (data) {
     throw new Error(msg);
   }
   Aoi.adminUpdatedAt = r.data; // 记录新版本，供下次写入
+  Aoi.bumpDataVersion(); // v3.15.0 S8：记忆化失效信号
   return r.data;
 };
 

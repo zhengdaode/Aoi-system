@@ -14,6 +14,32 @@ Aoi.genId = function () {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 };
 
+// —— v3.15.0 S8：数据信号与版本（审批汇总/复盘统计记忆化的失效依据）——
+// dataVersion 在每次 saveTeamData 成功后自增；dataSig 再叠加数据对象代数（引用变化即换代，
+// 覆盖测试直接替换 aoi.state.data 的场景）与关键集合行数。版本号自增不存在的场景（如行内
+// 原地改动）由 buyerSummary 记忆化的「同 tick 自动过期」兜底，不会跨交互读到旧值。
+Aoi.dataVersion = 0;
+
+Aoi.bumpDataVersion = function () {
+  Aoi.dataVersion++;
+  if (Aoi.approval && Aoi.approval.clearSummaryCache) Aoi.approval.clearSummaryCache();
+};
+
+Aoi.dataSig = function (d) {
+  d = d || Aoi.state.data || {};
+  var gen = '';
+  if (typeof WeakMap !== 'undefined') {
+    Aoi._dataIds = Aoi._dataIds || new WeakMap();
+    Aoi._dataSeq = Aoi._dataSeq || 0;
+    if (!Aoi._dataIds.has(d)) Aoi._dataIds.set(d, ++Aoi._dataSeq);
+    gen = Aoi._dataIds.get(d);
+  }
+  return [Aoi.dataVersion, gen,
+    d.orders ? d.orders.length : 0,
+    d.payments ? d.payments.length : 0,
+    d.batches ? d.batches.length : 0].join('|');
+};
+
 // 屏幕路由：只显示目标 screen，隐藏其余
 Aoi.showScreen = function (screenId) {
   document.querySelectorAll('[data-screen]').forEach(function (el) {

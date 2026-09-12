@@ -140,7 +140,9 @@ Aoi.enterApp = async function () {
   Aoi.approval.refillBatches();
   Aoi.ship.refillBatches();
   Aoi.notify.refillBatches();
-  Aoi.notify.sync();
+  // v3.15.0 S8：自动通知同步延后到首帧之后——登录期它要对「批次×全量订单」做重算、
+  // 且可能触发整包写回，与 ~20 个渲染函数并行抢主线程，是进入系统时「时快时慢」的页面级因素
+  setTimeout(function () { Aoi.notify.sync(); }, 1500);
   Aoi.warehouse.render();
   Aoi.warehouse.renderTransfers();
   Aoi.orders.renderCnChanges();

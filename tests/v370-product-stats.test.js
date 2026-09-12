@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi } from './helpers/aoi.js';
 
 // v3.7.0 S1：商品主档聚合（productStats / missingProducts / registerProduct / syncProductsFromOrders）
-// + F9 接口预留（d.pcoItems）
+// v3.15.0 S7（D1）：d.pcoItems 停止初始化——「已存目录」已下线
 describe('商品主档聚合（v3.7.0 S1）', () => {
   beforeEach(() => {
     aoi.saveTeamData = vi.fn().mockResolvedValue(undefined);
@@ -28,12 +28,9 @@ describe('商品主档聚合（v3.7.0 S1）', () => {
     };
   });
 
-  it('ensure 预留 d.pcoItems（F9 接口）且幂等', () => {
+  it('ensure 不再初始化 d.pcoItems（v3.15.0 S7：已存目录下线）', () => {
     const d = aoi.orders.ensure();
-    expect(Array.isArray(d.pcoItems)).toBe(true);
-    d.pcoItems.push({ id: 'x' });
-    aoi.orders.ensure();
-    expect(d.pcoItems).toHaveLength(1);
+    expect(d.pcoItems).toBeUndefined();
   });
 
   it('productStats 聚合件数/购买者/按件加权均价', () => {

@@ -1,6 +1,6 @@
 {
   "name": "aoi-system",
-  "version": "3.14.0",
+  "version": "3.15.1",
   "private": true,
   "description": "Aoi-system 谷圈团购排单系统（测试与工具脚本；前端本体无构建）",
   "scripts": {

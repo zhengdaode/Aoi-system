@@ -23,11 +23,14 @@
   p_cn 空值写入拒绝、admin_login 序列节流（失败→5 秒冷却）、审计表/RPC 权限、F5 RPC 走单团守卫、
   v2 函数/表/列收敛删除、orders 104 条完好。
 - **⚠️ 待用户操作（按优先级）**：
-  1. **QQ 机器人真机部署批次（唯一阻塞 QQ 侧全部功能的事，F5+F10+relay v5 加固同批）**：ECS 上
-     `git pull` aoi-qqbot + 主仓库 relay/relay.js（v3.12.0 加固：body/消息上限、限频、/audit）+
-     `systemctl restart qq-relay`；NapCat WebUI 开 HTTP POST 上报；Caddy TLS 反代（顺带消除明文 http
-     token 链路）；网页设置页 relay 改 https 域名 + botConfig。**前置：47.101.194.103 SSH 密钥不可达，
-     需负责人授权公钥或由负责人本人执行。**
+  1. **NapCat 安装与扫码登录（QQ 链路最后一环；relay/Edge 已于 2026-09-13 凌晨全部部署）**：
+     relay v4 双向（aoi-qqbot v4.1 加固版：body/消息上限、限频、/audit）已部署在本机 `/root/relay/`
+     （systemd `qq-relay.service` enabled，重启自启已实测）；Edge `qq-relay` v8 已部署（bundle 通道修复后
+     v3.12.0 加固真实生效）；SSH 已打通（部署者公钥已授权）。**剩余三步**：①本机安装 NapCat（docker）并
+     扫码登录专用小号，HTTP API `127.0.0.1:3000` + 事件上报 `http://127.0.0.1:8080/onebot/event?token=<EVENT_TOKEN>`
+     （token 在服务器 `/root/relay/.env`）；②把团 QQ 群号填入服务器 `.env` 的 `ALLOWED_GROUPS` 并
+     `systemctl restart qq-relay`（空=忽略群事件，私聊指令不受影响）；③全链路验收（帮助/绑定/查单/我的快递/
+     催缴/排发表私发）；④（可选）Caddy TLS 反代消除明文 http token 链路。
   2. **PCO 已存目录数据清理（v3.15.0 S7，D1 已批准）**：`AOI_ADMIN_TOKEN=<token> node scripts/archive-pco.mjs`
      预览快照 → 确认后加 `--apply` 删除线上 `d.pcoItems`/`d.catalogConfig`（删前自动快照到本地 archives/，
      误删可 `--restore`；写回前服务端亦自动存档旧版）。F9 监控已被风控实测否决，原「载体拍板」遗留随之关闭；

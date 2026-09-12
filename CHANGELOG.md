@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.15.1 (2026-09-13)
+
+> **部署收尾补记**——SWAS 真机批次落地：relay v4 双向加固版上线 + Edge bundle 通道修复。零业务代码改动。
+
+### Deployed（47.101.194.103 · 阿里云轻量应用服务器，SSH 已打通）
+- **aoi-qqbot relay v4.1 已部署**（`/root/relay/relay.js`，systemd `qq-relay.service` enabled，重启自启实测）：移植主仓库 v3.12.0 推送侧加固——POST / body 1MB→64KB、单条消息 ≤4500 字符、每 token ≤60 次/分限频、推送写 JSONL 审计（admin/通道/目标尾 4 位/长度/结果）、新增 GET /audit 查询端点（admin 鉴权，最近 200 条）；修复 NapCat 不可达时推送挂起（现返回 502 + 失败审计）与 readBody 超限 `destroy()` 导致 413 发不出（改为停止累积+排空）。线上探针全过：401 / 403（event 无 token）/ 400（超长消息）/ 413（超大 body）/ 502（NapCat 未装）→ /audit 审计闭环可见。aoi-qqbot 68 测试全绿（commits `d6518ed..2542095`）。
+- **Edge `qq-relay` v8：bundle 部署通道修复后真实更新**——根因 = deploy-edge.js 上传文件名带 slug 前缀（`qq-relay/index.ts`）与 `entrypoint_path`（`index.ts`）不匹配，bundle 400 后静默回落到「只改配置不更新代码」的 PATCH 通道（v3.9.3 教训的变体，v3.12.0 的 v7 即因此未生效）；修复后 v3.12.0 的 UPSTREAM env 化 / POST 64KB 上限 / /fetch 重定向逐跳校验真实生效。探针：70KB 经 Edge 直接 413、POST 401、/fetch 非白名单 403 全过。
+- **服务器事实与恢复过程**：47.101.194.103 实为阿里云**轻量应用服务器**（SWAS，非 ECS）；09-12 整机挂死致全端口失联（Edge/直连双路超时），负责人控制台重启（01:58 relay 自启验证 enabled）+ 控制台授权部署者公钥后 SSH 打通。**NapCat 未安装**（127.0.0.1:3000 拒绝）——QQ 链路最后一环见 STATUS「待用户操作 1」。
+
 ## v3.15.0 (2026-09-13)
 
 > **商品联动闭环 + 活动级价格生成与导出 + PCO 目录瘦身 + 复盘性能治理**（九项实测反馈，

@@ -67,10 +67,12 @@ async function main() {
   const attempts = [];
 
   // 通道一：bundle 部署（supabase CLI 同款接口）
+  // 注意：文件名必须与 metadata.entrypoint_path 一致（'index.ts'）——带 slug 前缀会报
+  // "Entrypoint path does not exist"（v3.14.0 实测；此前因此一直静默回落到不更新代码的 PATCH 通道）
   try {
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify({ entrypoint_path: 'index.ts', verify_jwt: false })], { type: 'application/json' }), 'metadata');
-    form.append('file', new Blob([content], { type: 'application/typescript' }), slug + '/index.ts');
+    form.append('file', new Blob([content], { type: 'application/typescript' }), 'index.ts');
     const r = await fetch(api + '/functions/deploy?slug=' + encodeURIComponent(slug), {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token },

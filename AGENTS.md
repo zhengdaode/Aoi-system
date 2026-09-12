@@ -8,8 +8,8 @@
 1. **每次改动完成后，必须创建一个对应的 Git commit**，以便后续追踪和回滚。
 2. **每次改动完成后，必须编写或更新相关测试，并在交付给用户前，确保所有测试和验证全部通过。**
    （测试基建已建立：vitest + jsdom，`npm test`；harness 见 `tests/helpers/aoi.js`，新增 js 模块需加入其 MODULES 列表。）
-3. **推送规则（2026-09-09 修订）：`origin`（zhengdaode/Aoi-system）可随时随意推送，无需逐次请示——GitHub Pages 通道即由 origin 驱动（push main 触发 `.github/workflows/deploy.yml`：先跑测试、通过后自动部署 Pages），Netlify 通道亦随 origin 推送自动构建，即推 origin = 双通道上线；`deploy` 远端（ICGP-Click/Click_sales_system）未经部署者明确允许，禁止 push 及任何其他改动**（确需操作 deploy 时由部署者明确指示后执行）。
-4. **服务器部署权限现状（2026-09-10 SSH 实测复核）**：工作服务器 `47.101.194.103`（relay 所在，:8080 存活）**SSH 密钥不可达**（root/ecs-user/admin/ubuntu 均 Permission denied，与 CHANGELOG v3.5.2 记录一致）——常驻服务部署与配置查询需先由负责人在该机为部署者公钥授权（authorized_keys 或阿里云控制台绑定密钥）；`106.14.28.206` 为负责人**自用机**（docker 跑 napcat + astrbot；2C/1.6G 内存仅剩 ~98MB）SSH 可登录（F5 待真机部署在此执行）但**不可承载 Chromium 类负载**；免 SSH 的服务端部署走 Supabase Edge Function（先例：qq-relay v5 经 Management API）。**服务器凭据一律不入仓库**，此处仅记录授权范围与结论。
+3. **推送规则（2026-09-12 修订，以实测为准）：`origin`（zhengdaode/Aoi-system）可随时随意推送，无需逐次请示——GitHub Pages 通道由 origin 驱动（push main 触发 `.github/workflows/deploy.yml`：先跑测试、通过后自动部署 Pages）。**Netlify 站点挂靠的是 `deploy` 仓库（ICGP-Click/Click_sales_system），不随 origin 更新**——实测 deploy 停在 v3.1.0（2026-09-06）、落后 origin 100+ 提交，其对应的 Netlify 站是 v3.1.0 旧前端（2026-09-06 数据事故中的「旧生产站」即它），**勿在该站测试/使用**。**使用、测试与开发一律基于 Pages**；`deploy` 远端未经部署者明确允许禁止 push 及任何其他改动（确需操作时由部署者明确指示后执行）。
+4. **服务器部署权限现状（2026-09-12 复测）**：工作服务器 `47.101.194.103`（relay 所在）**整机入网不可达**——SSH 22 与 relay 8080 从本机直连与 Supabase Edge 双侧均超时（2026-09-12 凌晨 03:16 Edge 探针尚返回 relay 401，其后失联；2026-09-10 旧记录「SSH Permission denied」说明当时可达仅密钥未授权，现状更严重），需负责人在阿里云控制台核查实例运行状态/安全组 22+8080 入方向，并为部署者公钥授权（authorized_keys 或控制台绑定密钥对）；`106.14.28.206` 为负责人**自用机**（docker 跑 napcat + astrbot；2C/1.6G 内存仅剩 ~98MB）SSH 可登录（F5 待真机部署在此执行）但**不可承载 Chromium 类负载**；免 SSH 的服务端部署走 Supabase Edge Function（先例：qq-relay v7 经 Management API，2026-09-12）。**服务器凭据一律不入仓库**，此处仅记录授权范围与结论。
 
 ## 当前项目计划
 

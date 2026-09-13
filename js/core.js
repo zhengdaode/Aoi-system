@@ -57,8 +57,7 @@ Aoi.nav = function (viewId) {
   var target = document.getElementById(viewId);
   if (target) target.classList.remove('hidden');
   document.querySelectorAll('[data-nav]').forEach(function (el) {
-    el.classList.toggle('bg-blue-600', el.getAttribute('data-nav') === viewId);
-    el.classList.toggle('text-white', el.getAttribute('data-nav') === viewId);
+    el.classList.toggle('nav-active', el.getAttribute('data-nav') === viewId);
   });
   Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
   // 数据可能在其他视图被修改，回到限购页时刷新活动下拉与商品表
@@ -153,7 +152,7 @@ Aoi.confirm = function (msg, opts) {
     if (body) body.textContent = msg;
     okBtn.textContent = opts.okText || '确定';
     okBtn.className = 'px-4 py-2 rounded font-bold text-white '
-      + (opts.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700');
+      + (opts.danger ? 'bg-red-600 hover:bg-red-700' : 'btn-primary');
     modal.classList.remove('hidden');
     var done = false;
     function onOk() { close(true); }

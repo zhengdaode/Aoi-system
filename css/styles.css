@@ -53,9 +53,30 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15);
 }
 
-/* 侧边栏导航：当前项珊瑚底白字（on-primary） */
-[data-nav].bg-blue-600 {
+/* 侧边栏导航：当前项珊瑚底白字（v3.16.0 由 bg-blue-600 特例改为正式 .nav-active 类） */
+[data-nav].nav-active {
+  background: var(--primary);
   color: #fff;
+}
+[data-nav].nav-active:hover {
+  background: var(--primary-active);
+}
+
+/* v3.16.0 按钮配色收敛：全站实底主操作统一珊瑚、描边导出统一珊瑚描边（替代散落的 Tailwind 蓝/绿/靛/紫） */
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--primary-active);
+}
+.btn-outline {
+  border: 1px solid rgba(204, 120, 92, 0.45);
+  color: var(--primary);
+  background: transparent;
+}
+.btn-outline:hover {
+  background: rgba(204, 120, 92, 0.08);
 }
 
 /* 卡片 hover 微阴影（文档 0 1px 3px rgba(20,20,19,0.08)，阴影罕见） */

@@ -191,8 +191,8 @@ Aoi.notify.render = function () {
       + '<td class="px-3 py-2 text-sm">' + Aoi.escapeHtml(n.body) + '</td>'
       + '<td class="px-3 py-2 whitespace-nowrap text-xs text-gray-400">' + Aoi.escapeHtml(n.date || '') + '</td>'
       + '<td class="px-3 py-2 whitespace-nowrap">'
-      + '<button data-copy="' + n.id + '" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">复制</button> '
-      + '<button data-toggle="' + n.id + '" class="px-2 py-1 ' + (n.sent ? 'bg-green-600' : 'bg-gray-400') + ' text-white text-xs rounded hover:opacity-90">' + (n.sent ? '已发' : '未发') + '</button> '
+      + '<button data-copy="' + n.id + '" class="px-2 py-1 btn-primary text-xs rounded">复制</button> '
+      + '<button data-toggle="' + n.id + '" class="px-2 py-1 ' + (n.sent ? 'btn-primary' : 'bg-gray-400') + ' text-white text-xs rounded hover:opacity-90">' + (n.sent ? '已发' : '未发') + '</button> '
       + '<button data-del="' + n.id + '" class="px-2 py-1 text-red-500 text-xs hover:underline">删</button>'
       + '</td></tr>';
   }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">' + (Aoi.notify.filter === 'unsent' ? '没有未发送的通知' : '暂无通知（点「同步生成」或上方按钮生成）') + '</td></tr>';

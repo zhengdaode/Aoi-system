@@ -1105,8 +1105,8 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.shipDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td data-lowpri class="px-3 py-2"><input type="text" list="shipFuzzyOptions" value="' + Aoi.escapeHtml(m.shipDateFuzzy || '') + '" placeholder="如 9月中旬" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDateFuzzy" class="border border-gray-300 rounded px-2 py-1 text-sm w-28"></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
-      + '<td class="px-3 py-2"><button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (buyers.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (buyers.length ? buyers.length + ' 人' : '填写') + '</button></td>'
-      + '<td class="px-3 py-2"><button data-expand="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border border-gray-300 rounded text-xs ' + (sum.count ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (sum.count ? sum.count + ' 款·' + sum.qty + ' 件' : '商品') + '</button></td>'
+      + '<td class="px-3 py-2"><button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border rounded text-xs ' + (buyers.length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (buyers.length ? buyers.length + ' 人' : '填写') + '</button></td>'
+      + '<td class="px-3 py-2"><button data-expand="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border rounded text-xs ' + (sum.count ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (sum.count ? sum.count + ' 款·' + sum.qty + ' 件' : '商品') + '</button></td>'
       + '<td class="px-3 py-2"><input type="text" value="' + Aoi.escapeHtml(m.remark || '') + '" placeholder="备注" data-activity="' + Aoi.escapeHtml(name) + '" data-field="remark" class="border border-gray-300 rounded px-2 py-1 text-sm w-32"></td>'
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
@@ -1289,8 +1289,8 @@ Aoi.orders.renderCnChanges = function () {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.newCn) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(c.qq || '—') + '</td>'
       + '<td class="px-3 py-2 whitespace-nowrap">'
-      + '<button data-cnapprove="' + c.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">同意</button>'
-      + '<button data-cnreject="' + c.id + '" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>'
+      + '<button data-cnapprove="' + c.id + '" class="px-2 py-1 btn-primary text-xs rounded mr-1">同意</button>'
+      + '<button data-cnreject="' + c.id + '" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">驳回</button>'
       + '</td></tr>';
   }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无改圈名申请</td></tr>';
 };
@@ -1824,7 +1824,7 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '</div>'
     + '<div class="flex items-center gap-2">'
-    + '<button data-psave="' + p.id + '" class="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700">保存</button>'
+    + '<button data-psave="' + p.id + '" class="px-3 py-1 btn-primary text-xs font-bold rounded">保存</button>'
     + '<button type="button" onclick="Aoi.img.openPicker(\'' + imgId + '\')" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>'
     + '<button data-pjump="' + p.id + '" class="text-blue-600 hover:underline text-xs whitespace-nowrap">查订单</button>'
     + '<button data-pdel="' + p.id + '" class="ml-auto text-red-500 hover:underline text-xs">删</button>'
@@ -1841,14 +1841,14 @@ Aoi.orders.actExpandHtml = function (name, idx) {
   var head = '<div class="flex flex-wrap items-center gap-2 mb-3">'
     + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded hover:bg-gray-900 whitespace-nowrap">查订单</button>'
     + '<input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="w-48 border border-gray-300 rounded px-2 py-1.5 text-sm">'
-    + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (trackings.length ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
-    + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs ' + (plan ? 'text-blue-600 border-blue-300' : 'text-gray-500') + ' hover:bg-blue-50 whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
-    + '<button data-act-planexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="按已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>'
-    + '<button data-act-genprice="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="整个活动批量生成人民币价：商品主档 + 外币订单，公式（汇率/加价）可临时调整">生成人民币价</button>'
+    + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (trackings.length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
+    + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (plan ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
+    + '<button data-act-planexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="按已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>'
+    + '<button data-act-genprice="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="整个活动批量生成人民币价：商品主档 + 外币订单，公式（汇率/加价）可临时调整">生成人民币价</button>'
     + '<button data-act-exportproducts="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap" title="导出该活动商品主档 xlsx（类型/型号/原名/价格/限购/参考图/链接）">导出商品列表</button>'
-    + '<button data-act-miniexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap" title="按小程序模板导出该活动全部商品（说明 6 行 + 表头 + 数据）">导出到小程序</button>'
+    + '<button data-act-miniexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="按小程序模板导出该活动全部商品（说明 6 行 + 表头 + 数据）">导出到小程序</button>'
     + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
-    + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-blue-300 rounded text-xs text-blue-600 hover:bg-blue-50 whitespace-nowrap">导出汇总表</button>'
+    + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap">导出汇总表</button>'
     + '</div>';
   var form = '<div class="flex flex-wrap items-center gap-2 mb-3">'
     + '<input id="apNewType' + sfx + '" list="actProductTypeOptions" placeholder="制品类型" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
@@ -1858,7 +1858,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<input id="apNewImage' + sfx + '" data-img-paste placeholder="参考图 URL（可上传/粘贴）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<button type="button" onclick="Aoi.img.openPicker(\'apNewImage' + sfx + '\')" class="px-2 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>'
     + '<input id="apNewUrl' + sfx + '" placeholder="跳转链接（空=平台链接）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
-    + '<button data-act-addproduct="' + Aoi.escapeHtml(name) + '" data-suffix="' + sfx + '" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded hover:bg-blue-700 whitespace-nowrap">添加商品</button>'
+    + '<button data-act-addproduct="' + Aoi.escapeHtml(name) + '" data-suffix="' + sfx + '" class="px-3 py-1.5 btn-primary text-xs font-bold rounded whitespace-nowrap">添加商品</button>'
     + '</div>';
   var cards = m.products.length
     ? '<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">' + m.products.map(function (p) { return Aoi.orders.actProductCardHtml(name, p); }).join('') + '</div>'

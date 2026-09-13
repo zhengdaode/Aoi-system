@@ -80,8 +80,8 @@ Aoi.warehouse.renderTransfers = function () {
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(Aoi.warehouse.name(t.toWarehouseId)) + '</td>'
       + '<td class="px-3 py-2 text-sm text-gray-500">' + Aoi.escapeHtml(t.reason || '') + '</td>'
       + '<td class="px-3 py-2 whitespace-nowrap">'
-      + '<button data-tapprove="' + t.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">同意</button>'
-      + '<button data-treject="' + t.id + '" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>'
+      + '<button data-tapprove="' + t.id + '" class="px-2 py-1 btn-primary text-xs rounded mr-1">同意</button>'
+      + '<button data-treject="' + t.id + '" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">驳回</button>'
       + '</td></tr>';
   }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">暂无换囤货地申请</td></tr>';
 };

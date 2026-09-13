@@ -41,7 +41,7 @@
       <form onsubmit="Aoi.auth.login(); return false;" class="space-y-3">
         <input id="loginUsername" type="text" placeholder="用户名" autocomplete="username" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         <input id="loginPassword" type="password" placeholder="密码" autocomplete="current-password" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-        <button type="submit" class="w-full bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">登录</button>
+        <button type="submit" class="w-full btn-primary font-bold py-2 rounded">登录</button>
       </form>
       <a class="block mt-3 text-center text-sm text-blue-500 hover:underline cursor-pointer" onclick="Aoi.showScreen('screen-member')">我是团员 → 免登录查询</a>
     </div>
@@ -56,7 +56,7 @@
         <input id="initUsername" type="text" placeholder="用户名（至少 2 个字符）" autocomplete="username" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         <input id="initPassword" type="password" placeholder="密码（至少 6 位）" autocomplete="new-password" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
         <input id="initConfirm" type="password" placeholder="确认密码" autocomplete="new-password" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700">创建并进入系统</button>
+        <button type="submit" class="w-full btn-primary font-bold py-2 rounded">创建并进入系统</button>
       </form>
       <p class="mt-3 text-xs text-gray-400">之后可在「账号与设置」中添加其他管理员</p>
     </div>
@@ -72,7 +72,7 @@
         <form onsubmit="Aoi.member.enter(); return false;" class="space-y-3">
           <input id="memberKey" type="password" placeholder="团员密钥" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
           <input id="memberId" type="text" placeholder="你的圈名 / CN 或 QQ 号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
-          <button type="submit" class="w-full bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">进入</button>
+          <button type="submit" class="w-full btn-primary font-bold py-2 rounded">进入</button>
         </form>
         <a class="block mt-3 text-sm text-blue-500 hover:underline cursor-pointer" onclick="Aoi.showScreen('screen-auth')">← 团长 / 管理员登录</a>
       </div>
@@ -134,7 +134,7 @@
         <p class="text-sm text-gray-500 mb-3">填写你的收件地址用于发货。为保护隐私，提交后不可回看原文，只能再次修改。</p>
         <p id="memberAddrStatus" class="text-sm text-gray-600 mb-2"></p>
         <textarea id="memberAddr" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="收件人、电话、详细地址"></textarea>
-        <button onclick="Aoi.member.saveAddress()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">保存 / 更新地址</button>
+        <button onclick="Aoi.member.saveAddress()" class="mt-3 px-5 py-2 btn-primary font-bold rounded">保存 / 更新地址</button>
       </div>
 
       <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -145,7 +145,7 @@
           <select id="transferTo" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
         </div>
         <textarea id="memberTransferReason" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mt-3" placeholder="理由（选填）"></textarea>
-        <button onclick="Aoi.member.submitTransfer()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">提交申请</button>
+        <button onclick="Aoi.member.submitTransfer()" class="mt-3 px-5 py-2 btn-primary font-bold rounded">提交申请</button>
       </div>
 
       <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -153,7 +153,7 @@
         <p class="text-sm text-gray-500 mb-3">更换圈名（CN），团长审核通过后你的订单/交费记录会自动迁移</p>
         <div class="flex flex-wrap items-center gap-3">
           <input id="memberNewCn" type="text" placeholder="新圈名（CN）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-          <button onclick="Aoi.member.submitCnChange()" class="px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">提交申请</button>
+          <button onclick="Aoi.member.submitCnChange()" class="px-5 py-2 btn-primary font-bold rounded">提交申请</button>
         </div>
         <p id="memberCnChangeStatus" class="mt-2 text-sm text-gray-500"></p>
       </div>
@@ -177,7 +177,7 @@
         <div>
           <p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">业务</p>
           <div class="space-y-0.5">
-            <a data-nav="view-overview" onclick="Aoi.nav('view-overview')" class="block px-3 py-2 rounded-md text-sm font-medium cursor-pointer bg-blue-600 text-white">总览</a>
+            <a data-nav="view-overview" onclick="Aoi.nav('view-overview')" class="block px-3 py-2 rounded-md text-sm font-medium cursor-pointer nav-active">总览</a>
             <a data-nav="view-entry" onclick="Aoi.nav('view-entry')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">信息录入</a>
             <a data-nav="view-orders" onclick="Aoi.nav('view-orders')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">订单管理</a>
             <a data-nav="view-batches" onclick="Aoi.nav('view-batches')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">国际批次</a>
@@ -352,7 +352,7 @@
             <div class="ml-auto flex flex-wrap items-center gap-2">
               <select id="catPushActivity" class="border border-gray-300 rounded px-2 py-1.5 text-sm"></select>
               <input id="catNewActivity" class="border border-gray-300 rounded px-2 py-1.5 text-sm w-36" placeholder="或输入新活动名">
-              <button onclick="Aoi.catalog.pushSelected()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-500">推入活动商品</button>
+              <button onclick="Aoi.catalog.pushSelected()" class="px-3 py-1.5 btn-primary rounded text-sm">推入活动商品</button>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -376,7 +376,7 @@
           <p class="text-sm text-gray-600 mb-3">团队名：<span id="teamName" class="font-semibold"></span></p>
           <div id="teamRenameBox" class="flex gap-2">
             <input id="teamRenameInput" type="text" placeholder="新团名" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.onRenameTeam()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">改名</button>
+            <button onclick="Aoi.onRenameTeam()" class="px-4 py-2 btn-primary text-sm font-bold rounded">改名</button>
           </div>
         </div>
 
@@ -391,7 +391,7 @@
               <option value="admin">管理员</option>
               <option value="super">超级管理员</option>
             </select>
-            <button onclick="Aoi.adminMgmt.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">添加</button>
+            <button onclick="Aoi.adminMgmt.add()" class="px-4 py-2 btn-primary text-sm font-bold rounded">添加</button>
           </div>
         </div>
 
@@ -400,7 +400,7 @@
           <p class="text-sm text-gray-500 mb-3">把团员密钥发到群里，团员在登录页点「我是团员」，凭密钥 + 圈名自助查询、缴国际费、确认收货</p>
           <div class="flex items-center gap-3">
             <span id="memberKeyLabel" class="font-mono text-lg"></span>
-            <button onclick="Aoi.onRegenerateMemberKey()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">生成 / 刷新</button>
+            <button onclick="Aoi.onRegenerateMemberKey()" class="px-4 py-2 btn-primary text-sm font-bold rounded">生成 / 刷新</button>
           </div>
         </div>
 
@@ -409,7 +409,7 @@
           <p class="text-sm text-gray-500 mb-3">每次保存数据时服务端自动存档旧版本（保留近 30 天 / 最多 100 份）；也可下载备份文件到本地，或从备份文件 / 历史快照恢复</p>
           <p id="backupReminder" class="text-xs text-amber-600 mb-3"></p>
           <div class="flex flex-wrap gap-3 mb-3">
-            <button onclick="Aoi.backup.download()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">下载全量备份（JSON）</button>
+            <button onclick="Aoi.backup.download()" class="px-4 py-2 btn-primary text-sm font-bold rounded">下载全量备份（JSON）</button>
             <button onclick="document.getElementById('backupImportFile').click()" class="px-4 py-2 bg-white border border-gray-300 text-sm font-bold rounded hover:bg-gray-50">从备份文件恢复…</button>
             <input id="backupImportFile" type="file" accept=".json,application/json" class="hidden" onchange="Aoi.backup.onImportFile(event)">
           </div>
@@ -438,7 +438,7 @@
             <div><label class="block text-xs text-gray-500 mb-1">Token 位置</label><select id="imgTokenIn" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"><option value="url">URL 参数</option><option value="header">请求头</option></select></div>
             <div class="md:col-span-2"><label class="block text-xs text-gray-500 mb-1">响应 URL 路径（选填，如 data.links.url）</label><input id="imgRespPath" type="text" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
           </div>
-          <button onclick="Aoi.img.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
+          <button onclick="Aoi.img.saveSettings()" class="mt-3 px-5 py-2 btn-primary text-sm font-bold rounded">保存设置</button>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -460,14 +460,14 @@
               </div>
             </div>
           </div>
-          <button onclick="Aoi.bot.saveSettings()" class="mt-3 px-5 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存设置</button>
+          <button onclick="Aoi.bot.saveSettings()" class="mt-3 px-5 py-2 btn-primary text-sm font-bold rounded">保存设置</button>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">修改我的密码</h3>
           <div class="flex gap-3">
             <input id="newPassword" type="password" placeholder="新密码（至少6位）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.auth.changePassword()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存</button>
+            <button onclick="Aoi.auth.changePassword()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存</button>
           </div>
         </div>
       </div>
@@ -480,7 +480,7 @@
           <input type="file" accept=".xlsx,.xls,.csv" onchange="Aoi.orders.importFile(this.files[0]); this.value='';" class="block w-full text-sm text-gray-600 border border-gray-300 rounded px-3 py-2 mb-3">
           <div class="flex gap-3">
             <input id="importUrl" type="url" placeholder="或粘贴表格直链（如 https://static.zwlhome.com/appMedia/….xlsx）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.orders.importFromUrl()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600 whitespace-nowrap">从链接导入</button>
+            <button onclick="Aoi.orders.importFromUrl()" class="px-4 py-2 btn-primary text-sm font-bold rounded whitespace-nowrap">从链接导入</button>
           </div>
           <p class="text-xs text-gray-400 mt-2">直链由本站服务端代理拉取（规避浏览器跨域限制）；代理不可用时自动尝试直连，仍失败请点开链接下载文件后从上方选择文件导入。</p>
         </div>
@@ -500,7 +500,7 @@
                 <div class="flex items-center gap-1 p-2 border-b border-gray-100">
                   <input id="oTypeNewName" type="text" placeholder="快捷新建类型" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
                   <select id="oTypeNewRoute" class="border border-gray-200 rounded px-1 py-1 text-xs"></select>
-                  <button onclick="Aoi.orders.quickAddType('oType')" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">新建</button>
+                  <button onclick="Aoi.orders.quickAddType('oType')" class="px-2 py-1 btn-primary text-xs rounded">新建</button>
                 </div>
                 <div id="oTypeList" class="max-h-64 overflow-y-auto p-2"></div>
               </div>
@@ -521,7 +521,7 @@
             <span id="oPriceRmbWrap" class="flex items-center gap-2">人民币价格 <input id="oPriceRmb" type="number" step="0.01" oninput="Aoi.orders.previewEntry()" class="w-28 border border-gray-300 rounded px-2 py-1 text-sm"></span>
           </div>
           <p class="mt-2 text-xs text-gray-500">价格预览 <span id="oPricePreview" class="font-semibold text-gray-700"></span><span class="text-gray-400">（非人民币不再自动转换；人民币价可在「活动管理 → 展开活动 → 生成人民币价」统一生成）</span></p>
-          <button onclick="Aoi.orders.addManual()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">添加订单</button>
+          <button onclick="Aoi.orders.addManual()" class="mt-3 px-5 py-2 btn-primary font-bold rounded">添加订单</button>
         </div>
 
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -540,7 +540,7 @@
                 <div class="flex items-center gap-1 p-2 border-b border-gray-100">
                   <input id="pTypeNewName" type="text" placeholder="快捷新建类型" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
                   <select id="pTypeNewRoute" class="border border-gray-200 rounded px-1 py-1 text-xs"></select>
-                  <button onclick="Aoi.orders.quickAddType('pType')" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">新建</button>
+                  <button onclick="Aoi.orders.quickAddType('pType')" class="px-2 py-1 btn-primary text-xs rounded">新建</button>
                 </div>
                 <div id="pTypeList" class="max-h-64 overflow-y-auto p-2"></div>
               </div>
@@ -560,7 +560,7 @@
             <input id="pUrl" placeholder="跳转链接（选填，空=活动平台链接）" class="md:col-span-2 border border-gray-300 rounded px-3 py-2 text-sm">
           </div>
           <p class="mt-2 text-xs text-gray-500">价格预览 <span id="pPricePreview" class="font-semibold text-gray-700"></span></p>
-          <button onclick="Aoi.orders.addProduct()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">登记商品</button>
+          <button onclick="Aoi.orders.addProduct()" class="mt-3 px-5 py-2 btn-primary font-bold rounded">登记商品</button>
           <datalist id="pActivityOptions"></datalist>
         </div>
       </div>
@@ -598,9 +598,9 @@
           <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.orders.toggleAll(this)"> 全选</label>
           <select id="arriveBatchSel" onchange="Aoi.orders.onBatchSel(this)" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
           <input id="arriveDate" type="date" class="hidden border border-gray-300 rounded px-3 py-2 text-sm">
-          <button onclick="Aoi.orders.markArrived()" class="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700">标记到货</button>
+          <button onclick="Aoi.orders.markArrived()" class="px-4 py-2 btn-primary text-sm font-bold rounded">标记到货</button>
           <button onclick="Aoi.orders.markUnarrived()" class="px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">设为未到货</button>
-          <button onclick="Aoi.orders.batchDelete()" class="px-4 py-2 bg-red-500 text-white text-sm font-bold rounded hover:bg-red-600">批量删除</button>
+          <button onclick="Aoi.orders.batchDelete()" class="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded hover:bg-red-700">批量删除</button>
         </div>
         <div class="overflow-x-auto table-scroll">
           <table id="orderTable" class="w-full text-sm data-table responsive-cards">
@@ -635,7 +635,7 @@
           </div>
           <div class="flex justify-end gap-3 mt-4">
             <button onclick="Aoi.orders.closeActBuyers()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>
-            <button onclick="Aoi.orders.saveActBuyers()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700">保存</button>
+            <button onclick="Aoi.orders.saveActBuyers()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存</button>
           </div>
         </div>
       </div>
@@ -648,7 +648,7 @@
           <textarea id="actTrackInput" rows="6" placeholder="每行一个快递单号" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></textarea>
           <div class="flex justify-end gap-3 mt-4">
             <button onclick="Aoi.orders.closeActTrack()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>
-            <button onclick="Aoi.orders.saveActTrack()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700">保存</button>
+            <button onclick="Aoi.orders.saveActTrack()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存</button>
           </div>
         </div>
       </div>
@@ -661,7 +661,7 @@
           <p class="text-xs text-gray-400 mb-3">与「工具 → 限购计划」双向同步：此处修改件数、确认购买状态即时生效；某商品购买失败时自动按原计算器规则重分配给其余账号</p>
           <div id="actPlanBody" class="overflow-x-auto max-h-96"></div>
           <div class="flex justify-end gap-2 mt-3">
-            <button onclick="Aoi.planExport.exportAll(Aoi.limits.actTarget || '')" class="px-4 py-2 border border-blue-300 text-blue-600 text-sm font-bold rounded hover:bg-blue-50" title="导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>
+            <button onclick="Aoi.planExport.exportAll(Aoi.limits.actTarget || '')" class="px-4 py-2 btn-outline text-sm font-bold rounded" title="导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>
             <button onclick="Aoi.limits.closeActPlan()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">关闭</button>
           </div>
         </div>
@@ -687,7 +687,7 @@
           </div>
           <div class="flex justify-end gap-3 mt-4">
             <button onclick="Aoi.orders.closeEdit()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>
-            <button onclick="Aoi.orders.saveEdit()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700">保存</button>
+            <button onclick="Aoi.orders.saveEdit()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存</button>
           </div>
         </div>
       </div>
@@ -730,12 +730,12 @@
       <!-- 活动管理 -->
       <div id="view-activities" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
-          <div class="flex items-center mb-2"><h3 class="font-bold">活动管理</h3><button onclick="Aoi.exportSummary()" class="px-3 py-1 border border-blue-300 text-blue-600 rounded text-xs hover:bg-blue-50 ml-auto">导出汇总表（全部活动）</button><button onclick="Aoi.exportImage(this)" data-table="activityTable" data-name="活动管理" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="activityTable" data-name="活动管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
+          <div class="flex items-center mb-2"><h3 class="font-bold">活动管理</h3><button onclick="Aoi.exportSummary()" class="px-3 py-1 btn-outline rounded text-xs ml-auto">导出汇总表（全部活动）</button><button onclick="Aoi.exportImage(this)" data-table="activityTable" data-name="活动管理" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="activityTable" data-name="活动管理" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button></div>
           <p class="text-sm text-gray-500 mb-3">为每个活动记录所属 IP、购买时间、出货日期、平台链接与进度状态</p>
           <div class="flex flex-wrap items-center gap-3 mb-4">
             <input id="newActivity" type="text" placeholder="新活动名称" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <input id="newActivityIp" list="ipOptions" placeholder="所属 IP（可选）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.orders.addActivity()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增活动</button>
+            <button onclick="Aoi.orders.addActivity()" class="px-4 py-2 btn-primary text-sm font-bold rounded">新增活动</button>
           </div>
           <div class="overflow-x-auto">
             <table id="activityTable" class="w-full text-sm data-table">
@@ -794,7 +794,7 @@
             <select id="newTypeRoute" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option>常规二次元线路</option><option>一般线路发送</option><option>大件类</option><option>名贵类</option><option>未分类</option>
             </select>
-            <button onclick="Aoi.orders.addType()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增类型</button>
+            <button onclick="Aoi.orders.addType()" class="px-4 py-2 btn-primary text-sm font-bold rounded">新增类型</button>
           </div>
           <input id="typeSearch" type="text" placeholder="筛选类型（名称或线路关键词）…" oninput="Aoi.orders.renderTypes()" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3">
           <div id="typeGroups"></div>
@@ -820,7 +820,7 @@
             <input id="whName" type="text" placeholder="囤货地名称（如 上海仓）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <input id="whQr" type="text" data-img-paste placeholder="收款码 URL（选填，可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <button type="button" onclick="Aoi.img.openPicker('whQr')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">图片…</button>
-            <button onclick="Aoi.warehouse.add()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新增</button>
+            <button onclick="Aoi.warehouse.add()" class="px-4 py-2 btn-primary text-sm font-bold rounded">新增</button>
           </div>
           <ul id="whList"></ul>
         </div>
@@ -834,7 +834,7 @@
           <div class="flex gap-3">
             <input id="newBatchDate" type="date" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <input id="newBatchName" type="text" placeholder="批次名称（可选，默认用日期）" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.orders.createBatch()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">新建批次</button>
+            <button onclick="Aoi.orders.createBatch()" class="px-4 py-2 btn-primary text-sm font-bold rounded">新建批次</button>
           </div>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -856,8 +856,8 @@
           <div class="flex flex-wrap items-center gap-3">
             <select id="intlBatch" onchange="Aoi.intl.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
             <input id="intlTarget" type="number" step="0.01" placeholder="国际运费总额 (¥)" class="border border-gray-300 rounded px-3 py-2 text-sm">
-            <button onclick="Aoi.intl.saveTarget()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">保存总额</button>
-            <button onclick="Aoi.intl.saveAllocation()" class="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700">保存分摊到订单</button>
+            <button onclick="Aoi.intl.saveTarget()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存总额</button>
+            <button onclick="Aoi.intl.saveAllocation()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存分摊到订单</button>
           </div>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -933,7 +933,7 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">催缴名单</h3>
           <p class="text-sm text-gray-500 mb-2">生成未交费名单，复制后发到群里催缴</p>
-          <button onclick="Aoi.approval.remind()" class="mb-2 px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">生成催缴名单</button>
+          <button onclick="Aoi.approval.remind()" class="mb-2 px-4 py-2 btn-primary text-sm font-bold rounded">生成催缴名单</button>
           <button onclick="Aoi.approval.copyRemind()" class="mb-2 ml-2 px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">复制</button>
           <textarea id="approvalRemind" rows="6" readonly class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
         </div>
@@ -986,7 +986,7 @@
             <label class="text-sm text-gray-500 flex items-center gap-1"><input type="checkbox" onchange="Aoi.ship.toggleAll(this)"> 全选</label>
             <input id="shipPhoto" type="text" data-img-paste placeholder="合照 URL（可上传/粘贴）" class="border border-gray-300 rounded px-3 py-2 text-sm">
             <button type="button" onclick="Aoi.img.openPicker('shipPhoto')" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">图片…</button>
-            <button onclick="Aoi.ship.setPhoto()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量设合照</button>
+            <button onclick="Aoi.ship.setPhoto()" class="px-4 py-2 btn-primary text-sm font-bold rounded">批量设合照</button>
             <select id="shipStatus" class="border border-gray-300 rounded px-3 py-2 text-sm">
               <option value="已发">设为已发</option>
               <option value="未发">设为未发</option>
@@ -1016,8 +1016,8 @@
           <h3 class="font-bold mb-2">发布公告</h3>
           <p class="text-sm text-gray-500 mb-2">团员端首页可见，可一键推送 QQ 群</p>
           <textarea id="announceInput" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-2" placeholder="公告内容"></textarea>
-          <button onclick="Aoi.announce.publish()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">发布</button>
-          <button onclick="Aoi.announce.publish(true)" class="px-4 py-2 bg-indigo-500 text-white text-sm font-bold rounded hover:bg-indigo-600">发布并推送 QQ 群</button>
+          <button onclick="Aoi.announce.publish()" class="px-4 py-2 btn-primary text-sm font-bold rounded">发布</button>
+          <button onclick="Aoi.announce.publish(true)" class="px-4 py-2 btn-primary text-sm font-bold rounded">发布并推送 QQ 群</button>
           <ul id="announceList" class="mt-3"></ul>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
@@ -1025,18 +1025,18 @@
           <p class="text-sm text-gray-500 mb-3">按当前数据自动生成催缴 / 发货通知（进入应用时也会自动同步），也可按批次手动补发</p>
           <div class="flex flex-wrap items-center gap-3">
             <select id="notifyBatch" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
-            <button onclick="Aoi.notify.generate('remind')" class="px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded hover:bg-amber-600">生成催缴通知</button>
-            <button onclick="Aoi.notify.generate('shipped')" class="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700">生成发货通知</button>
+            <button onclick="Aoi.notify.generate('remind')" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">生成催缴通知</button>
+            <button onclick="Aoi.notify.generate('shipped')" class="px-4 py-2 btn-primary text-sm font-bold rounded">生成发货通知</button>
             <button onclick="Aoi.notify.sync()" class="px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">同步生成</button>
           </div>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">通知列表</h3>
           <div class="flex flex-wrap items-center gap-3 mb-3">
-            <button onclick="Aoi.notify.copyAll()" class="px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">复制全部（未发）</button>
-            <button onclick="Aoi.notify.pushBot('all')" class="px-4 py-2 bg-indigo-500 text-white text-sm font-bold rounded hover:bg-indigo-600">推送·私聊+群@（推荐）</button>
-            <button onclick="Aoi.notify.pushBot('group')" class="px-4 py-2 bg-indigo-300 text-gray-800 text-sm font-bold rounded hover:bg-indigo-400">推送·仅群发(@)</button>
-            <button onclick="Aoi.notify.pushBot('private')" class="px-4 py-2 bg-purple-600 text-white text-sm font-bold rounded hover:bg-purple-700">推送·仅私聊</button>
+            <button onclick="Aoi.notify.copyAll()" class="px-4 py-2 btn-primary text-sm font-bold rounded">复制全部（未发）</button>
+            <button onclick="Aoi.notify.pushBot('all')" class="px-4 py-2 btn-primary text-sm font-bold rounded">推送·私聊+群@（推荐）</button>
+            <button onclick="Aoi.notify.pushBot('group')" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">推送·仅群发(@)</button>
+            <button onclick="Aoi.notify.pushBot('private')" class="px-4 py-2 btn-primary text-sm font-bold rounded">推送·仅私聊</button>
             <button onclick="Aoi.notify.clearSent()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">清除已发送</button>
             <span class="ml-auto flex items-center gap-1 text-xs">
               <button data-notify-filter="all" class="px-3 py-1.5 rounded font-bold">全部</button>
@@ -1067,7 +1067,7 @@
             <div><label class="block text-xs text-gray-500 mb-1">韩元汇率</label><input id="krwRate" type="number" step="0.0001" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
             <div><label class="block text-xs text-gray-500 mb-1">韩元加价（0.00n）</label><input id="krwMarkup" type="number" step="0.0001" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
           </div>
-          <button onclick="Aoi.calc.save()" class="mt-3 px-5 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600">保存设置</button>
+          <button onclick="Aoi.calc.save()" class="mt-3 px-5 py-2 btn-primary font-bold rounded">保存设置</button>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-3">单笔换算</h3>
@@ -1084,7 +1084,7 @@
           <h3 class="font-bold mb-2">批量换算</h3>
           <p class="text-sm text-gray-500 mb-2">每行一个外币价，逗号或换行分隔（用上方所选货币）</p>
           <textarea id="cBatchIn" rows="4" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
-          <button onclick="Aoi.calc.batch()" class="mt-2 px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded hover:bg-blue-600">批量换算</button>
+          <button onclick="Aoi.calc.batch()" class="mt-2 px-4 py-2 btn-primary text-sm font-bold rounded">批量换算</button>
           <pre id="cBatchOut" class="mt-3 text-sm whitespace-pre-wrap"></pre>
         </div>
       </div>
@@ -1120,12 +1120,12 @@
               <tbody id="limProductTbody"></tbody>
             </table>
           </div>
-          <button onclick="Aoi.limits.plan()" class="mt-4 px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700">计算购买计划</button>
+          <button onclick="Aoi.limits.plan()" class="mt-4 px-5 py-2 btn-primary text-sm font-bold rounded">计算购买计划</button>
         </div>
         <div id="limResultBox" class="bg-white rounded-lg border border-gray-200 p-6 hidden">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">购买计划结果</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button><button onclick="Aoi.planExport.exportAll((document.getElementById('limActivity')||{}).value)" class="ml-2 px-3 py-1 border border-blue-300 text-blue-600 rounded text-xs hover:bg-blue-50" title="按当前活动已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表（每账号一个 Sheet）</button>
+            <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button><button onclick="Aoi.planExport.exportAll((document.getElementById('limActivity')||{}).value)" class="ml-2 px-3 py-1 btn-outline rounded text-xs" title="按当前活动已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表（每账号一个 Sheet）</button>
           </div>
           <p id="limResultStat" class="text-sm text-gray-500 mb-2"></p>
           <div class="overflow-x-auto">
@@ -1155,7 +1155,7 @@
       <input id="importIp" list="ipOptions" class="w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3">
       <label class="flex items-center gap-2 text-sm text-gray-600 mb-4"><input id="importAutoRegister" type="checkbox" checked> 未识别的新商品自动登记进商品主档（下次导入/录入即可识别，可关）</label>
       <div class="flex gap-3">
-        <button onclick="Aoi.orders.confirmImport()" class="flex-1 bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">确认导入</button>
+        <button onclick="Aoi.orders.confirmImport()" class="flex-1 btn-primary font-bold py-2 rounded">确认导入</button>
         <button onclick="Aoi.orders.cancelImport()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-2 rounded hover:bg-gray-300">取消</button>
       </div>
     </div>
@@ -1183,7 +1183,7 @@
         <label class="flex items-center gap-2"><input type="radio" name="agCover" value="all"> 全部按公式重算（覆盖已有）</label>
       </div>
       <div class="flex gap-3">
-        <button onclick="Aoi.orders.applyActGenRmb()" class="flex-1 bg-blue-500 text-white font-bold py-2 rounded hover:bg-blue-600">生成</button>
+        <button onclick="Aoi.orders.applyActGenRmb()" class="flex-1 btn-primary font-bold py-2 rounded">生成</button>
         <button onclick="Aoi.orders.hideActGenRmb()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-2 rounded hover:bg-gray-300">取消</button>
       </div>
     </div>
@@ -1207,7 +1207,7 @@
         <p class="text-xs text-gray-400 mt-1">截图后直接按 Ctrl+V（无需点击任何输入框）</p>
       </div>
       <div class="flex items-center gap-2 mb-2">
-        <label class="px-3 py-2 bg-blue-500 text-white text-sm font-bold rounded cursor-pointer hover:bg-blue-600 whitespace-nowrap">② 上传图片<input id="imgPickerFile" type="file" accept="image/*" class="hidden" onchange="Aoi.img.pickerFileInput(this)"></label>
+        <label class="px-3 py-2 btn-primary text-sm font-bold rounded cursor-pointer whitespace-nowrap">② 上传图片<input id="imgPickerFile" type="file" accept="image/*" class="hidden" onchange="Aoi.img.pickerFileInput(this)"></label>
         <input id="imgUrlInput" data-img-paste placeholder="③ 或粘贴图床链接（https://…）" class="flex-1 min-w-0 border border-gray-300 rounded px-2 py-2 text-sm" oninput="Aoi.img.applyPickedUrl(this.value)">
       </div>
       <p id="imgPickerStatus" class="text-xs text-gray-500 mb-2"></p>
@@ -1219,7 +1219,7 @@
       </div>
       <div class="flex justify-end gap-3">
         <button onclick="Aoi.img.closePicker()" class="px-4 py-2 rounded font-bold text-gray-600 border border-gray-300 hover:bg-gray-100">取消</button>
-        <button id="imgPickerConfirm" onclick="Aoi.img.confirmPicker()" class="px-4 py-2 rounded font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed" disabled>确认填入</button>
+        <button id="imgPickerConfirm" onclick="Aoi.img.confirmPicker()" class="px-4 py-2 rounded font-bold btn-primary disabled:opacity-40 disabled:cursor-not-allowed" disabled>确认填入</button>
       </div>
     </div>
   </div>
@@ -1231,7 +1231,7 @@
       <p id="confirmBody" class="text-sm text-gray-600 mb-6"></p>
       <div class="flex justify-end gap-3">
         <button id="confirmCancel" class="px-4 py-2 rounded font-bold text-gray-600 border border-gray-300 hover:bg-gray-100">取消</button>
-        <button id="confirmOk" class="px-4 py-2 rounded font-bold text-white bg-blue-600 hover:bg-blue-700">确定</button>
+        <button id="confirmOk" class="px-4 py-2 rounded font-bold btn-primary">确定</button>
       </div>
     </div>
   </div>

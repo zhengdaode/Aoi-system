@@ -98,8 +98,8 @@ Aoi.approval.render = function () {
       ? ' <a href="' + Aoi.escapeHtml(receiptUrl) + '" target="_blank" class="text-blue-500 hover:underline text-xs">凭证</a>'
       : '';
     var actions = '';
-    if (r.status !== '已交') actions += '<button data-buyer="' + b + '" data-status="已交" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 mr-1">标记已交</button>';
-    if (r.status !== '已驳回') actions += '<button data-buyer="' + b + '" data-status="已驳回" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">驳回</button>';
+    if (r.status !== '已交') actions += '<button data-buyer="' + b + '" data-status="已交" class="px-2 py-1 btn-primary text-xs rounded mr-1">标记已交</button>';
+    if (r.status !== '已驳回') actions += '<button data-buyer="' + b + '" data-status="已驳回" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">驳回</button>';
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + b + '</td>'

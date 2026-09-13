@@ -131,7 +131,7 @@ Aoi.member.renderFees = function (cn) {
     if (status !== '已交') {
       action = '<input id="receipt_' + batchId + '" type="text" data-img-paste placeholder="付款凭证 URL（可上传/粘贴）" class="w-40 border border-gray-300 rounded px-2 py-1 text-xs">'
         + '<button type="button" data-imgpicker="receipt_' + batchId + '" class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300">图片…</button>'
-        + '<button data-batch="' + batchId + '" class="ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">提交凭证</button>';
+        + '<button data-batch="' + batchId + '" class="ml-2 px-3 py-1 btn-primary text-xs rounded">提交凭证</button>';
     } else if (receipt && Aoi.safeUrl(receipt)) {
       action = '<a href="' + Aoi.escapeHtml(Aoi.safeUrl(receipt)) + '" target="_blank" class="text-blue-500 hover:underline text-xs">查看凭证</a>';
     } else {
@@ -186,7 +186,7 @@ Aoi.member.renderOrders = function (cn) {
     var shipped = (o.shipped || '未发') === '已发';
     var confirm;
     if (shipped && !o.received) {
-      confirm = '<button data-order="' + o.id + '" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">确认收货</button>';
+      confirm = '<button data-order="' + o.id + '" class="px-2 py-1 btn-primary text-xs rounded">确认收货</button>';
     } else if (o.received) {
       confirm = '<span class="text-green-600 text-xs">已确认</span>';
     } else {
@@ -290,7 +290,7 @@ Aoi.member.renderBind = function (cn) {
   } else {
     box.innerHTML = '<div class="flex items-center gap-2">'
       + '<input id="memberQq" type="text" placeholder="QQ 号（可选，便于机器人联系提醒）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm">'
-      + '<button onclick="Aoi.member.bindQq()" class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">绑定</button>'
+      + '<button onclick="Aoi.member.bindQq()" class="px-3 py-2 btn-primary text-sm rounded">绑定</button>'
       + '</div>'
       + '<div class="flex items-center gap-2 mt-2">'
       + '<button onclick="Aoi.member.copyBindCommand()" class="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">复制绑定指令</button>'

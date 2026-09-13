@@ -692,6 +692,41 @@
         </div>
       </div>
 
+      <!-- 商品详情弹窗（v3.16.0：订单表点击型号查看商品主档，全程不跳转页面；≤640px 贴底 bottom sheet 见 styles.css） -->
+      <div id="productModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onclick="Aoi.orders.closeProduct()">
+        <div class="bg-white rounded-lg w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+              <h3 id="pdModel" class="font-bold break-all"></h3>
+              <p id="pdSub" class="text-xs text-gray-400 mt-0.5"></p>
+            </div>
+            <button onclick="Aoi.orders.closeProduct()" class="text-gray-400 hover:text-gray-600 text-xl leading-none px-1 flex-shrink-0" title="关闭">×</button>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <div class="sm:w-40 flex-shrink-0">
+              <a id="pdImgLink" class="hidden block"><img id="pdImg" alt="参考图" class="w-full max-h-44 object-contain rounded border border-gray-200 bg-gray-50"></a>
+              <div id="pdImgEmpty" class="w-full h-36 flex items-center justify-center text-xs text-gray-400 rounded border border-dashed border-gray-300 bg-gray-50">暂无参考图</div>
+            </div>
+            <div class="flex-1 text-sm space-y-1.5 min-w-0">
+              <div><span class="text-gray-400">原名</span><span id="pdNameOrig" class="ml-2 break-all"></span></div>
+              <div><span class="text-gray-400">参考价</span><span id="pdPrice" class="ml-2"></span></div>
+              <div><span class="text-gray-400">外币原价</span><span id="pdPriceOrig" class="ml-2"></span></div>
+              <div><span class="text-gray-400">当前订单</span><span id="pdOrder" class="ml-2"></span></div>
+            </div>
+          </div>
+          <div id="pdMore" class="hidden mt-3 pt-3 border-t border-gray-100 text-sm space-y-1.5">
+            <div><span class="text-gray-400">图片链接</span><span id="pdImgUrl" class="ml-2 break-all"></span></div>
+            <div><span class="text-gray-400">购买地址</span><span id="pdBuyUrl" class="ml-2 break-all"></span></div>
+            <div><span class="text-gray-400">活动平台链接</span><span id="pdActUrl" class="ml-2 break-all"></span></div>
+            <div><span class="text-gray-400">限购</span><span id="pdLimit" class="ml-2"></span></div>
+          </div>
+          <div class="flex justify-end gap-2 mt-4">
+            <button id="pdToggle" onclick="Aoi.orders.toggleProductMore()" class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">展开更多信息</button>
+            <button onclick="Aoi.orders.closeProduct()" class="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">关闭</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 活动管理 -->
       <div id="view-activities" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">

@@ -198,6 +198,36 @@ textarea:focus {
   }
 }
 
+/* v3.16.0：订单表型号列可点击 → 商品详情弹窗（按钮重置为文字外观，墨色+虚线下划线，hover 珊瑚） */
+.product-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted var(--muted-soft);
+  text-underline-offset: 3px;
+}
+.product-link:hover {
+  color: var(--primary);
+  text-decoration-color: var(--primary);
+}
+
+/* v3.16.0：商品详情弹窗移动端贴底 bottom sheet —— ≤640px 顶部圆角、全宽、限高内滚动（图片上文下文由 sm: 断点堆叠） */
+@media (max-width: 640px) {
+  #productModal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  #productModal > div {
+    max-width: 100%;
+    max-height: 88vh;
+    border-radius: 1rem 1rem 0 0;
+  }
+}
+
 /* v2.0.0（问题 4 收尾）：移动端订单表卡片视图 —— 窄屏下每行变为一张卡片，
    td::before 用 data-label 显示列名，避免横向滚动过远 */
 @media (max-width: 640px) {

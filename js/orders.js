@@ -722,7 +722,7 @@ Aoi.orders.render = function () {
       + '<td data-label="选择" class="px-2 py-2"><input type="checkbox" class="row-check" data-id="' + o.id + '"></td>'
       + '<td data-label="活动" class="px-3 py-2 wrap" title="' + Aoi.escapeHtml(o.activity || '—') + '">' + Aoi.escapeHtml(o.activity || '—') + '</td>'
       + '<td data-label="制品类型" class="px-3 py-2 wrap" title="' + Aoi.escapeHtml(o.type) + '">' + Aoi.escapeHtml(o.type) + '</td>'
-      + '<td data-label="型号" class="px-3 py-2 wrap" title="' + Aoi.escapeHtml(o.model) + '">' + Aoi.escapeHtml(o.model) + '</td>'
+      + '<td data-label="型号" class="px-3 py-2 wrap"><button data-product="' + o.id + '" class="product-link" title="点击查看商品详情">' + Aoi.escapeHtml(o.model) + '</button></td>'
       + '<td data-label="单价(¥)" class="px-3 py-2 text-right wrap">' + Aoi.orders.priceText(o) + '</td>'
       + '<td data-label="外币原价" data-lowpri class="px-3 py-2 text-right whitespace-nowrap">' + Aoi.orders.origText(o) + '</td>'
       + '<td data-label="数量" class="px-3 py-2 text-right">' + o.count + '</td>'
@@ -858,6 +858,82 @@ Aoi.orders.closeEdit = function () {
   var modal = document.getElementById('orderEditModal');
   if (modal) modal.classList.add('hidden');
   Aoi.orders.editingId = null;
+};
+
+// —— 商品详情弹窗（v3.16.0）：订单表点击型号 → 商品主档 + 订单价一屏可见；
+// 展开区放链接与限购；链接为普通超链接直接跳转（用户指定），页面本身不导航 ——
+
+// 弹窗内链接行：有链接渲染为可直接跳转的 <a>（文本=完整 URL），无则显示 —
+Aoi.orders._fillProductLink = function (elId, url) {
+  var box = document.getElementById(elId);
+  if (!box) return;
+  box.innerHTML = '';
+  if (!url) { box.textContent = '—'; return; }
+  var a = document.createElement('a');
+  a.href = url;
+  a.className = 'text-blue-500 hover:underline';
+  a.textContent = url;
+  box.appendChild(a);
+};
+
+Aoi.orders.openProduct = function (orderId) {
+  var d = Aoi.orders.ensure();
+  var o = null;
+  (d.orders || []).forEach(function (x) { if (x.id === orderId) o = x; });
+  if (!o) return;
+  var p = Aoi.orders.activityProduct(o.activity, o.type, o.model) || Aoi.orders.productFillFor(o.activity, o.model);
+  var set = function (elId, v) { var el = document.getElementById(elId); if (el) el.textContent = v; };
+  set('pdModel', o.model || '—');
+  set('pdSub', (o.activity || '—') + ' · ' + (o.type || '—'));
+  // 参考图（safeUrl 白名单校验，防 javascript: 伪链接）
+  var img = Aoi.safeUrl(p && p.refImage);
+  var imgLink = document.getElementById('pdImgLink');
+  var imgEmpty = document.getElementById('pdImgEmpty');
+  document.getElementById('pdImg').removeAttribute('src');
+  if (img) {
+    document.getElementById('pdImg').src = img;
+    imgLink.href = img;
+    imgLink.classList.remove('hidden');
+    imgEmpty.classList.add('hidden');
+  } else {
+    imgLink.classList.add('hidden');
+    imgEmpty.classList.remove('hidden');
+  }
+  // 参考价：主档价优先，无主档价回落订单人民币单价，仍无则待生成
+  if (p && p.price != null) set('pdPrice', '¥' + p.price);
+  else if (o.price != null) set('pdPrice', '¥' + o.price.toFixed(2) + '（订单价）');
+  else set('pdPrice', '待生成');
+  // 外币原价：同 origText 约定，人民币单显示 —
+  var orig = (p && p.priceOrig != null) ? p.priceOrig : o.priceOrig;
+  var cur = (p && p.currency) || o.currency;
+  set('pdPriceOrig', (orig == null || cur === 'cny') ? '—' : Aoi.currencySymbol(cur) + orig);
+  set('pdNameOrig', (p && p.nameOrig) || '—');
+  // 当前订单行
+  var sum = (o.price != null) ? o.price * o.count : null;
+  set('pdOrder', '×' + o.count + (sum != null ? ' · 小计 ¥' + sum.toFixed(2) : '') + ' · ' + Aoi.orders.combinedStatus(o).text);
+  // 展开区：链接（购买地址 refUrl 优先回落活动平台链接）与限购
+  Aoi.orders._fillProductLink('pdImgUrl', img);
+  Aoi.orders._fillProductLink('pdBuyUrl', Aoi.safeUrl(Aoi.orders.productLink(o.activity, p)));
+  var actMeta = (d.activityMeta || {})[o.activity] || {};
+  Aoi.orders._fillProductLink('pdActUrl', Aoi.safeUrl(actMeta.link));
+  set('pdLimit', (p && p.limit != null) ? '每账号限 ' + p.limit + ' 件' : '—');
+  // 每次打开重置为收起态
+  document.getElementById('pdMore').classList.add('hidden');
+  document.getElementById('pdToggle').textContent = '展开更多信息';
+  document.getElementById('productModal').classList.remove('hidden');
+};
+
+Aoi.orders.closeProduct = function () {
+  var modal = document.getElementById('productModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+Aoi.orders.toggleProductMore = function () {
+  var more = document.getElementById('pdMore');
+  var btn = document.getElementById('pdToggle');
+  if (!more || !btn) return;
+  var collapsed = more.classList.toggle('hidden');
+  btn.textContent = collapsed ? '展开更多信息' : '收起';
 };
 
 Aoi.orders.saveEdit = async function () {
@@ -1966,10 +2042,17 @@ document.getElementById('buyerTbody').addEventListener('click', function (e) {
   if (btn) Aoi.orders.removeBuyer(btn.getAttribute('data-del-buyer'));
 });
 
-// 事件委托：订单行「编辑」按钮
+// 事件委托：订单行「编辑」按钮 + 型号「商品详情」按钮（v3.16.0）
 document.getElementById('orderTbody').addEventListener('click', function (e) {
   var btn = e.target.closest('button[data-edit]');
   if (btn) Aoi.orders.openEdit(btn.getAttribute('data-edit'));
+  var pd = e.target.closest('button[data-product]');
+  if (pd) Aoi.orders.openProduct(pd.getAttribute('data-product'));
+});
+
+// Esc 关闭商品详情弹窗（v3.16.0）
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && !document.getElementById('productModal').classList.contains('hidden')) Aoi.orders.closeProduct();
 });
 
 // 事件委托：表头点击排序（v3.6.2）

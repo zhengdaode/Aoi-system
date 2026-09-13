@@ -311,10 +311,35 @@ Aoi.orders.addManual = async function () {
     if (!d.activityMeta[activity]) d.activityMeta[activity] = {};
     d.activityMeta[activity].ip = ip;
   }
+  // v3.15.1：录入的订单商品同步登记进活动商品主档（与活动管理/表格导入同一份
+  // activityMeta[].products，展开区即时可见，不再需要手动「从订单同步商品」）；
+  // type+model 去重，已存在的只补缺失的价格字段
+  var newProduct = false;
+  if (activity) {
+    if (!d.activityMeta[activity]) d.activityMeta[activity] = {};
+    var pm = d.activityMeta[activity];
+    if (!Array.isArray(pm.products)) pm.products = [];
+    var found = null;
+    for (var pi = 0; pi < pm.products.length; pi++) {
+      if (pm.products[pi].type === type && pm.products[pi].model === model) { found = pm.products[pi]; break; }
+    }
+    if (!found) {
+      found = { id: Aoi.genId(), type: type, model: model, refImage: '', refUrl: '' };
+      pm.products.push(found);
+      newProduct = true;
+    }
+    if (found.price == null && prices.price != null) found.price = prices.price;
+    if (found.priceOrig == null && prices.priceOrig != null) {
+      found.priceOrig = prices.priceOrig;
+      found.currency = currency;
+    }
+  }
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
   Aoi.orders.refillDatalists();
-  Aoi.toast('已为 ' + buyers.length + ' 位购买者新增订单' + (prices.price == null ? '（人民币价待批量生成）' : ''), 'success');
+  Aoi.toast('已为 ' + buyers.length + ' 位购买者新增订单'
+    + (newProduct ? '，商品「' + type + '-' + model + '」已登记进活动商品' : '')
+    + (prices.price == null ? '（人民币价待活动管理统一生成）' : ''), 'success');
 };
 
 // 信息录入页：登记活动商品（v3.7.0 S4 统一入活动商品主档 activityMeta[].products，

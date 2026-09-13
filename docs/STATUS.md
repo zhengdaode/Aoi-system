@@ -1,6 +1,7 @@
 # Aoi System · 当前状态
 
-> 更新日期：2026-09-13 · 版本 **v3.15.0**（v3.15.0 商品联动闭环 + 活动级价格生成与导出 + PCO 目录瘦身 +
+> 更新日期：2026-09-13 · 版本 **v3.15.2**（v3.15.2 手动录入订单商品同步登记主档；v3.15.1 部署收尾：relay v4.1 +
+> Edge v8 真实生效；v3.15.0 商品联动闭环 + 活动级价格生成与导出 + PCO 目录瘦身 +
 > 复盘性能治理，见 `docs/PLAN-v3.15.0.md`；v3.10.0 安全止血：p_cn 空值整份覆盖后门封堵 / admin_login 防爆破 /
 > escapeHtml 引号 + safeUrl 协议白名单 / v2 账号体系（邀请码·team_members）归档；v3.11.0 数据信任：管理端保存
 > 失败强提示 / notify.sync 不吞错 / B6 通知·blob 治理 + assert_single_team 单团守卫；v3.12.0 B3 审计日志 +
@@ -10,11 +11,13 @@
 > 历史里程碑：v3.7.0 管理端第二轮 S1–S8；v3.6.3 F10 机器人交互；v3.5 复盘统计并入 + 链接导入；
 > v3.4 数据安全兜底；v3.0 账号体系重设计；v1.7.0–v2.0.0 十项问题迭代）
 
-## 当前状态速览（2026-09-13 v3.15.0 后）
+## 当前状态速览（2026-09-13 v3.15.2 后）
 
-- **代码层**：v3.15.0 功能轮；vitest 全套 **439 例全绿**，aoi-qqbot node:test **68 例全绿**。前端两通道
-  （GitHub Pages / Netlify）随推送自动部署（CI 全绿）。Edge Function `qq-relay` 已部署 v7（UPSTREAM 走
-  env `RELAY_UPSTREAM`，经 `scripts/deploy-edge.js --secret` 注入）。零 schema 改动。
+- **代码层**：v3.15.2 功能轮；vitest 全套 **442 例全绿**，aoi-qqbot node:test **68 例全绿**。前端两通道
+  （GitHub Pages / Netlify）随推送自动部署（CI 全绿）。Edge Function `qq-relay` 已部署 **v8**（bundle 部署
+  通道修复后真实生效，UPSTREAM 走 env `RELAY_UPSTREAM`）；SWAS relay v4.1 已部署（systemd 自启）。零 schema 改动。
+- **v3.15.2 要点**：手动录入订单的商品同步登记进活动商品主档（type+model 去重、只补缺失价格）——
+  手动录入 / 表格导入 / 登记活动商品 / PCO 推入 四条入口写同一份 `activityMeta[].products` 主档。
 - **v3.15.0 要点**：手动录入选活动后商品下拉联动回填；表格导入按主档识别回填+新商品自动登记；
   活动管理新增 生成人民币价（公式可临时调整）/导出商品列表/导出到小程序（模板自 PCO 页迁入，全活动可用）；
   PCO 页不再默认生成人民币价、AI 提示词 8 列支持一次性导入、导航移入工具组；

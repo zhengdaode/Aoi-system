@@ -263,3 +263,58 @@ describe('S9 AI 提示词一次导入（8 列 + 链接校验）', () => {
     expect(aoi.catalog.draft[0].url).toBe('https://www.pokemoncenter-online.com/products/123.html');
   });
 });
+
+describe('v3.15.1 手动录入订单的商品同步登记进活动商品主档', () => {
+  beforeEach(() => {
+    aoi.saveTeamData = vi.fn().mockResolvedValue(undefined);
+    aoi.state.data = { activities: [], activityMeta: {}, typeMeta: {}, orders: [], batches: [], ips: [] };
+    ['oActivity', 'oType', 'oModel', 'oPrice', 'oPriceRmb', 'oIp', 'oBuyer', 'oCount'].forEach(function (id) {
+      var el = doc.getElementById(id); if (el) el.value = '';
+    });
+    doc.getElementById('oCurrency').value = 'cny';
+    doc.querySelector('input[name="oPriceMode"][value="calc"]').checked = true;
+  });
+
+  it('新商品：订单入库的同时登记进商品主档（活动管理可见）', async () => {
+    doc.getElementById('oActivity').value = '万圣节';
+    doc.getElementById('oType').value = '毛绒玩偶';
+    doc.getElementById('oModel').value = '皮卡丘玩偶';
+    doc.getElementById('oPrice').value = '210';
+    doc.getElementById('oCount').value = '1';
+    doc.getElementById('oBuyer').value = '小樱\n小狼';
+    await aoi.orders.addManual();
+    expect(aoi.state.data.orders).toHaveLength(2);
+    const ps = aoi.state.data.activityMeta['万圣节'].products;
+    expect(ps).toHaveLength(1);
+    expect(ps[0]).toMatchObject({ type: '毛绒玩偶', model: '皮卡丘玩偶', price: 210 });
+  });
+
+  it('已有同型号商品：不重复登记，仅补缺失的价格字段', async () => {
+    aoi.state.data.activityMeta['万圣节'] = { products: [{ id: 'p1', type: '毛绒玩偶', model: '皮卡丘玩偶', priceOrig: 3960, currency: 'jpy' }] };
+    doc.getElementById('oActivity').value = '万圣节';
+    doc.getElementById('oType').value = '毛绒玩偶';
+    doc.getElementById('oModel').value = '皮卡丘玩偶';
+    doc.getElementById('oCurrency').value = 'jpy';
+    doc.querySelector('input[name="oPriceMode"][value="direct"]').checked = true;
+    doc.getElementById('oPrice').value = '4000';
+    doc.getElementById('oCount').value = '1';
+    doc.getElementById('oBuyer').value = '小樱';
+    await aoi.orders.addManual();
+    const ps = aoi.state.data.activityMeta['万圣节'].products;
+    expect(ps).toHaveLength(1);
+    expect(ps[0].id).toBe('p1');
+    expect(ps[0].price).toBeUndefined(); // direct 模式无人民币价，主档已有外币原价不动
+    expect(ps[0].priceOrig).toBe(3960);
+  });
+
+  it('未填活动名：只入订单，不登记主档', async () => {
+    doc.getElementById('oType').value = '徽章';
+    doc.getElementById('oModel').value = '电次';
+    doc.getElementById('oPrice').value = '12';
+    doc.getElementById('oCount').value = '1';
+    doc.getElementById('oBuyer').value = '小樱';
+    await aoi.orders.addManual();
+    expect(aoi.state.data.orders).toHaveLength(1);
+    expect(aoi.state.data.activityMeta).toEqual({});
+  });
+});

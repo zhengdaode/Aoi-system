@@ -831,6 +831,110 @@ Aoi.orders.applyActGenRmb = async function () {
     : '没有可生成的对象（仅补空缺模式下已有人民币价的不动）', msg.length ? 'success' : 'warning');
 };
 
+// —— 批量生成人民币价（v3.17.0 恢复 v1.8.0 勾选版，v3.15.0 D2 曾移除；与活动级生成并存）——
+// 公式与活动级一致：人民币 = 外币原价 × (汇率 + 加价)，0.5 圆整；弹层内临时调整不写回 d.calc；
+// 只作用于勾选订单中的外币订单（人民币单 / 缺外币原价的不动）
+
+Aoi.orders.showGenRmb = function () {
+  var ids = Aoi.orders.selectedIds();
+  if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
+  var box = document.getElementById('genRmbBox');
+  if (!box) return;
+  // 预填汇率：取勾选订单中最常见的外币币种
+  var d = Aoi.orders.ensure();
+  var idSet = {};
+  ids.forEach(function (id) { idSet[id] = 1; });
+  var counter = {};
+  d.orders.forEach(function (o) {
+    if (idSet[o.id] && o.currency && o.currency !== 'cny') counter[o.currency] = (counter[o.currency] || 0) + 1;
+  });
+  var best = null, bestN = 0;
+  Object.keys(counter).forEach(function (c) { if (counter[c] > bestN) { best = c; bestN = counter[c]; } });
+  if (!best) Aoi.toast('勾选中没有外币订单，生成不会改动任何订单', 'info');
+  document.getElementById('genCurrency').value = best || 'jpy';
+  Aoi.orders.onGenCurrencyChange();
+  box.classList.remove('hidden');
+};
+
+// 币种切换 → 回填计算器配置的汇率/加价（可在此基础上修改，仅本次生效）
+Aoi.orders.onGenCurrencyChange = function () {
+  var cfg = Aoi.calc.get()[document.getElementById('genCurrency').value];
+  if (!cfg) return;
+  document.getElementById('genRate').value = cfg.rate;
+  document.getElementById('genMarkup').value = cfg.markup;
+};
+
+Aoi.orders.hideGenRmb = function () {
+  var box = document.getElementById('genRmbBox');
+  if (box) box.classList.add('hidden');
+};
+
+Aoi.orders.applyGenRmb = async function () {
+  var ids = Aoi.orders.selectedIds();
+  if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
+  var rate = parseFloat(document.getElementById('genRate').value);
+  var markup = parseFloat(document.getElementById('genMarkup').value) || 0;
+  if (isNaN(rate) || rate <= 0) { Aoi.toast('请填写汇率', 'warning'); return; }
+  var idSet = {};
+  ids.forEach(function (id) { idSet[id] = 1; });
+  var d = Aoi.orders.ensure();
+  var n = 0;
+  Aoi.undo.arm('批量生成人民币价', d);
+  d.orders.forEach(function (o) {
+    if (!idSet[o.id] || o.currency === 'cny' || o.priceOrig == null) return;
+    o.price = Aoi.calc.convert(o.priceOrig, rate, markup);
+    n++;
+  });
+  await Aoi.saveTeamData(d);
+  Aoi.orders.render();
+  Aoi.orders.hideGenRmb();
+  Aoi.toast(n ? ('已为 ' + n + ' 条订单生成人民币价（30 秒内可撤销）') : '没有可生成的订单（需含外币原价）', n ? 'success' : 'warning');
+};
+
+// —— 勾选订单统计（v3.17.0）：物件总数量 / 本体总金额（原货币+人民币）/
+// 国际邮费总金额 / 整体总金额（货物价格 + 邮费之和）——
+// 本体总金额按订单人民币单价 × 数量累加；原货币合计按币种分列（外币原价 × 数量）；
+// 国际邮费读分摊时写入的 o.intlFee（未分摊批次为 0）；人民币价待生成的件数单独提示不计入。
+
+Aoi.orders.selectionStats = function () {
+  var ids = Aoi.orders.selectedIds();
+  if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }
+  var idSet = {};
+  ids.forEach(function (id) { idSet[id] = 1; });
+  var d = Aoi.orders.ensure();
+  var n = 0, count = 0, rmb = 0, pendingCount = 0, intl = 0;
+  var orig = {}; // 币种 → 外币原价小计
+  d.orders.forEach(function (o) {
+    if (!idSet[o.id]) return;
+    n++;
+    count += o.count || 0;
+    if (o.price != null) rmb += o.price * o.count;
+    else pendingCount += o.count || 0;
+    if (o.priceOrig != null && o.currency && o.currency !== 'cny') {
+      orig[o.currency] = (orig[o.currency] || 0) + o.priceOrig * o.count;
+    }
+    intl += (o.intlFee != null) ? o.intlFee : 0;
+  });
+  var box = document.getElementById('orderSelStat');
+  var body = document.getElementById('orderSelStatBody');
+  if (!box || !body) return;
+  var origText = Object.keys(orig).map(function (c) {
+    return Aoi.currencySymbol(c) + orig[c].toFixed(2);
+  }).join(' + ');
+  body.innerHTML = '选中 <b>' + n + '</b> 条 · 物件总数量 <b>' + count + '</b> 件'
+    + ' · 本体总金额 ¥<b>' + rmb.toFixed(2) + '</b>'
+    + (origText ? '（外币原价合计 ' + origText + '）' : '')
+    + (pendingCount ? '<span class="text-amber-500">（' + pendingCount + ' 件人民币价待生成，未计入）</span>' : '')
+    + ' · 国际邮费 ¥<b>' + intl.toFixed(2) + '</b>'
+    + ' · 整体总金额 ¥<b>' + (rmb + intl).toFixed(2) + '</b>（货物 + 邮费）';
+  box.classList.remove('hidden');
+};
+
+Aoi.orders.hideSelStats = function () {
+  var box = document.getElementById('orderSelStat');
+  if (box) box.classList.add('hidden');
+};
+
 // —— 订单编辑（v1.8.0）——
 
 Aoi.orders.editingId = null;

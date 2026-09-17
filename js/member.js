@@ -101,16 +101,19 @@ Aoi.member.renderAnnounce = function () {
   }).join('') : '<li class="text-sm text-gray-400 py-2">暂无公告</li>';
 };
 
-// 我的国际费：按到货批次，复用 intl 分摊 + approval 交费状态
+// 我的国际费：按到货批次，复用 intl 分摊 + approval 交费状态；
+// v3.17.0：增列「我的件数」（该批次本人订单件数合计，收货时与团长核对清点用）
 Aoi.member.renderFees = function (cn) {
   var d = Aoi.orders.ensure();
   var myBatches = {};
+  var myCounts = {};
   d.orders.forEach(function (o) {
     if (o.buyer !== cn || !o.batchId) return;
     if (!myBatches[o.batchId]) {
       var b = Aoi.intl.getBatch(o.batchId);
       if (b) myBatches[o.batchId] = b;
     }
+    myCounts[o.batchId] = (myCounts[o.batchId] || 0) + (o.count || 0);
   });
 
   var ids = Object.keys(myBatches).sort(function (a, b) {
@@ -141,11 +144,12 @@ Aoi.member.renderFees = function (cn) {
     return '<tr class="border-b border-gray-100">'
       + '<td data-label="序号" class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td data-label="到货日期" class="px-3 py-2">' + Aoi.escapeHtml(batch.date || '') + '</td>'
+      + '<td data-label="我的件数" class="px-3 py-2 text-right">' + (myCounts[batchId] || 0) + ' 件</td>'
       + '<td data-label="应付国际费" class="px-3 py-2 text-right font-semibold">¥' + fee.toFixed(2) + '</td>'
       + '<td data-label="状态" class="px-3 py-2">' + Aoi.approval.statusBadge(status) + '</td>'
       + '<td data-label="操作" class="px-3 py-2">' + action + '</td>'
       + '</tr>';
-  }).join('') : '<tr><td colspan="5" class="px-3 py-2 text-gray-400">暂无到货批次（该圈名还没有已到货的订单）</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="px-3 py-2 text-gray-400">暂无到货批次（该圈名还没有已到货的订单）</td></tr>';
 
   var stat = document.getElementById('memberFeeStat');
   if (stat) stat.textContent = ids.length ? '共 ' + ids.length + ' 个到货批次' : '';

@@ -219,15 +219,28 @@ Aoi.exportFilterRows = function (clone, ids) {
 };
 
 // 导出文件基础名（v3.6.0 S5）：data-name = 表格类型；按钮可带 data-activity-from="<下拉id>"，
-// 该下拉当前选中活动非空时文件名变为「活动名-表格类型」（非法文件名字符替换为 -，空则维持原名）
+// 该下拉当前选中活动非空时文件名变为「活动名-表格类型」（非法文件名字符替换为 -，空则维持原名）；
+// v3.17.0：另支持 data-batch-from="<批次下拉id>"——按批次 ID 取批次显示名（name 优先回落日期）
+// 作前缀（国际计算各表按当前批次导出），活动前缀优先、两者皆空维持原名
 Aoi.exportBaseName = function (btn) {
   var name = btn.getAttribute('data-name') || '表格';
+  var prefix = '';
   var fromId = btn.getAttribute('data-activity-from');
-  if (!fromId) return name;
-  var el = document.getElementById(fromId);
-  var act = el ? (el.value || '').trim() : '';
-  if (!act) return name;
-  return act.replace(/[\\/:*?"<>|]/g, '-') + '-' + name;
+  if (fromId) {
+    var el = document.getElementById(fromId);
+    prefix = el ? (el.value || '').trim() : '';
+  }
+  if (!prefix) {
+    var batchFrom = btn.getAttribute('data-batch-from');
+    if (batchFrom) {
+      var sel = document.getElementById(batchFrom);
+      var batchId = sel ? (sel.value || '').trim() : '';
+      var batch = (batchId && Aoi.intl && Aoi.intl.getBatch) ? Aoi.intl.getBatch(batchId) : null;
+      if (batch) prefix = (Aoi.orders.batchLabel(batch) || '').trim();
+    }
+  }
+  if (!prefix) return name;
+  return prefix.replace(/[\\/:*?"<>|]/g, '-') + '-' + name;
 };
 
 // Promise 超时包装（v3.9.3）：p 在 ms 内未落定则 reject——html2canvas 遇到挂起的

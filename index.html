@@ -104,7 +104,7 @@
         <div class="overflow-x-auto">
           <table id="memberFeeTable" class="w-full text-sm data-table responsive-cards">
             <thead><tr class="text-left text-gray-500 border-b border-gray-200">
-              <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">到货批次</th><th class="px-3 py-2 text-right">应付国际费</th>
+              <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">到货批次</th><th class="px-3 py-2 text-right">我的件数</th><th class="px-3 py-2 text-right">应付国际费</th>
               <th class="px-3 py-2">状态</th><th class="px-3 py-2">操作</th>
             </tr></thead>
             <tbody id="memberFeeTbody"></tbody>
@@ -600,7 +600,27 @@
           <input id="arriveDate" type="date" class="hidden border border-gray-300 rounded px-3 py-2 text-sm">
           <button onclick="Aoi.orders.markArrived()" class="px-4 py-2 btn-primary text-sm font-bold rounded">标记到货</button>
           <button onclick="Aoi.orders.markUnarrived()" class="px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded hover:bg-gray-900">设为未到货</button>
+          <button onclick="Aoi.orders.showGenRmb()" class="px-4 py-2 btn-outline text-sm font-bold rounded" title="为勾选的外币订单按公式生成人民币价（0.5 圆整）">批量生成人民币价</button>
+          <button onclick="Aoi.orders.selectionStats()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-bold rounded hover:bg-gray-100" title="统计勾选订单：物件总数量 / 本体总金额 / 国际邮费 / 整体总金额">统计勾选</button>
           <button onclick="Aoi.orders.batchDelete()" class="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded hover:bg-red-700">批量删除</button>
+        </div>
+        <div id="genRmbBox" class="hidden flex flex-wrap items-center gap-3 mb-4 border border-gray-200 bg-gray-50 rounded-lg p-3">
+          <span class="text-sm font-semibold">公式：人民币 = 外币原价 × (</span>
+          <select id="genCurrency" onchange="Aoi.orders.onGenCurrencyChange()" class="border border-gray-300 rounded px-2 py-1 text-sm">
+            <option value="jpy">日元</option>
+            <option value="krw">韩元</option>
+          </select>
+          <span class="text-sm">汇率</span>
+          <input id="genRate" type="number" step="0.0001" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm">
+          <span class="text-sm">+ 加价</span>
+          <input id="genMarkup" type="number" step="0.0001" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+          <span class="text-sm">) × 0.5 圆整</span>
+          <button onclick="Aoi.orders.applyGenRmb()" class="px-4 py-2 btn-primary text-sm font-bold rounded">生成</button>
+          <button onclick="Aoi.orders.hideGenRmb()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-bold rounded hover:bg-gray-300">取消</button>
+        </div>
+        <div id="orderSelStat" class="hidden flex flex-wrap items-center gap-2 mb-4 border border-gray-200 bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+          <span id="orderSelStatBody" class="flex-1 min-w-0 leading-relaxed"></span>
+          <button onclick="Aoi.orders.hideSelStats()" class="px-2 py-1 text-gray-400 hover:text-gray-600 text-lg leading-none" title="收起统计">×</button>
         </div>
         <div class="overflow-x-auto table-scroll">
           <table id="orderTable" class="w-full text-sm data-table responsive-cards">
@@ -863,7 +883,7 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">分摊明细</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="intlTable" data-name="分摊明细" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="intlTable" data-name="分摊明细" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
+            <button onclick="Aoi.exportImage(this)" data-table="intlTable" data-name="分摊明细" data-batch-from="intlBatch" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="intlTable" data-name="分摊明细" data-batch-from="intlBatch" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
           </div>
           <div class="overflow-x-auto">
             <table id="intlTable" class="w-full text-sm data-table">
@@ -880,13 +900,13 @@
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <div class="flex items-center mb-2">
             <h3 class="font-bold">每人应付国际费</h3>
-            <button onclick="Aoi.exportImage(this)" data-table="intlBuyerTable" data-name="每人应付国际费" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="intlBuyerTable" data-name="每人应付国际费" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
+            <button onclick="Aoi.exportImage(this)" data-table="intlBuyerTable" data-name="每人应付国际费" data-batch-from="intlBatch" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="intlBuyerTable" data-name="每人应付国际费" data-batch-from="intlBatch" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
           </div>
           <div class="overflow-x-auto">
             <table id="intlBuyerTable" class="w-full text-sm data-table">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">购买者</th>
-                <th class="px-3 py-2">购买内容</th><th class="px-3 py-2 text-right">国际金额</th>
+                <th class="px-3 py-2">购买内容</th><th class="px-3 py-2 text-right">货物件数</th><th class="px-3 py-2 text-right">国际金额</th>
                 <th class="px-3 py-2 text-right">国内额外金额</th>
               </tr></thead>
               <tbody id="intlBuyerTbody"></tbody>

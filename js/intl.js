@@ -61,7 +61,7 @@ Aoi.intl.buyerTotals = function (batchId, items) {
   return totals;
 };
 
-// 每人应付国际费明细：购买内容聚合 + 国际金额 + 国内额外金额（读交费记录）
+// 每人应付国际费明细：购买内容聚合 + 货物件数（v3.17.0，买家/发货核对用）+ 国际金额 + 国内额外金额（读交费记录）
 Aoi.intl.buyerRows = function (batchId, items) {
   var feeByKey = {};
   items.forEach(function (it) { feeByKey[it.key] = it.weightedIntlFee; });
@@ -70,8 +70,9 @@ Aoi.intl.buyerRows = function (batchId, items) {
   d.orders.forEach(function (o) {
     if (o.batchId !== batchId) return;
     var key = o.type + '|' + o.model;
-    if (!map[o.buyer]) map[o.buyer] = { buyer: o.buyer, content: [], intl: 0 };
+    if (!map[o.buyer]) map[o.buyer] = { buyer: o.buyer, content: [], intl: 0, count: 0 };
     map[o.buyer].intl += (feeByKey[key] || 0) * o.count;
+    map[o.buyer].count += o.count || 0;
     map[o.buyer].content.push(o.type + '-' + o.model + ' ×' + o.count);
   });
   return Object.keys(map).map(function (buyer) {
@@ -80,6 +81,7 @@ Aoi.intl.buyerRows = function (batchId, items) {
     return {
       buyer: buyer,
       content: m.content.join('，'),
+      count: m.count,
       intl: m.intl,
       domestic: (rec && rec.domesticFee != null) ? rec.domesticFee : ''
     };
@@ -147,10 +149,12 @@ Aoi.intl.render = function () {
 
   var g = Aoi.intl.gaugeData(items, batch.targetAmount || 0);
   g.targetAmount = batch.targetAmount || 0;
+  // v3.17.0：批次货物总件数（各制品数量累加），分摊核对与买家/发货清点共用
+  var totalQty = items.reduce(function (s, it) { return s + it.quantity; }, 0);
   var stat = document.getElementById('intlStat');
   if (stat) {
     stat.textContent = items.length
-      ? '共 ' + items.length + ' 种制品 · 总重量 ' + g.tareTotal.toFixed(2)
+      ? '共 ' + items.length + ' 种制品 · 合计 ' + totalQty + ' 件 · 总重量 ' + g.tareTotal.toFixed(2)
         + ' · 已分摊 ' + g.feeTotal.toFixed(2) + ' / 目标 ' + (batch.targetAmount || 0).toFixed(2)
         + ' · 差值 ' + (g.diff >= 0 ? '+' : '') + g.diff.toFixed(2) + (g.diff >= 0 ? '（未分摊完）' : '（超出目标）')
       : '该批次暂无订单';
@@ -165,6 +169,7 @@ Aoi.intl.render = function () {
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.buyer) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.content) + '</td>'
+      + '<td class="px-3 py-2 text-right">' + r.count + ' 件</td>'
       + '<td class="px-3 py-2 text-right">' + r.intl.toFixed(2) + '</td>'
       + '<td class="px-3 py-2"><input type="number" step="0.01" value="' + (r.domestic || '') + '" onchange="Aoi.intl.setDomesticFee(\'' + batch.id + '\', \'' + b + '\', this.value)" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '</tr>';

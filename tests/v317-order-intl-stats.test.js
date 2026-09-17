@@ -181,6 +181,15 @@ describe('国际计算货物件数（v3.17.0）', () => {
     const cells = Array.from(row.querySelectorAll('td')).map((td) => td.getAttribute('data-label'));
     expect(cells.indexOf('我的件数')).toBe(cells.indexOf('应付国际费') - 1);
   });
+
+  it('v3.17.1：购买内容列挂 intl-content-cell（宽度上限随视口自适应换行）', () => {
+    aoi.intl.refillBatches();
+    doc.getElementById('intlBatch').value = 'b1';
+    aoi.intl.render();
+    const tds = doc.querySelectorAll('#intlBuyerTbody td.intl-content-cell');
+    expect(tds).toHaveLength(2); // 每行内容格各一
+    expect(tds[0].textContent).toContain('×'); // 内容本体不变（类型-型号 ×件数）
+  });
 });
 
 // —— 需求4：订单管理勾选统计 ——

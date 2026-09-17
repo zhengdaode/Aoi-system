@@ -130,6 +130,21 @@ textarea:focus {
   min-width: 5rem;
 }
 
+/* v3.17.1：每人应付国际费「购买内容」列——宽度上限随页面宽度自适应：
+   min() 取 28rem 与 42vw 较小者（桌面 ≥1067px 稳定在 28rem，之下随视口线性收窄），
+   超出上限自动换行；≤640px 再收窄，避免长内容把单列撑爆导致表格大幅横向溢出 */
+.data-table td.intl-content-cell {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: min(28rem, 42vw);
+}
+@media (max-width: 640px) {
+  .data-table td.intl-content-cell {
+    max-width: min(18rem, 55vw);
+  }
+}
+
 /* v3.2.0（T4）：长表视口内滚动 —— 容器限高，横向滚动条始终在可视区内，
    表头吸顶、首列吸附（原先仅 ≤767px 有首列 sticky），长表不必滚到页面底部才能左右滑 */
 @media (min-width: 768px) {

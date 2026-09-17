@@ -168,7 +168,7 @@ Aoi.intl.render = function () {
     return '<tr class="border-b border-gray-100 hover:bg-gray-50">'
       + '<td class="px-2 py-2 text-right text-gray-400 select-none">' + (i + 1) + '</td>'
       + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.buyer) + '</td>'
-      + '<td class="px-3 py-2">' + Aoi.escapeHtml(r.content) + '</td>'
+      + '<td class="px-3 py-2 intl-content-cell">' + Aoi.escapeHtml(r.content) + '</td>'
       + '<td class="px-3 py-2 text-right">' + r.count + ' 件</td>'
       + '<td class="px-3 py-2 text-right">' + r.intl.toFixed(2) + '</td>'
       + '<td class="px-3 py-2"><input type="number" step="0.01" value="' + (r.domestic || '') + '" onchange="Aoi.intl.setDomesticFee(\'' + batch.id + '\', \'' + b + '\', this.value)" class="w-24 border border-gray-300 rounded px-2 py-1 text-sm"></td>'

@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.17.1 (2026-09-18)
+
+> **每人应付国际费「购买内容」列宽自适应**（用户需求：购买内容栏设置宽度上限，超出自动换行，
+> 上限随当前页面宽度自动变化）。
+
+### Changed
+- `Aoi.intl.render` 购买内容单元格挂新类 `intl-content-cell`；css/styles.css 新增规则——
+  `max-width: min(28rem, 42vw)`（桌面 ≥1067px 稳定在 28rem，之下随视口线性收窄，上限自动跟随页面宽度），
+  `white-space: normal + word-break: break-word + overflow-wrap: anywhere` 超出自动换行；≤640px 媒体查询
+  再收窄至 `min(18rem, 55vw)`，避免长内容把单列撑爆导致表格大幅横向溢出。导出图片（html2canvas）与
+  下载表格沿用同一类，样式一致。
+
+### Tests
+- 464 → **465 例全绿**：`tests/v317-order-intl-stats.test.js` 增 1 例（每行内容格挂 `intl-content-cell`
+  且内容本体不变）。
+
 ## v3.17.0 (2026-09-18)
 
 > **国际计算批次化四项体验**（用户需求：①每人应付国际费导出图片文件名加批次前缀；②恢复订单管理勾选版

@@ -190,6 +190,42 @@ describe('国际计算货物件数（v3.17.0）', () => {
     expect(tds).toHaveLength(2); // 每行内容格各一
     expect(tds[0].textContent).toContain('×'); // 内容本体不变（类型-型号 ×件数）
   });
+
+  it('v3.17.2：同一买家同商品多笔订单，购买内容合并为一条累计件数', () => {
+    aoi.state.data = {
+      orders: [
+        { id: 'o1', type: '毛绒', model: '鲤鱼王毛绒', count: 1, buyer: 'rex', batchId: 'b1' },
+        { id: 'o2', type: '毛绒', model: '鲤鱼王毛绒', count: 1, buyer: 'rex', batchId: 'b1' },
+        { id: 'o3', type: '毛绒', model: '鲤鱼王毛绒', count: 1, buyer: '冬藏', batchId: 'b1' },
+        { id: 'o4', type: '吧唧', model: '鲤鱼王吧唧', count: 3, buyer: 'rex', batchId: 'b1' }
+      ],
+      batches: [{ id: 'b1', date: '2026-09-01', targetAmount: 100, weights: { '毛绒|鲤鱼王毛绒': 10, '吧唧|鲤鱼王吧唧': 5 } }],
+      payments: []
+    };
+    const items = aoi.intl.buildItems(aoi.intl.getBatch('b1'));
+    const rows = aoi.intl.buyerRows('b1', items);
+    const rex = rows.find((r) => r.buyer === 'rex');
+    expect(rex.content).toBe('毛绒-鲤鱼王毛绒 ×2，吧唧-鲤鱼王吧唧 ×3'); // 合并且保持首次出现顺序
+    expect(rex.count).toBe(5);
+    const dong = rows.find((r) => r.buyer === '冬藏');
+    expect(dong.content).toBe('毛绒-鲤鱼王毛绒 ×1');
+  });
+
+  it('v3.17.2：render 后购买内容格不再出现同商品重复条目', () => {
+    aoi.state.data = {
+      orders: [
+        { id: 'o1', type: '毛绒', model: '鲤鱼王毛绒', count: 1, buyer: 'rex', batchId: 'b1' },
+        { id: 'o2', type: '毛绒', model: '鲤鱼王毛绒', count: 1, buyer: 'rex', batchId: 'b1' }
+      ],
+      batches: [{ id: 'b1', date: '2026-09-01', targetAmount: 100, weights: { '毛绒|鲤鱼王毛绒': 10 } }],
+      payments: []
+    };
+    aoi.intl.refillBatches();
+    doc.getElementById('intlBatch').value = 'b1';
+    aoi.intl.render();
+    const cell = doc.querySelector('#intlBuyerTbody td.intl-content-cell');
+    expect(cell.textContent).toBe('毛绒-鲤鱼王毛绒 ×2');
+  });
 });
 
 // —— 需求4：订单管理勾选统计 ——

@@ -70,17 +70,23 @@ Aoi.intl.buyerRows = function (batchId, items) {
   d.orders.forEach(function (o) {
     if (o.batchId !== batchId) return;
     var key = o.type + '|' + o.model;
-    if (!map[o.buyer]) map[o.buyer] = { buyer: o.buyer, content: [], intl: 0, count: 0 };
-    map[o.buyer].intl += (feeByKey[key] || 0) * o.count;
-    map[o.buyer].count += o.count || 0;
-    map[o.buyer].content.push(o.type + '-' + o.model + ' ×' + o.count);
+    if (!map[o.buyer]) map[o.buyer] = { content: {}, intl: 0, count: 0 };
+    var m = map[o.buyer];
+    m.intl += (feeByKey[key] || 0) * o.count;
+    m.count += o.count || 0;
+    // 同商品多笔订单合并为一条（v3.17.2），按首次出现顺序展示
+    if (!m.content[key]) m.content[key] = { type: o.type, model: o.model, count: 0 };
+    m.content[key].count += o.count || 0;
   });
   return Object.keys(map).map(function (buyer) {
     var m = map[buyer];
     var rec = Aoi.approval.getRecord(batchId, buyer);
     return {
       buyer: buyer,
-      content: m.content.join('，'),
+      content: Object.keys(m.content).map(function (k) {
+        var c = m.content[k];
+        return c.type + '-' + c.model + ' ×' + c.count;
+      }).join('，'),
       count: m.count,
       intl: m.intl,
       domestic: (rec && rec.domesticFee != null) ? rec.domesticFee : ''

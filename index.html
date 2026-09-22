@@ -614,6 +614,10 @@
           <button onclick="Aoi.orders.selectionStats()" class="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-bold rounded hover:bg-gray-100" title="统计勾选订单：物件总数量 / 本体总金额 / 国际邮费 / 整体总金额">统计勾选</button>
           <button onclick="Aoi.orders.batchDelete()" class="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded hover:bg-red-700">批量删除</button>
         </div>
+        <div class="flex gap-2 mb-4">
+          <textarea id="arrivePaste" rows="2" placeholder="粘贴代购/仓库的到货清单文本（每行一条）——AI 自动预勾选匹配订单，核对后点「标记到货」" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
+          <button onclick="Aoi.orders.pasteArriveList()" class="px-4 py-2 btn-outline text-sm font-bold rounded whitespace-nowrap self-stretch">清单预勾选</button>
+        </div>
         <div id="genRmbBox" class="hidden flex flex-wrap items-center gap-3 mb-4 border border-gray-200 bg-gray-50 rounded-lg p-3">
           <span class="text-sm font-semibold">公式：人民币 = 外币原价 × (</span>
           <select id="genCurrency" onchange="Aoi.orders.onGenCurrencyChange()" class="border border-gray-300 rounded px-2 py-1 text-sm">
@@ -1009,6 +1013,10 @@
           <div class="flex flex-wrap items-center gap-3">
             <select id="shipBatch" onchange="Aoi.ship.render()" class="border border-gray-300 rounded px-3 py-2 text-sm"></select>
             <button onclick="Aoi.exportImage(this)" data-table="shipTable" data-name="发货排发" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="shipTable" data-name="发货排发" class="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 ml-2">下载表格</button>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <textarea id="shipTrackingPaste" rows="2" placeholder="粘贴代购/快递发来的单号信息（AI 自动识别归属并预填未发货订单的单号列，请表内核对）" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm font-mono"></textarea>
+            <button onclick="Aoi.ship.smartTracking()" class="px-4 py-2 btn-outline text-sm font-bold rounded whitespace-nowrap">单号智能预填</button>
           </div>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-6">

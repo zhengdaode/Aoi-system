@@ -1419,6 +1419,39 @@ Aoi.orders.markUnarrived = async function () {
   Aoi.toast('已设为未到货', 'success');
 };
 
+// v3.20.0 T7：粘贴到货清单 → AI 预勾选匹配订单（只动勾选框，不落库；人工核对后走「标记到货」）
+Aoi.orders.pasteArriveList = async function () {
+  var ta = document.getElementById('arrivePaste');
+  var text = ta ? ta.value.trim() : '';
+  if (!text) { Aoi.toast('请先粘贴到货清单文本（每行一条）', 'warning'); return; }
+  if (!Aoi.typesafe.available()) { Aoi.toast('AI 语义判断未启用/不可用，请手工勾选', 'warning'); return; }
+  var lines = [];
+  String(text).split(/\r?\n/).forEach(function (s) {
+    s = s.trim();
+    if (s.length >= 2 && lines.indexOf(s) < 0) lines.push(s);
+  });
+  lines = lines.slice(0, 30);
+  if (!lines.length) { Aoi.toast('清单里没有有效行', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  var cands = d.orders.filter(function (o) { return o.status !== '已到货'; }).slice(0, 12);
+  if (!cands.length) { Aoi.toast('没有未到货订单', 'warning'); return; }
+  var candidates = cands.map(function (o) {
+    return { label: o.buyer + ' · ' + o.type + '-' + o.model + (o.count > 1 ? ' ×' + o.count : '') };
+  });
+  var decisions = await Aoi.typesafe.matchToCandidates(lines, candidates, {
+    what: '订单',
+    instructions: '这是代购/仓库发来的到货清单里的一行（可能是买家名、商品名或组合）。它对应哪一笔订单？匹配不到就选「匹配不到」。'
+  });
+  var applied = 0, unmatched = 0;
+  decisions.forEach(function (dec) {
+    if (dec.idx < 0 || dec.conf < Aoi.typesafe.TH.col) { unmatched++; return; }
+    var cb = document.querySelector('.row-check[data-id="' + cands[dec.idx].id + '"]');
+    if (cb) { cb.checked = true; applied++; } else unmatched++;
+  });
+  ta.value = '';
+  Aoi.toast('清单 ' + lines.length + ' 行：已预勾选 ' + applied + ' 笔' + (unmatched ? '，' + unmatched + ' 行未识别（请人工勾选）' : '') + '——核对后点「标记到货」', applied ? 'success' : 'warning');
+};
+
 Aoi.orders.batchDelete = async function () {
   var ids = Aoi.orders.selectedIds();
   if (!ids.length) { Aoi.toast('请先勾选订单', 'warning'); return; }

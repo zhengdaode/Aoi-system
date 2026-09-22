@@ -129,3 +129,62 @@ Aoi.ship.setShipped = async function () {
 Aoi.ship.refillBatches = function () {
   Aoi.orders.refillBatchSelect(document.getElementById('shipBatch'), '选择批次…');
 };
+
+// —— v3.20.0 T6：快递单号智能预填（docs/PLAN-TYPESAFE.md G8）——
+// 确定性正则抽号（≥10 位纯数字，或 1~4 位字母前缀+≥8 位数字；排除手机号形态）→
+// TypeSafe 只判「这个单号属于本批次哪笔未发货订单」→ ≥TH.col 预填 o.tracking 并整包保存一次；
+// 低置信/未匹配留给人手工。表内核对后走既有「批量设发货」（私发排发表链路不变）。
+Aoi.ship.extractTracking = function (text) {
+  var out = [], seen = {};
+  String(text == null ? '' : text).split(/\r?\n/).forEach(function (line) {
+    var s = line.trim();
+    if (!s) return;
+    (s.match(/\b[A-Za-z]{1,4}\d{8,22}\b|\b\d{10,22}\b/g) || []).forEach(function (no) {
+      if (/^1[3-9]\d{9}$/.test(no)) return; // 手机号形态排除
+      var key = no.toUpperCase();
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push({ no: no, context: s.length > 60 ? s.slice(0, 59) + '…' : s });
+    });
+  });
+  return out.slice(0, 20);
+};
+
+Aoi.ship.smartTracking = async function () {
+  var ta = document.getElementById('shipTrackingPaste');
+  var text = ta ? ta.value.trim() : '';
+  if (!text) { Aoi.toast('请先粘贴快递/代购发来的单号信息', 'warning'); return; }
+  var batchId = document.getElementById('shipBatch').value;
+  if (!batchId) { Aoi.toast('请先选择到货批次', 'warning'); return; }
+  if (!Aoi.typesafe.available()) { Aoi.toast('AI 语义判断未启用/不可用，请逐行手工粘贴单号', 'warning'); return; }
+  var d = Aoi.orders.ensure();
+  var cands = d.orders.filter(function (o) { return o.batchId === batchId && (o.shipped || '未发') !== '已发'; }).slice(0, 12);
+  if (!cands.length) { Aoi.toast('该批次没有未发货订单', 'warning'); return; }
+  var nums = Aoi.ship.extractTracking(text);
+  if (!nums.length) { Aoi.toast('未识别到快递单号（需 10 位以上数字，或字母前缀+8 位以上数字；手机号已排除）', 'warning'); return; }
+  var candidates = cands.map(function (o) {
+    return { label: o.buyer + ' · ' + o.type + '-' + o.model + ' ×' + o.count };
+  });
+  var lines = nums.map(function (n) { return { text: n.no, context: n.context }; });
+  var decisions = await Aoi.typesafe.matchToCandidates(lines, candidates, {
+    what: '订单',
+    instructions: '这是团长收到的快递发货信息里的一行。这个快递单号属于本批次哪一笔订单？（依据同一行的姓名/商品名/数量线索判断）匹配不到就选「匹配不到」。'
+  });
+  var applied = 0, unmatched = [];
+  decisions.forEach(function (dec, i) {
+    if (dec.idx >= 0 && dec.conf >= Aoi.typesafe.TH.col) {
+      cands[dec.idx].tracking = nums[i].no;
+      applied++;
+    } else {
+      unmatched.push(nums[i].no);
+    }
+  });
+  ta.value = '';
+  if (!applied) {
+    Aoi.toast('识别到 ' + nums.length + ' 个单号但没有可靠归属，请对照表格手工填写', 'warning');
+    return;
+  }
+  await Aoi.saveTeamData(d);
+  Aoi.ship.render();
+  Aoi.toast('已预填 ' + applied + ' 个单号（表内核对后勾选「批量设发货」）' + (unmatched.length ? '；' + unmatched.length + ' 个单号未匹配，请手工填写' : ''), 'success');
+};

@@ -73,6 +73,36 @@ Aoi.typesafe = {
     return out;
   },
 
+  // 通用「行 → 候选」批量归属判断（v3.20.0 T6 快递归属 / T7 到货清单共用）：
+  //   lines = [{text, context?}]（粘贴文本按行拆分），candidates = [{label, ...}]（≤12，label 为
+  //   criteria 描述文本）。opts = { what, instructions, noneChoice }。
+  //   返回 [{ idx, conf }]（idx=-1 表示「匹配不到」或解析失败）；是否采纳由调用方按阈值决定。
+  matchToCandidates: async function (lines, candidates, opts) {
+    opts = opts || {};
+    var noneChoice = opts.noneChoice || '匹配不到';
+    var empty = (lines || []).map(function () { return { idx: -1, conf: 0 }; });
+    if (!candidates || !candidates.length || !lines || !lines.length) return empty;
+    var criteria = {};
+    candidates.forEach(function (c, i) { criteria['#' + (i + 1)] = c.label; });
+    criteria[noneChoice] = '候选里没有对应的条目';
+    var instructions = opts.instructions || ('这一行对应哪个' + (opts.what || '条目') + '？匹配不到就选「' + noneChoice + '」。');
+    var jobs = lines.map(function (ln) {
+      var text = typeof ln === 'string' ? ln : (ln.text || '');
+      return {
+        state: { line: text, context: (typeof ln === 'object' && ln.context) || '' },
+        questions: { target: { type: 'choice', instructions: instructions, criteria: criteria } }
+      };
+    });
+    var answers = await Aoi.typesafe.judgeAll(jobs);
+    return answers.map(function (a) {
+      var ans = a && a.target;
+      if (!ans || ans.type !== 'choice') return { idx: -1, conf: 0 };
+      var m2 = /^#(\d+)$/.exec(ans.choice);
+      var conf = ans.confidence == null ? 1 : ans.confidence;
+      return m2 ? { idx: parseInt(m2[1], 10) - 1, conf: conf } : { idx: -1, conf: conf };
+    });
+  },
+
   // —— 设置页开关 ——
   renderSettings: function () {
     var el = document.getElementById('tsEnabled');

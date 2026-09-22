@@ -353,3 +353,49 @@ describe('v3.18.1 ChatGPT「复制」按钮畸形 HTML（单元格级 <p>，无 
     expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('AI 翻译表格'), 'success');
   });
 });
+
+describe('v3.18.2 校对表真实性问题（类型表外值错显 / 类型建议阈值 / 型号重复预警 / 提示词唯一性）', () => {
+  it('render：类型不在 typeMeta 时补「表外」选中项——select 显示真值，不再错显第一个选项', () => {
+    aoi.catalog.addToDraft([{ jpName: 'アクリルブロック X', name: '阿罗拉', type: '未分类' }]);
+    aoi.catalog.render();
+    const sel = doc.querySelector('#catDraftTbody .cat-type');
+    expect(sel.value).toBe('未分类'); // 修复前：无该选项 → 显示第一个选项（如「卡套」），collectEdits 读回假值
+    expect(sel.selectedOptions[0].textContent).toContain('表外');
+  });
+
+  it('render：类型为空时显示「（未设置）」而不是第一个类型', () => {
+    aoi.catalog.addToDraft([{ jpName: 'XYZ アイテム', name: '某商品' }]); // 词典未命中 → 类型空
+    aoi.catalog.render();
+    const sel = doc.querySelector('#catDraftTbody .cat-type');
+    expect(sel.value).toBe('');
+  });
+
+  it('render：同「类型+中文名」多行显示型号重复预警（推入将合并）', () => {
+    aoi.catalog.addToDraft([
+      { jpName: 'ブロック A', name: '阿罗拉', type: '未分类' },
+      { jpName: 'クッキー B', name: '阿罗拉', type: '未分类' }
+    ]);
+    aoi.catalog.render();
+    expect(doc.querySelector('#catDraftTbody').textContent).toContain('型号重复');
+  });
+
+  it('enrichDraft：类型建议低于 typeShow(0.7) 不展示，≥0.7 才展示', async () => {
+    aoi.catalog.addToDraft([{ jpName: 'アクリルブロック X', name: '阿罗拉', type: '未分类' }]);
+    aoi.catalog.render();
+    aoi.typesafe.judgeAll = async () => [
+      { type: { type: 'choice', choice: '亚克力挂件', confidence: 0.5 } }
+    ];
+    await aoi.catalog.enrichDraft();
+    expect(aoi.catalog.draft[0].aiSuggest).toBeUndefined(); // 50% 噪声建议不再出现
+    aoi.typesafe.judgeAll = async () => [
+      { type: { type: 'choice', choice: '亚克力挂件', confidence: 0.75 } }
+    ];
+    await aoi.catalog.enrichDraft();
+    expect(aoi.catalog.draft[0].aiSuggest.type).toBe('亚克力挂件');
+  });
+
+  it('AI_PROMPT：含中文名唯一性硬约束与「未分类不要硬凑」', () => {
+    expect(aoi.catalog.AI_PROMPT).toContain('绝对不允许重复');
+    expect(aoi.catalog.AI_PROMPT).toContain('不要硬凑');
+  });
+});

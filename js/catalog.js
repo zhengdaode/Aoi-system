@@ -110,8 +110,9 @@ Aoi.catalog.AI_PROMPT = [
   '   - 宝可梦物种名一律用最常见的官方中文译名，例如：ピカチュウ→皮卡丘、リザードン→喷火龙、イーブイ→伊布、カビゴン→卡比兽、ミュウツー→超梦、ゼニガメ→杰尼龟、フシギダネ→妙蛙种子。',
   '   - 地区形态加前缀：アローラ→阿罗拉、ガラル→伽勒尔、ヒスイ→洗翠、パルデア→帕底亚。',
   '   - 品类词按下表翻译（与「类型」列保持一致）：ぬいぐるみ→毛绒玩偶、ぬいぐるみバッジ→毛绒徽章、バッジ→徽章、缶バッジ→铁质徽章、アクリルスタンド→亚克力立牌、アクリルキーホルダー→亚克力挂件、マスコット→挂件、クリアファイル→文件夹、クリアカード→透卡、ステッカー/シール→贴纸、フィギュア→手办、スイーツフィギュア→甜品手办、タペストリー→挂画、ポーチ→收纳包、トートバッグ→托特包、マグカップ→马克杯、ランダム→随机、セット→套装、限定→限定、ハロウィン→万圣节、クリスマス→圣诞节。',
-  '   - 中文名 = 物种/角色名 + 主题词（如万圣节、圣诞节、2025 等），品类词可以省略（品类已单独成列）；保持简短，不超过 12 个字；英文字母系列名（如 Pokémon accessory）保留原文。',
-  '3. 类型：从上面品类词表中选一个最贴切的中文类型名；确实没有合适的就填「未分类」。',
+'   - 中文名 = 物种/角色名 + 主题词（如万圣节、圣诞节、2025 等），品类词可以省略（品类已单独成列）；保持简短，不超过 12 个字；英文字母系列名（如 Pokémon accessory）保留原文。',
+'   - 中文名在整张表内绝对不允许重复：无物种/角色名的地区·主题系列商品，中文名 = 主题词 + 地区或图案特征 + 品类词，例如「Timeless Adventure 阿罗拉 亚克力块」——「阿罗拉」会在 A4文件夹/亚克力挂件/贴纸套装等多种品类上各出现一次，必须把品类词补进中文名以示区分。',
+'3. 类型：从上面品类词表中选一个最贴切的中文类型名；确实没有合适的就填「未分类」，不要硬凑。',
   '4. 日元价：只填数字，去掉「円」和千位逗号（如 385）。',
   '5. 限购：页面标注「お一人様○個」时填数字 ○，未标注留空。',
   '6. 発売日：形如「11月8日発売」照抄，没有就留空。',
@@ -533,6 +534,14 @@ Aoi.catalog.pushSelected = async function () {
   var activity = (newEl && newEl.value.trim()) || (selEl && selEl.value) || '';
   if (!activity) { Aoi.toast('请先选择或输入目标活动', 'warning'); return; }
   if (!sel.length) { Aoi.toast('请勾选要推入的商品', 'warning'); return; }
+  // v3.18.2：同「类型+中文名」多行预警——registerProduct 按 type+model 去重，重复行会静默合并成一件
+  var keyCount = {};
+  sel.forEach(function (x) {
+    var k = (x.type || '未分类') + '|' + (x.name || x.jpName || '');
+    keyCount[k] = (keyCount[k] || 0) + 1;
+  });
+  var dupKeys = Object.keys(keyCount).filter(function (k) { return keyCount[k] > 1; });
+  if (dupKeys.length) Aoi.toast('注意：有 ' + dupKeys.length + ' 组「类型+中文名」重复的勾选行，推入时它们会合并为一件商品', 'warning');
   // 新活动名直接建档（否则 activityMeta 成孤儿，活动管理里看不到）
   var dPre = Aoi.orders.ensure();
   if (dPre.activities.indexOf(activity) < 0) dPre.activities.push(activity);
@@ -625,9 +634,9 @@ Aoi.catalog.enrichDraft = async function () {
       }
     }
     if (needType) {
-      var tc = { '（保持未分类）': '没有合适的类型' };
+      var tc = { '（保持未分类）': '没有合适的类型，或拿不准' };
       typeKeys.forEach(function (t) { tc[t] = '系统已有商品类型'; });
-      q.type = { type: 'choice', instructions: '商品「' + it.jpName + '」应归入哪个商品类型（品类）？', criteria: tc };
+      q.type = { type: 'choice', instructions: '商品「' + it.jpName + '」应归入哪个商品类型（品类）？拿不准就选「（保持未分类）」，不要硬凑。', criteria: tc };
     }
     if (Object.keys(q).length) jobs.push({ it: it, state: { jpName: it.jpName, unmatched: it.unmatched || [], url: it.url || '' }, questions: q });
   });
@@ -640,7 +649,7 @@ Aoi.catalog.enrichDraft = async function () {
     if (a.cn && a.cn.type === 'choice' && a.cn.choice !== '（无匹配，保持现状）' && (a.cn.confidence == null || a.cn.confidence >= Aoi.typesafe.TH.show)) {
       sug.cn = a.cn.choice; sug.cnConf = a.cn.confidence;
     }
-    if (a.type && a.type.type === 'choice' && a.type.choice !== '（保持未分类）' && it.type !== a.type.choice && (a.type.confidence == null || a.type.confidence >= Aoi.typesafe.TH.show)) {
+    if (a.type && a.type.type === 'choice' && a.type.choice !== '（保持未分类）' && it.type !== a.type.choice && (a.type.confidence == null || a.type.confidence >= (Aoi.typesafe.TH.typeShow || Aoi.typesafe.TH.show))) {
       sug.type = a.type.choice; sug.typeConf = a.type.confidence;
     }
     if (sug.cn || sug.type) { it.aiSuggest = sug; Aoi.catalog.renderSuggest(it); shown++; }
@@ -829,6 +838,12 @@ Aoi.catalog.render = function () {
   var tbody = document.getElementById('catDraftTbody');
   if (!tbody) return;
   var d = Aoi.orders.ensure();
+  // v3.18.2：型号（类型+中文名）重复计数——供行内预警
+  var typeCounts = {};
+  Aoi.catalog.draft.forEach(function (x) {
+    var k = (x.type || '未分类') + '|' + (x.name || x.jpName || '');
+    typeCounts[k] = (typeCounts[k] || 0) + 1;
+  });
   tbody.innerHTML = Aoi.catalog.draft.map(function (it) {
     var unmatched = (it.unmatched || []).length
       ? '<div class="text-[11px] text-red-500 mt-0.5">未识别：' + Aoi.escapeHtml(it.unmatched.join(' / ')) + '</div>'
@@ -838,14 +853,26 @@ Aoi.catalog.render = function () {
         + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',true)">合并</button>'
         + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',false)">保留两行</button></div>'
       : '';
-    var typeOpts = Object.keys(d.typeMeta || {}).map(function (t) {
+    var typeKeys = Object.keys(d.typeMeta || {});
+    var typeOpts = typeKeys.map(function (t) {
       return '<option value="' + Aoi.escapeHtml(t) + '"' + (t === it.type ? ' selected' : '') + '>' + Aoi.escapeHtml(t) + '</option>';
     }).join('');
+    // v3.18.2：当前类型不在类型表时补「表外」选中项——否则 select 显示第一个选项（如「卡套」），
+    // 校对者看到假值、collectEdits 也会把假值读回草稿（真类型丢失）
+    if (it.type && typeKeys.indexOf(it.type) < 0) {
+      typeOpts += '<option value="' + Aoi.escapeHtml(it.type) + '" selected>' + Aoi.escapeHtml(it.type) + '（表外）</option>';
+    } else if (!it.type) {
+      typeOpts += '<option value="" selected>（未设置）</option>';
+    }
+    var modelKey = (it.type || '未分类') + '|' + (it.name || it.jpName || '');
+    var dupNote = typeCounts[modelKey] > 1
+      ? '<div class="text-[11px] text-amber-600 mt-0.5">型号重复（' + typeCounts[modelKey] + ' 行同类型同名，推入将合并）</div>'
+      : '';
     return '<tr data-id="' + it.id + '" class="border-b border-gray-100">'
       + '<td class="px-2 py-1 text-center"><input type="checkbox" class="cat-sel"' + (it.select ? ' checked' : '') + '></td>'
       + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
       + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + suspect + '</td>'
-      + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '">' + Aoi.catalog.aiSuggestHtml(it, 'cn') + '</td>'
+      + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '">' + dupNote + Aoi.catalog.aiSuggestHtml(it, 'cn') + '</td>'
       + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select>' + Aoi.catalog.aiSuggestHtml(it, 'type') + '</td>'
       + '<td class="px-2 py-1 text-right text-sm text-gray-500">' + (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() : '—') + '</td>'
       + '<td class="px-2 py-1"><input class="cat-price border border-gray-300 rounded px-2 py-1 text-sm w-16 text-right" value="' + (it.priceCny != null ? it.priceCny : '') + '" placeholder="选填"></td>'

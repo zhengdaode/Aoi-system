@@ -9,9 +9,9 @@ window.Aoi = window.Aoi || {};
 Aoi.typesafe = {
   KEY: 'aoi_typesafe',           // localStorage 开关（'off' 关闭；缺省开）
   MODEL: 'jev-latest',
-  // 置信度阈值：auto=自动应用（对齐合并），show=展示建议（低于不展示），col=列映射采纳。
-  // 上线前在万圣节 40 件真实目录基准集上校准（PLAN-TYPESAFE §5），此处为保守初值。
-  TH: { auto: 0.85, show: 0.5, col: 0.6 },
+  // 置信度阈值：auto=自动应用（对齐合并），show=展示译名建议，typeShow=展示类型建议（类型错选
+  // 比不选更烦，门槛更高），col=列映射采纳。上线前在真实目录基准集上校准（PLAN-TYPESAFE §5）。
+  TH: { auto: 0.85, show: 0.5, typeShow: 0.7, col: 0.6 },
   _cache: new Map(),             // 会话级缓存：JSON(model+state+questions) → answers
 
   enabled: function () {

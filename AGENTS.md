@@ -39,6 +39,7 @@
 **v3.17.0 国际计算批次化四项体验已实施完成（2026-09-18，见 CHANGELOG v3.17.0）**：①`Aoi.exportBaseName` 新增 `data-batch-from`（批次 ID→显示名，自定义名优先回落日期），国际计算「每人应付国际费」「分摊明细」导出图片/下载表格文件名加批次前缀（如 `8.23涩谷-每人应付国际费.png`），活动前缀优先；②每人应付国际费增列「货物件数」（`buyerRows.count`，紧邻国际金额，买家/发货核对）+ 分摊明细统计行「合计 N 件」；③团员端「我的国际费」增列「我的件数」（colspan 5→6）；④订单管理恢复 v1.8.0 勾选版「批量生成人民币价」（v3.15.0 D2 曾移除，与活动管理级并存：公式条临时调率、只动勾选外币单、0.5 圆整、可撤销）+ 新增「统计勾选」（`selectionStats`：物件总数量/本体总金额·人民币+外币原价分列/国际邮费 `o.intlFee`/整体总金额，统计条可收起，待生成件数提示不计入）；零 schema 改动；测试 449→464 全绿；
 **v3.17.1 每人应付国际费「购买内容」列宽自适应（2026-09-18，见 CHANGELOG v3.17.1）**：`Aoi.intl.render` 内容格挂 `intl-content-cell`，styles.css 规则 `max-width: min(28rem, 42vw)`（上限随页面宽度连续变化，桌面 ≥1067px 稳定 28rem）+ 自动换行（break-word/anywhere），≤640px 收窄 `min(18rem, 55vw)`；测试 464→465 全绿；
 **v3.17.2 每人应付国际费「购买内容」同商品合并（2026-09-19，见 CHANGELOG v3.17.2）**：用户实测同一买家两笔同商品订单显示「×1, ×1」两条未合并——`Aoi.intl.buyerRows` 购买内容聚合改按 `type|model` 键合并、件数累加（保持首次出现顺序），与分摊明细 `itemsForBatch` 口径对齐；金额/件数逐笔累加本就正确，纯显示修复，导出读渲染 DOM 自动跟随；测试 465→467 全绿；
+**v3.18.0 TypeSafe（Jev）语义判断集成第一期已实施完成（2026-09-23，见 [docs/PLAN-TYPESAFE.md](docs/PLAN-TYPESAFE.md) 与 CHANGELOG v3.18.0）**：①基建——typesafe-proxy Edge Function（`admin_verify_session` 鉴权/30 次每分钟限频/14s 超时，`TYPESAFE_API_KEY` 只存 function secrets）+ `js/typesafe.js` 客户端（judge/judgeAll 并发 ≤3、会话缓存、全故障静默 null 降级，阈值 TH auto/show/col）+ 设置页「AI 语义判断」总开关；②T1 PCO 目录词典未命中行「AI 建议[采纳]」（候选词典预筛，Choice 选译名/类型，行内定向注入不重绘）；③T2 AI 表语义对齐（精确匹配不中 → 问「哪一行同一款」，≥0.85 自动合并/中间带标黄人工，「日文原名一字不差」约束放开）+ 无表头列角色判断（失败回落固定列序）；三段式纪律：精确匹配优先→AI 增强→人工兜底，关闭/故障全站回落 v3.17.2 行为；零 schema 改动；测试 467→484 全绿；T3–T10（表格模板识别/商品主档对齐/购买人归一/快递归属/到货预选/bot 路由等）按 PLAN-TYPESAFE 版本切分后续实施；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
@@ -69,6 +70,7 @@
 |------|------|
 | `docs/ROADMAP.md` | **当前唯一有效路线图**：10 项问题 → v1.7.0–v2.0.0 任务分解 + P0 团员侧故障分析（基线已更新至 v3.3.0） |
 | `docs/PLAN-NEXT.md` | **下一轮计划（待批准）**：新功能（F1–F8）× 后端（B1–B7）双路线 + 版本切分 |
+| `docs/PLAN-TYPESAFE.md` | TypeSafe（Jev/System One）语义判断集成方案：代码级缺口摸底（G1–G11）→ 应用地图（T1–T10）+ 五条集成纪律 + 版本切分（**v3.18.0 已实施第一期**：基建+T1+T2） |
 | `docs/PLAN-F5-QQBOT-BIDIRECTIONAL.md` | F5 QQ 机器人双向（独立项目 [aoi-qqbot](https://github.com/zhengdaode/aoi-qqbot)）：**已实施（2026-09-09，M1–M7）**，部署动作待真机执行 |
 | `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
 | `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**主仓库侧已交付（2026-09-10，v3.8.0）**——粘贴导入+词典翻译+校对工作台+小程序模板导出；监控被 PCO 风控实测否决（自动化浏览器一律 Restricted access），载体待拍板 |

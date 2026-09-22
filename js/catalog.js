@@ -156,10 +156,9 @@ Aoi.catalog.AI_HEADER_KEYS = [
   ['url', /链接|URL|网址/]
 ];
 
-// 解析 ChatGPT 回复的表格（Markdown 管道表或 TSV）→ 目录条目数组。
-// 有表头按关键字映射列；无表头按固定顺序 [原名, 中文, 类型, 价格, 限购] 兜底。
-// 无法解析出任何行时返回 null（调用方回落富文本/纯文本解析）。
-Aoi.catalog.parseAi = function (text) {
+// 解析 ChatGPT 回复的表格 → 原始行 + 表头映射（v3.18.0 自 parseAi 拆出，供无表头时的
+// AI 列角色判断复用）。有表头按关键字映射列；无表头 map 为 null。
+Aoi.catalog.aiRows = function (text) {
   var rows = [];
   String(text == null ? '' : text).split(/\r?\n/).forEach(function (ln) {
     var s = ln.trim();
@@ -184,6 +183,11 @@ Aoi.catalog.parseAi = function (text) {
       }
     });
   }
+  return { rows: rows, map: map };
+};
+
+// 原始行 → 目录条目（map 为 null 时按固定顺序 [原名, 中文, 类型, 价格, 限购] 兜底）
+Aoi.catalog.aiItems = function (rows, map) {
   var items = [];
   rows.forEach(function (cells) {
     var g = function (field, fallbackIdx) {
@@ -206,6 +210,15 @@ Aoi.catalog.parseAi = function (text) {
     });
   });
   return items.length ? items : null;
+};
+
+// 解析 ChatGPT 回复的表格（Markdown 管道表或 TSV）→ 目录条目数组。
+// 有表头按关键字映射列；无表头按固定顺序兜底。
+// 无法解析出任何行时返回 null（调用方回落富文本/纯文本解析）。
+Aoi.catalog.parseAi = function (text) {
+  var p = Aoi.catalog.aiRows(text);
+  if (!p) return null;
+  return Aoi.catalog.aiItems(p.rows, p.map);
 };
 
 // ChatGPT 页面上直接复制渲染表格（剪贴板带 text/html <table>）→ 还原为管道行交给 parseAi。
@@ -365,7 +378,7 @@ Aoi.catalog.addToDraft = function (items) {
       else if (!existing.name && cn) existing.name = cn;
       if (hasType || !existing.type) existing.type = type;
     } else {
-      Aoi.catalog.draft.push({
+      var entry = {
         id: Aoi.genId(),
         url: it.url || '',
         jpName: it.jpName,
@@ -381,7 +394,12 @@ Aoi.catalog.addToDraft = function (items) {
         watched: true,
         select: true,
         firstSeenAt: new Date().toISOString()
-      });
+      };
+      // v3.18.0 T2：AI 行（或草稿里已有 AI 行时新粘的页面行）标记参与语义对齐——精确匹配
+      // 没合并、日文名可能一字之差，随后异步问 AI「哪一行是同一款」；合并走既有语义、低置信人工确认
+      if (it._ai) entry.aiFrom = true;
+      if (it._ai || Aoi.catalog.draft.some(function (x) { return x.aiFrom; })) entry.alignPending = true;
+      Aoi.catalog.draft.push(entry);
       added++;
     }
   });
@@ -404,23 +422,37 @@ Aoi.catalog.collectEdits = function () {
   });
 };
 
-Aoi.catalog.importPaste = function () {
+Aoi.catalog.importPaste = async function () {
   var box = document.getElementById('catPaste');
   if (!box || !box.value.trim()) { Aoi.toast('请先粘贴内容（整页复制后粘贴至此）', 'warning'); return; }
   var v = box.value;
   // v3.9.4/v3.9.5：ChatGPT 翻译表格优先（纯文本 Markdown/TSV → 渲染表格 HTML）；
-  // 否则回落富文本商品卡（带出商品图/链接/价格/限购）/ 纯文本「名称+价格円」
-  var ai = Aoi.catalog.parseAi(v);
+  // 否则回落富文本商品卡（带出商品图/链接/价格/限购）/ 纯文本「名称+价格円」。
+  // v3.18.0 T2：无表头表格先问 AI 列角色（关闭/失败/超时 → 固定列序兜底，与原行为一致；
+  // 带表头路径全程无 await，与既有同步行为一致）
+  var parsed = Aoi.catalog.aiRows(v);
+  var ai = null;
+  if (parsed && parsed.rows.length) {
+    var map = parsed.map;
+    if (!map) {
+      var m2 = await Aoi.catalog.aiColumnMap(parsed.rows);
+      if (m2 && m2.jp != null) map = m2;
+    }
+    ai = Aoi.catalog.aiItems(parsed.rows, map);
+  }
   if (!ai && /<\s*table\b/i.test(v)) ai = Aoi.catalog.parseAiHtml(v);
   var items = ai || (/<\s*(img|a|div|span|table|li)\b/i.test(v) ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v));
   if (!items.length) {
     Aoi.toast('未解析出商品（AI 翻译表格、「名称 + 价格円」行或商品卡结构均可）', 'error');
     return;
   }
+  if (ai) items.forEach(function (x) { x._ai = true; });
   var r = Aoi.catalog.addToDraft(items);
   box.value = '';
   Aoi.catalog.render();
   Aoi.toast((ai ? '已按 AI 翻译表格解析 ' : '解析 ') + items.length + ' 条：新增 ' + r.added + '，合并 ' + r.updated, 'success');
+  // v3.18.0：先语义对齐（可能合并删行）再出译名/类型建议——串行异步、不阻塞校对
+  Aoi.catalog.aiAlign().then(function () { return Aoi.catalog.enrichDraft(); });
 };
 
 // 粘贴事件：剪贴板带 text/html 时直接采用（保真图片/链接）；纯文本走默认插入 + 解析按钮
@@ -474,6 +506,260 @@ Aoi.catalog.pushSelected = async function () {
   if (ok && Aoi.orders.render) Aoi.orders.render();
 };
 
+// —— v3.18.0 TypeSafe 语义增强（docs/PLAN-TYPESAFE.md T1/T2）——
+// 三段式：词典/精确匹配优先 → AI 判断增强（只对失败行，批量并发 ≤3）→ 人工校对兜底。
+// AI 只产「建议 + 置信度」：译名/类型建议必须点「采纳」才生效；对齐合并高置信自动、
+// 中间带标黄人工确认。关闭开关 / proxy 不可用 / 超时 → 本节全部静默跳过，回落原行为。
+
+// 编辑距离（短串用途，O(mn) DP）
+Aoi.catalog._ed = function (a, b) {
+  var m = a.length, n = b.length;
+  if (!m || !n) return m + n;
+  var prev = [], cur = [];
+  for (var j = 0; j <= n; j++) prev[j] = j;
+  for (var i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (var j2 = 1; j2 <= n; j2++) {
+      cur[j2] = Math.min(prev[j2] + 1, cur[j2 - 1] + 1, prev[j2 - 1] + (a.charAt(i - 1) === b.charAt(j2 - 1) ? 0 : 1));
+    }
+    var t = prev; prev = cur; cur = t;
+  }
+  return prev[n];
+};
+
+// T1-G1：词典候选预筛（纯函数）——从词典/种名表找与未识别片段相近的词条
+// （归一化互为子串，或 ≤12 字符且编辑距离 ≤2），供 AI 在小候选集里「选」而非凭空生成
+Aoi.catalog.suggestCandidates = function (it) {
+  Aoi.catalog.initDict();
+  var frags = (it.unmatched || []).filter(Boolean);
+  if (!frags.length) return [];
+  var out = [], seen = {};
+  Aoi.catalog.matchers.forEach(function (m) {
+    if (seen[m.zh] || out.length >= 10) return;
+    var hit = frags.some(function (f) {
+      var a = Aoi.catalog.normalize(f), b = Aoi.catalog.normalize(m.jp);
+      if (!a || !b) return false;
+      if (a.indexOf(b) >= 0 || b.indexOf(a) >= 0) return true;
+      return Math.max(a.length, b.length) <= 12 && Aoi.catalog._ed(a, b) <= 2;
+    });
+    if (hit) { seen[m.zh] = true; out.push({ zh: m.zh, jp: m.jp }); }
+  });
+  return out;
+};
+
+// T1：给「词典未识别 / 类型未分类」的草稿行批量生成建议（不自动落库，采纳走人工点击）。
+// 定向注入 DOM（不整表重绘）——保护校对时其他行的在途编辑。
+Aoi.catalog.enrichDraft = async function () {
+  if (!Aoi.typesafe.available()) return;
+  var d = Aoi.orders.ensure();
+  var typeKeys = Object.keys(d.typeMeta || {});
+  var jobs = [];
+  Aoi.catalog.draft.forEach(function (it) {
+    if (it.aiSuggest && (it.aiSuggest.cn || it.aiSuggest.type)) return; // 已有建议不重复计费
+    var hasUn = (it.unmatched || []).length > 0;
+    var needType = !it.type || it.type === '未分类';
+    if (!hasUn && !needType) return;
+    var q = {};
+    if (hasUn) {
+      var cands = Aoi.catalog.suggestCandidates(it);
+      if (cands.length) {
+        var criteria = { '（无匹配，保持现状）': '所有候选都不对' };
+        cands.forEach(function (c) { criteria[c.zh] = '词典候选（日文：' + c.jp + '）'; });
+        q.cn = { type: 'choice', instructions: '商品「' + it.jpName + '」的未识别片段为 ' + JSON.stringify(it.unmatched) + '，请从候选中选出正确的中文译名（整体或补全该片段），都不对就选无匹配。', criteria: criteria };
+      }
+    }
+    if (needType) {
+      var tc = { '（保持未分类）': '没有合适的类型' };
+      typeKeys.forEach(function (t) { tc[t] = '系统已有商品类型'; });
+      q.type = { type: 'choice', instructions: '商品「' + it.jpName + '」应归入哪个商品类型（品类）？', criteria: tc };
+    }
+    if (Object.keys(q).length) jobs.push({ it: it, state: { jpName: it.jpName, unmatched: it.unmatched || [], url: it.url || '' }, questions: q });
+  });
+  if (!jobs.length) return;
+  var answers = await Aoi.typesafe.judgeAll(jobs);
+  var shown = 0;
+  answers.forEach(function (a, i) {
+    if (!a) return;
+    var it = jobs[i].it, sug = {};
+    if (a.cn && a.cn.type === 'choice' && a.cn.choice !== '（无匹配，保持现状）' && (a.cn.confidence == null || a.cn.confidence >= Aoi.typesafe.TH.show)) {
+      sug.cn = a.cn.choice; sug.cnConf = a.cn.confidence;
+    }
+    if (a.type && a.type.type === 'choice' && a.type.choice !== '（保持未分类）' && it.type !== a.type.choice && (a.type.confidence == null || a.type.confidence >= Aoi.typesafe.TH.show)) {
+      sug.type = a.type.choice; sug.typeConf = a.type.confidence;
+    }
+    if (sug.cn || sug.type) { it.aiSuggest = sug; Aoi.catalog.renderSuggest(it); shown++; }
+  });
+  if (shown) Aoi.toast('AI 给出 ' + shown + ' 条译名/类型建议（校对表绿色行，点「采纳」生效）', 'info');
+};
+
+// 建议行内标记（render 与 renderSuggest 共用同一 HTML，保证整表重绘后建议不丢）
+Aoi.catalog.aiSuggestHtml = function (it, field) {
+  var sug = it.aiSuggest;
+  if (!sug || !sug[field]) return '';
+  var conf = Math.round(((field === 'cn' ? sug.cnConf : sug.typeConf) || 0) * 100);
+  var val = field === 'cn' ? sug.cn : sug.type;
+  return '<div class="cat-ai text-[11px] text-emerald-700 mt-0.5">AI 建议：' + Aoi.escapeHtml(val) + '（' + conf + '%）'
+    + ' <button type="button" class="underline" onclick="Aoi.catalog.applyAiSuggest(\'' + it.id + '\',\'' + field + '\')">采纳</button></div>';
+};
+
+// 定向注入单行建议（enrichDraft 异步返回时避免整表重绘冲掉在途编辑）
+Aoi.catalog.renderSuggest = function (it) {
+  var tr = document.querySelector('#catDraftTbody tr[data-id="' + it.id + '"]');
+  if (!tr) return;
+  ['cn', 'type'].forEach(function (field) {
+    var el = tr.querySelector(field === 'cn' ? '.cat-cn' : '.cat-type');
+    if (!el) return;
+    var cell = el.parentElement;
+    var old = cell.querySelector('.cat-ai');
+    if (old) old.remove();
+    if (it.aiSuggest && it.aiSuggest[field]) cell.insertAdjacentHTML('beforeend', Aoi.catalog.aiSuggestHtml(it, field));
+  });
+};
+
+// 采纳建议：先 collectEdits 把全部在途编辑收回草稿，再改本行、整表重绘（无编辑丢失）
+Aoi.catalog.applyAiSuggest = function (id, field) {
+  var it = null;
+  for (var i = 0; i < Aoi.catalog.draft.length; i++) if (Aoi.catalog.draft[i].id === id) { it = Aoi.catalog.draft[i]; break; }
+  if (!it || !it.aiSuggest) return;
+  Aoi.catalog.collectEdits();
+  if (field === 'cn' && it.aiSuggest.cn) { it.name = it.aiSuggest.cn; it.unmatched = []; it.aiSuggest.cn = null; }
+  if (field === 'type' && it.aiSuggest.type) { it.type = it.aiSuggest.type; it.aiSuggest.type = null; }
+  if (!it.aiSuggest.cn && !it.aiSuggest.type) delete it.aiSuggest;
+  Aoi.catalog.render();
+};
+
+// T2-G3：语义对齐候选预筛（纯函数）——草稿中与该行日文名归一化后互为子串或
+// 编辑距离相近（≤30 字符且 ≤min(5, 长度30%)）的其他行
+Aoi.catalog.alignCandidates = function (entry, draft) {
+  var a = Aoi.catalog.normalize(entry.jpName).toLowerCase();
+  if (!a) return [];
+  var out = [];
+  (draft || []).forEach(function (x) {
+    if (x.id === entry.id || x.alignPending || out.length >= 5) return;
+    var b = Aoi.catalog.normalize(x.jpName).toLowerCase();
+    if (!b || a === b) return; // 完全相等早在 addToDraft 精确合并（防御）
+    if (a.indexOf(b) >= 0 || b.indexOf(a) >= 0) { out.push(x); return; }
+    if (Math.max(a.length, b.length) <= 30 && Aoi.catalog._ed(a, b) <= Math.min(5, Math.floor(Math.max(a.length, b.length) * 0.3))) out.push(x);
+  });
+  return out;
+};
+
+// 语义合并：与 addToDraft 精确合并分支同语义——补缺失字段、AI 中文名覆盖并清未识别高亮
+Aoi.catalog.mergeEntry = function (target, src) {
+  ['priceJpy', 'limit', 'image', 'saleDate'].forEach(function (f) {
+    if ((target[f] == null || target[f] === '') && src[f] != null && src[f] !== '') target[f] = src[f];
+  });
+  if (src.url && !target.url) target.url = src.url;
+  if (src.name) { target.name = src.name; target.unmatched = []; }
+  if (src.type || !target.type) target.type = src.type;
+  return target;
+};
+
+// T2：AI 表行 ↔ 已有草稿行语义对齐（只处理精确匹配不中而标记 alignPending 的行）。
+// AI 只答「哪一行是同一款」：≥TH.auto 自动合并（先 collectEdits 收回在途编辑），
+// TH.show~auto 标黄人工确认，更低/失败/关闭 → 两行都保留（原行为）。
+Aoi.catalog.aiAlign = async function () {
+  if (!Aoi.typesafe.available()) return;
+  var pend = Aoi.catalog.draft.filter(function (x) { return x.alignPending; });
+  if (!pend.length) return;
+  var merged = 0, suspect = 0;
+  for (var i = 0; i < pend.length; i++) {
+    var it = pend[i];
+    var cands = Aoi.catalog.alignCandidates(it, Aoi.catalog.draft);
+    delete it.alignPending;
+    if (!cands.length) continue;
+    var criteria = {};
+    cands.forEach(function (c, k) { criteria['#' + (k + 1)] = '已有行「' + c.jpName + '」' + (c.url ? '（有链接）' : '（无链接）'); });
+    criteria['都不是同一款'] = '以上都不是同一件商品';
+    var answers = await Aoi.typesafe.judge({
+      newRow: { jpName: it.jpName, name: it.name || '', url: it.url || '' },
+      existingRows: cands.map(function (c) { return { jpName: c.jpName, name: c.name || '', url: c.url || '', priceJpy: c.priceJpy == null ? '' : c.priceJpy }; })
+    }, {
+      same: {
+        type: 'choice',
+        instructions: '新粘贴行与已有哪一行是同一件商品？日文原名可能有一字之差、全半角/空格差异或序号增减；中文名/链接/价格可作参考。没有对应行就选「都不是同一款」。',
+        criteria: criteria
+      }
+    });
+    var a = answers && answers.same;
+    if (!a || a.type !== 'choice') continue;
+    var conf = a.confidence == null ? 1 : a.confidence;
+    var idx = /^#\d+$/.test(a.choice) ? parseInt(a.choice.slice(1), 10) - 1 : -1;
+    var target = cands[idx] || null;
+    if (!target) continue;
+    if (conf >= Aoi.typesafe.TH.auto) {
+      Aoi.catalog.collectEdits();
+      Aoi.catalog.mergeEntry(target, it);
+      Aoi.catalog.draft = Aoi.catalog.draft.filter(function (x) { return x.id !== it.id; });
+      merged++;
+    } else if (conf >= Aoi.typesafe.TH.show) {
+      it.aiSuspect = { id: target.id, jpName: target.jpName };
+      suspect++;
+    }
+  }
+  if (merged || suspect) {
+    Aoi.catalog.render();
+    Aoi.toast('AI 对齐：自动合并 ' + merged + ' 行' + (suspect ? '，另有 ' + suspect + ' 行疑似重复待确认（表内标黄）' : ''), 'success');
+  }
+};
+
+// 疑似重复的人工裁决（标黄行上的「合并 / 保留两行」）
+Aoi.catalog.resolveSuspect = function (id, merge) {
+  var it = null, target = null, i = 0;
+  for (i = 0; i < Aoi.catalog.draft.length; i++) if (Aoi.catalog.draft[i].id === id) { it = Aoi.catalog.draft[i]; break; }
+  if (!it || !it.aiSuspect) return;
+  for (i = 0; i < Aoi.catalog.draft.length; i++) if (Aoi.catalog.draft[i].id === it.aiSuspect.id) { target = Aoi.catalog.draft[i]; break; }
+  Aoi.catalog.collectEdits();
+  if (merge && target) {
+    Aoi.catalog.mergeEntry(target, it);
+    Aoi.catalog.draft = Aoi.catalog.draft.filter(function (x) { return x.id !== id; });
+    Aoi.toast('已合并到「' + target.jpName + '」', 'success');
+  } else {
+    delete it.aiSuspect;
+  }
+  Aoi.catalog.render();
+};
+
+// T2-G4：无表头表格列角色的 criteria 词典（choice 原语用）
+Aoi.catalog.COLUMN_ROLES = {
+  jp: '日文原名（对齐键，照抄页面日文商品名）', name: '中文译名', type: '类型（中文品类词）',
+  priceJpy: '日元价（纯数字）', limit: '限购数量（纯数字）', saleDate: '発売日（如 11月8日発売）',
+  image: '图片链接 URL', url: '商品链接 URL', ignore: '与商品无关的列'
+};
+
+// answers → 列映射（纯函数）：按置信度降序占用列防冲突；低于 TH.col / 认不出对齐键列 → null
+Aoi.catalog.aiColumnMapFromAnswers = function (answers) {
+  if (!answers) return null;
+  var ids = Object.keys(answers).filter(function (k) { return /^c\d+$/.test(k) && answers[k] && answers[k].type === 'choice'; });
+  ids.sort(function (x, y) { return (answers[y].confidence || 0) - (answers[x].confidence || 0); });
+  var map = {}, usedCol = {};
+  ids.forEach(function (qid) {
+    var a = answers[qid], col = parseInt(qid.slice(1), 10);
+    if (usedCol[col]) return;
+    if (a.confidence != null && a.confidence < Aoi.typesafe.TH.col) return;
+    var role = a.choice;
+    if (role === 'ignore' || !Aoi.catalog.COLUMN_ROLES[role] || map[role] != null) return;
+    map[role] = col;
+    usedCol[col] = true;
+  });
+  return map.jp != null ? map : null;
+};
+
+// 无表头时问 AI 每列的角色（关闭/失败/列数异常 → null，调用方固定列序兜底）
+Aoi.catalog.aiColumnMap = async function (rows) {
+  if (!Aoi.typesafe.available()) return null;
+  var n = (rows[0] || []).length;
+  if (n < 3 || n > 12) return null;
+  var criteria = {};
+  Object.keys(Aoi.catalog.COLUMN_ROLES).forEach(function (k) { criteria[k] = Aoi.catalog.COLUMN_ROLES[k]; });
+  var questions = {};
+  for (var i = 0; i < n; i++) {
+    questions['c' + i] = { type: 'choice', instructions: '这张无表头商品表格的第 ' + (i + 1) + ' 列是什么字段？按各列单元格样本内容判断。', criteria: criteria };
+  }
+  var answers = await Aoi.typesafe.judge({ sampleRows: rows.slice(0, 3) }, questions);
+  return Aoi.catalog.aiColumnMapFromAnswers(answers);
+};
+
 // —— 渲染 ——
 
 // 导航进入本页时的一次性全量渲染（index.html nav 项 onclick 调用）
@@ -491,15 +777,20 @@ Aoi.catalog.render = function () {
     var unmatched = (it.unmatched || []).length
       ? '<div class="text-[11px] text-red-500 mt-0.5">未识别：' + Aoi.escapeHtml(it.unmatched.join(' / ')) + '</div>'
       : '';
+    var suspect = it.aiSuspect
+      ? '<div class="text-[11px] text-amber-600 mt-0.5">疑似与「' + Aoi.escapeHtml(it.aiSuspect.jpName) + '」同一商品（AI 对齐）'
+        + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',true)">合并</button>'
+        + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',false)">保留两行</button></div>'
+      : '';
     var typeOpts = Object.keys(d.typeMeta || {}).map(function (t) {
       return '<option value="' + Aoi.escapeHtml(t) + '"' + (t === it.type ? ' selected' : '') + '>' + Aoi.escapeHtml(t) + '</option>';
     }).join('');
     return '<tr data-id="' + it.id + '" class="border-b border-gray-100">'
       + '<td class="px-2 py-1 text-center"><input type="checkbox" class="cat-sel"' + (it.select ? ' checked' : '') + '></td>'
       + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
-      + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + '</td>'
-      + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '"></td>'
-      + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select></td>'
+      + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + suspect + '</td>'
+      + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '">' + Aoi.catalog.aiSuggestHtml(it, 'cn') + '</td>'
+      + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select>' + Aoi.catalog.aiSuggestHtml(it, 'type') + '</td>'
       + '<td class="px-2 py-1 text-right text-sm text-gray-500">' + (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() : '—') + '</td>'
       + '<td class="px-2 py-1"><input class="cat-price border border-gray-300 rounded px-2 py-1 text-sm w-16 text-right" value="' + (it.priceCny != null ? it.priceCny : '') + '" placeholder="选填"></td>'
       + '<td class="px-2 py-1"><input class="cat-limit border border-gray-300 rounded px-2 py-1 text-sm w-12 text-right" value="' + Aoi.escapeHtml(it.limit) + '"></td>'

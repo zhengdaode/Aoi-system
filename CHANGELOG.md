@@ -1,5 +1,51 @@
 # Changelog
 
+## v3.18.0 (2026-09-23)
+
+> **TypeSafe（Jev/System One）语义判断集成 · 第一期**（[docs/PLAN-TYPESAFE.md](docs/PLAN-TYPESAFE.md)
+> 经批准实施：基建 + T1 词典未命中建议 + T2 AI 表对齐/无表头列角色）。三段式纪律：词典/精确匹配
+> 优先 → AI 判断增强（只对失败行，批量并发 ≤3）→ 人工校对兜底；AI 只产「建议 + 置信度」，落库
+> 永远经人工确认；关闭/超时/故障一律静默回落现状行为。零 schema 改动。
+
+### Added
+- **基建**：`supabase/functions/typesafe-proxy/`（Deno Edge Function——`admin_verify_session` 管理员
+  会话鉴权、每 token 30 次/分钟内存限频、body ≤64KB、上游 14s 超时、429/529 单次退避重试；
+  `TYPESAFE_API_KEY` 只存 function secrets，前端零密钥）；`js/typesafe.js`（`judge`/`judgeAll`
+  并发 ≤3、15s 超时、会话级缓存、全故障静默 null 降级；阈值 `TH: auto 0.85 / show 0.5 / col 0.6`
+  为保守初值，待万圣节 40 件真实目录基准集校准）；设置页新增「AI 语义判断（TypeSafe）」卡
+  （总开关，默认开，localStorage `aoi_typesafe`；auth.js 登录引导回填勾选态）。
+- **T1 词典未命中建议（PLAN G1/G2）**：`Aoi.catalog.enrichDraft`——粘贴解析后对「词典未识别 /
+  类型未分类」的行批量送判；候选由 `suggestCandidates` 从词典/种名表预筛（归一化互为子串或
+  ≤12 字符且编辑距离 ≤2，≤10 条），Choice 在小候选集里「选」译名/类型并带「无匹配」出口；
+  校对表行内绿色「AI 建议：xx（N%）[采纳]」，采纳 = `collectEdits` 后走既有编辑通道；
+  建议返回时定向注入 DOM 不整表重绘（保护其他行在途编辑；PLAN 中「按置信度重排全表」以此
+  行内标注替代）。ChatGPT 两步流程原样保留为最终兜底。
+- **T2 AI 表语义对齐（PLAN G3）**：`Aoi.catalog.aiAlign`——两步流程里精确匹配（url / jpName
+  一字不差）不中的 AI 行（`addToDraft` 标记 `alignPending`/`aiFrom`，双向覆盖「页面先/AI 后」与
+  「AI 先/页面后」），候选预筛 `alignCandidates`（归一化子串/编辑距离 ≤30%·≤5 条）后问
+  「哪一行是同一款」；≥TH.auto 自动合并（`mergeEntry` 与既有精确合并分支同语义：补缺失字段、
+  AI 中文名覆盖并清未识别），TH.show~auto 行内标黄「疑似与「xx」同一商品 [合并][保留两行]」
+  人工裁决，更低/失败/关闭 → 两行保留（原行为）。AI_PROMPT 里「日文原名一字不差」的硬约束
+  自此放开——ChatGPT 转述/复制走样不再产生重复行。
+- **T2 无表头列角色（PLAN G4）**：`parseAi` 拆为 `aiRows`+`aiItems`（parseAi 签名与行为不变）；
+  `importPaste` 改 async，遇无表头表格先问 AI 每列角色（`aiColumnMap`：样本单元格 →
+  jp/name/type/…/ignore 的 Choice，`aiColumnMapFromAnswers` 置信度降序占用列防冲突、<TH.col 跳过、
+  认不出对齐键列即弃用），失败回落固定列序（原行为）。带表头路径全程无 await，既有同步调用方
+  无感（既有 catalog 测试零改动通过）。
+
+### Tests
+- 467 → **484 例全绿**：新增 `tests/v3180-typesafe.test.js` 17 例（客户端 url/available 三态、
+  降级矩阵关开关/无会话/debug/非 2xx/网络异常、缓存与 fresh、judgeAll 顺序与失败位、
+  suggestCandidates 预筛、enrichDraft 送判范围/阈值/无匹配过滤/定向注入、applyAiSuggest、
+  mergeEntry 补缺失与覆盖语义、alignCandidates 预筛排除、aiAlign 高置信自动合并/中间带标黄+
+  人工裁决/无候选与判失败回落、aiColumnMapFromAnswers 冲突与阈值与无对齐键、aiRows·aiItems
+  双路径、importPaste 无表头映射生效 + 带表头同步行为不变）。
+
+### Deploy（待真机执行一次）
+- `node scripts/deploy-edge.js --secret TYPESAFE_API_KEY=<本地 .env 中的值>` 注入密钥后
+  `node scripts/deploy-edge.js typesafe-proxy supabase/functions/typesafe-proxy/index.ts` 部署；
+  前端在未部署/密钥未配时自动静默降级（功能等于 v3.17.2），不阻塞 Pages 发布。
+
 ## v3.17.2 (2026-09-19)
 
 > **每人应付国际费「购买内容」同商品合并**（用户实测：同一买家两笔同商品订单显示为

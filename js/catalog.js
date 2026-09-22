@@ -238,6 +238,55 @@ Aoi.catalog.parseAiHtml = function (html) {
   return lines.length ? Aoi.catalog.parseAi(lines.join('\n')) : null;
 };
 
+// ChatGPT 网页「复制」按钮产生的畸形 HTML（v3.18.1 用户实测）：整张 Markdown 表格被拆成
+// 单元格级 <p> 段——管道符与单元格各占一段、<br> 标记行边界、整份 HTML 没有 <table>，
+// 旧解析链把它当纯文本逐行切会识别失败。
+// 重组算法：按顺序累积 <p> 段文本，「全 |/- 组成的分隔段」定位表头（列数=表头段数-2），
+// 之后管道计数达到「列数+1」即断行（跨段边界精确切分，缺图等空单元格不串位）。
+// 返回 parseAi 可解析的管道行文本；形状不符返回 null（调用方回落原通道）。
+Aoi.catalog.parseAiCopyHtml = function (html) {
+  var s = String(html || '').replace(/<!--[\s\S]*?-->/g, '').replace(/<br\s*\/?>/gi, '\n');
+  if (!/<\s*p[\s>]/i.test(s) || s.indexOf('|') < 0) return null;
+  var pieces = [];
+  s.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, function (_, inner) {
+    inner.split('\n').forEach(function (x) {
+      var t = x.replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').trim();
+      if (t) pieces.push(t);
+    });
+    return '';
+  });
+  var sep = -1;
+  for (var i = 0; i < pieces.length; i++) {
+    if (/^[\s|\-]+$/.test(pieces[i]) && pieces[i].indexOf('--') >= 0) { sep = i; break; }
+  }
+  if (sep < 1) return null;
+  var headerText = pieces.slice(0, sep).join('');
+  var colCount = headerText.split('|').length - 2; // 去掉首尾边界空段
+  if (colCount < 3) return null;
+  var rows = [], acc = '', tally = 0, target = colCount + 1;
+  for (var j = sep + 1; j < pieces.length; j++) {
+    var p = pieces[j], mm = p.match(/\|/g), n = mm ? mm.length : 0;
+    if (tally + n < target) { acc += p; tally += n; continue; }
+    // 本段内跨越行边界：含到第 (target-tally) 个管道为止，余下管道留给下一行开头
+    var need = target - tally, seen = 0, pos = -1;
+    for (var k = 0; k < p.length; k++) {
+      if (p.charAt(k) === '|' && ++seen === need) { pos = k; break; }
+    }
+    if (pos >= 0) {
+      rows.push(acc + p.slice(0, pos + 1));
+      acc = p.slice(pos + 1);
+      var rm = acc.match(/\|/g);
+      tally = rm ? rm.length : 0;
+    } else {
+      rows.push(acc + p);
+      acc = ''; tally = 0;
+    }
+  }
+  if (acc.replace(/[\s|]/g, '')) rows.push(acc); // 残尾兜底（末行缺右边界）
+  if (!rows.length) return null;
+  return Aoi.catalog.parseAi([headerText].concat(rows).join('\n'));
+};
+
 // —— 解析 ——
 
 // 纯文本：逐行「名称　X,XXX円」（全选复制情报页/详情页文本的形态）
@@ -428,20 +477,27 @@ Aoi.catalog.importPaste = async function () {
   var v = box.value;
   // v3.9.4/v3.9.5：ChatGPT 翻译表格优先（纯文本 Markdown/TSV → 渲染表格 HTML）；
   // 否则回落富文本商品卡（带出商品图/链接/价格/限购）/ 纯文本「名称+价格円」。
-  // v3.18.0 T2：无表头表格先问 AI 列角色（关闭/失败/超时 → 固定列序兜底，与原行为一致；
-  // 带表头路径全程无 await，与既有同步行为一致）
-  var parsed = Aoi.catalog.aiRows(v);
+  // v3.18.0 T2：无表头纯文本表格先问 AI 列角色（关闭/失败/超时 → 固定列序兜底）。
+  // v3.18.1：HTML 粘贴走专门通道——ChatGPT「复制」按钮把表格拆成单元格级 <p>（无 <table>），
+  // parseAiCopyHtml 重组失败再回落 <table> 通道；html 源文本不再直接进 aiRows/parseAi
+  // （管道符会被当单元格切出垃圾行）。
+  var isHtml = /<\/?[a-z][^>]*>/i.test(v);
   var ai = null;
-  if (parsed && parsed.rows.length) {
-    var map = parsed.map;
-    if (!map) {
-      var m2 = await Aoi.catalog.aiColumnMap(parsed.rows);
-      if (m2 && m2.jp != null) map = m2;
+  if (isHtml) {
+    ai = Aoi.catalog.parseAiCopyHtml(v);
+    if (!ai && /<\s*table\b/i.test(v)) ai = Aoi.catalog.parseAiHtml(v);
+  } else {
+    var parsed = Aoi.catalog.aiRows(v);
+    if (parsed && parsed.rows.length) {
+      var map = parsed.map;
+      if (!map) {
+        var m2 = await Aoi.catalog.aiColumnMap(parsed.rows);
+        if (m2 && m2.jp != null) map = m2;
+      }
+      ai = Aoi.catalog.aiItems(parsed.rows, map);
     }
-    ai = Aoi.catalog.aiItems(parsed.rows, map);
   }
-  if (!ai && /<\s*table\b/i.test(v)) ai = Aoi.catalog.parseAiHtml(v);
-  var items = ai || (/<\s*(img|a|div|span|table|li)\b/i.test(v) ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v));
+  var items = ai || (isHtml ? Aoi.catalog.parseHtml(v) : Aoi.catalog.parseText(v));
   if (!items.length) {
     Aoi.toast('未解析出商品（AI 翻译表格、「名称 + 价格円」行或商品卡结构均可）', 'error');
     return;

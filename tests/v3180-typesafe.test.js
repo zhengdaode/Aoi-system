@@ -296,3 +296,60 @@ describe('catalog T2：语义对齐合并与列角色', () => {
     expect(doc.getElementById('catPaste').value).toBe('');
   });
 });
+
+describe('v3.18.1 ChatGPT「复制」按钮畸形 HTML（单元格级 <p>，无 <table>，2026-09-23 用户实测）', () => {
+  // 真实形态：管道符与单元格各占一个 <p>，<br> 标记行边界，链接列为 <a>文本</a>&nbsp;，
+  // 缺图/缺発売日为空单元格（| | |），末行可能缺右边界。
+  const GPT_COPY_HTML = '<html><body><!--StartFragment-->'
+    + '<p>|<br>日文原名</p><p>|</p><p>中文名</p><p>|</p><p>类型</p><p>|</p><p>日元价</p><p>|</p><p>限购</p><p>|</p><p>発売日</p><p>|</p><p>商品链接</p><p>|</p><p>图片链接</p>'
+    + '<p>|<br>| --- | --- | --- | --- | --- | --- | --- | --- |<br>|</p>'
+    + '<p>A4クリアファイル Pokémon Timeless Adventure アローラ</p><p>|</p><p>阿罗拉</p><p>|</p><p>文件夹</p><p>|</p><p>495</p><p>| | |</p>'
+    + '<p><a href="https://www.pokemoncenter-online.com/4521329437491.html">https://www.pokemoncenter-online.com/4521329437491.html</a>&nbsp;</p><p>|</p>'
+    + '<p><a href="https://www.pokemoncenter-online.com/a/img/item/4521329437491/M/x.jpg">https://www.pokemoncenter-online.com/a/img/item/4521329437491/M/x.jpg</a>&nbsp;</p><p>|<br>|</p>'
+    + '<p>アクリルキーホルダー Pokémon Timeless Adventure アローラ</p><p>|</p><p>阿罗拉</p><p>|</p><p>亚克力挂件</p><p>|</p><p>935</p><p>| | |</p>'
+    + '<p><a href="https://www.pokemoncenter-online.com/4521329437897.html">https://www.pokemoncenter-online.com/4521329437897.html</a>&nbsp;</p><p>| |<br>|</p>'
+    + '<p>うたうフィギュア プリン</p><p>|</p><p>胖丁</p><p>|</p><p>手办</p><p>|</p><p>6600</p><p>| | |</p>'
+    + '<p><a href="https://www.pokemoncenter-online.com/4521329438108.html">https://www.pokemoncenter-online.com/4521329438108.html</a>&nbsp;</p><p>| |</p>'
+    + '<!--EndFragment--></body></html>';
+
+  it('parseAiCopyHtml：按管道计数重组行，3 条全解析（含缺图行不串位、末行残尾兜底）', () => {
+    const items = aoi.catalog.parseAiCopyHtml(GPT_COPY_HTML);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({
+      jpName: 'A4クリアファイル Pokémon Timeless Adventure アローラ',
+      name: '阿罗拉', type: '文件夹', priceJpy: 495
+    });
+    expect(items[0].url).toBe('https://www.pokemoncenter-online.com/4521329437491.html');
+    expect(items[0].image).toContain('/a/img/item/4521329437491/M/');
+    expect(items[1]).toMatchObject({
+      jpName: 'アクリルキーホルダー Pokémon Timeless Adventure アローラ',
+      name: '阿罗拉', type: '亚克力挂件', priceJpy: 935
+    });
+    expect(items[1].url).toContain('4521329437897');
+    expect(items[1].image).toBe(''); // 缺图行的空单元格不把 URL 串到图片列
+    expect(items[2]).toMatchObject({
+      jpName: 'うたうフィギュア プリン', name: '胖丁', type: '手办', priceJpy: 6600
+    });
+    expect(items[2].url).toContain('4521329438108');
+    expect(items[2].image).toBe('');
+  });
+
+  it('形状不符回落 null（PCO 商品卡 / 粗体行 / 纯文本）', () => {
+    expect(aoi.catalog.parseAiCopyHtml('<ul><li class="product" data-pid="1"><div class="txt"><p class="txt">ぬいぐるみ</p></div></li></ul>')).toBeNull();
+    expect(aoi.catalog.parseAiCopyHtml('<td><b>ぬいぐるみ ピカチュウ</b> 3,960円</td>')).toBeNull();
+    expect(aoi.catalog.parseAiCopyHtml('ぬいぐるみ ピカチュウ 3,960円')).toBeNull();
+  });
+
+  it('importPaste：粘贴该 HTML 直接入草稿并标记 AI 行（aiFrom）', async () => {
+    doc.getElementById('catPaste').value = GPT_COPY_HTML;
+    await aoi.catalog.importPaste();
+    expect(aoi.catalog.draft).toHaveLength(3);
+    expect(aoi.catalog.draft[0]).toMatchObject({
+      jpName: 'A4クリアファイル Pokémon Timeless Adventure アローラ',
+      name: '阿罗拉', type: '文件夹', priceJpy: 495
+    });
+    expect(aoi.catalog.draft[0].url).toContain('4521329437491');
+    expect(aoi.catalog.draft[0].aiFrom).toBe(true);
+    expect(aoi.toast).toHaveBeenCalledWith(expect.stringContaining('AI 翻译表格'), 'success');
+  });
+});

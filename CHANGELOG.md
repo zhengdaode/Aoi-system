@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.18.1 (2026-09-23)
+
+> **ChatGPT「复制」按钮粘贴识别修复**（用户实测：ChatGPT 网页下方「复制」产出的富文本
+> 粘贴进 PCO 目录导入提示「无法识别」）。
+
+### Fixed
+- 根因：ChatGPT「复制」按钮的 text/html 把整张 Markdown 表格拆成**单元格级 `<p>` 段**——管道符
+  与单元格各占一段、行边界藏在 `<br>` 里、整份 HTML 没有 `<table>`；旧解析链把它当纯文本逐行切，
+  HTML 源码里的管道被当单元格切出垃圾或识别失败。
+- 修复：新增 `Aoi.catalog.parseAiCopyHtml`——按顺序累积 `<p>` 段文本，以「全 `|/-` 组成的分隔段」
+  定位表头（列数=表头段数-2），之后**管道计数达到「列数+1」即断行**（跨段边界精确切分，
+  缺图等空单元格不串位、末行缺右边界兜底），重组结果直接复用既有 `parseAi`（表头映射/类型匹配/
+  safeUrl 全链路一致）；形状不符返回 null 回落原通道（PCO 商品卡 / `<table>` / 纯文本均不受影响）。
+- `importPaste` 分支重构：HTML 粘贴走 `parseAiCopyHtml → parseAiHtml → parseHtml` 专门通道，
+  html 源文本不再误入纯文本行解析（`aiRows`）；纯文本路径行为不变（含 v3.18.0 无表头列角色判断）。
+
+### Tests
+- 484 → **487 例全绿**：`tests/v3180-typesafe.test.js` 增 3 例（真实形态重组 3 条全解析——
+  含缺图行不串位/末行残尾兜底；形状不符回落 null；importPaste 入草稿并标记 aiFrom）。
+
 ## v3.18.0 (2026-09-23)
 
 > **TypeSafe（Jev/System One）语义判断集成 · 第一期**（[docs/PLAN-TYPESAFE.md](docs/PLAN-TYPESAFE.md)

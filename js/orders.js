@@ -62,6 +62,7 @@ Aoi.orders.refillDatalists = function () {
 Aoi.orders.importFile = async function (file) {
   var buf = await file.arrayBuffer();
   var records = Aoi.import.parse(buf, file.name);
+  if (!records.length) records = await Aoi.import.parseSmart(buf, file.name); // v3.19.0 T3：AI 模板识别兜底
   if (!records.length) { Aoi.toast('未识别到订单数据', 'warning'); return; }
   Aoi.orders.openImportModal(records);
 };
@@ -76,6 +77,7 @@ Aoi.orders.importFromUrl = async function () {
   var records;
   try { records = Aoi.import.parse(got.buffer, got.fileName); }
   catch (e) { Aoi.toast('表格解析失败，请确认链接指向的是排谷表/汇总表文件', 'error'); return; }
+  if (!records.length) records = await Aoi.import.parseSmart(got.buffer, got.fileName); // v3.19.0 T3
   if (!records.length) { Aoi.toast('未识别到订单数据', 'warning'); return; }
   Aoi.orders.openImportModal(records);
 };
@@ -103,21 +105,19 @@ Aoi.orders.confirmImport = async function () {
   var cb = document.getElementById('importAutoRegister');
   if (cb && !cb.checked) autoReg = false;
   var d = Aoi.orders.ensure();
+  // v3.19.0 T4/T5：主档语义对齐 + 购买人归一（TypeSafe 关闭/不可用时静默跳过，行为同 v3.18.x）。
+  // 高置信自动应用；中间带（0.5~0.85）进人工点选弹窗；任何失败回落原行为。
+  var reviewItems = [];
+  await Aoi.orders.alignImportProducts(records, reviewItems);
+  await Aoi.orders.normalizeImportBuyers(records, reviewItems);
+  if (reviewItems.length) await Aoi.orders.reviewModal(reviewItems);
   var filled = 0, registered = 0;
   for (var i = 0; i < records.length; i++) {
     var r = records[i];
     var p = Aoi.orders.productFillFor(r.activity, r.model);
     if (p) {
-      var touched = false;
-      if ((!r.type || r.type === '默认类型') && p.type) { r.type = p.type; touched = true; }
-      if ((r.price == null || r.price === 0) && p.price != null) { r.price = p.price; touched = true; }
-      if (r.priceOrig == null && p.priceOrig != null) {
-        r.priceOrig = p.priceOrig;
-        r.currency = p.currency || 'jpy';
-        touched = true;
-      }
-      if (touched) filled++;
-    } else if (autoReg && r.activity && r.model && r.type) {
+      if (Aoi.orders.fillFromProduct(r, p)) filled++;
+    } else if (autoReg && !r._aiAligned && r.activity && r.model && r.type) {
       // 直接登记骨架（不走 registerProduct：避免逐条 toast/逐条整包保存，导入末尾统一落库一次）
       var actName = r.activity;
       if (!d.activityMeta[actName]) d.activityMeta[actName] = {};
@@ -142,9 +142,14 @@ Aoi.orders.confirmImport = async function () {
   Aoi.import.pending = [];
   Aoi.orders.render();
   Aoi.orders.refillDatalists();
+  // v3.19.0：语义对齐/购买人归一计数进 toast（_aiAligned=语义匹配命中，buyerRaw=归一前原值留档）
+  var aligned = records.filter(function (r) { return r._aiAligned; }).length;
+  var buyerMerged = records.filter(function (r) { return r.buyerRaw; }).length;
   Aoi.toast('导入 ' + records.length + ' 条订单'
     + (filled ? '，按商品主档回填 ' + filled + ' 条' : '')
-    + (registered ? '，新登记 ' + registered + ' 个商品' : ''), 'success');
+    + (registered ? '，新登记 ' + registered + ' 个商品' : '')
+    + (aligned ? '，语义对齐 ' + aligned + ' 条' : '')
+    + (buyerMerged ? '，购买人归一 ' + buyerMerged + ' 条' : ''), 'success');
 };
 
 Aoi.orders.cancelImport = function () {
@@ -246,6 +251,276 @@ Aoi.orders.productFillFor = function (activity, model) {
   return null;
 };
 
+// —— v3.19.0 TypeSafe 语义增强（docs/PLAN-TYPESAFE.md T4/T5）——
+// 三段式：精确匹配优先 → AI 判断增强（仅对未命中的少数项，批量并发 ≤3）→ 人工兜底。
+// 高置信自动应用、中间带人工点选、低置信/失败/关闭 → 原行为；语义命中只回填缺失字段，
+// 永不覆盖已有人工值；购买人归一原名一律留档 buyerRaw 可追溯。
+
+// 名称归一：小写、去空白与常见装饰符（全半角/空格/表情/丶等差异抹平）
+Aoi.orders.normName = function (s) {
+  return String(s == null ? '' : s)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[・丶･。．~～*＊☆★♡♥❤✧@＠_＿\-—－—]/g, '');
+};
+
+// 按主档商品回填订单缺失字段（与精确命中分支同语义：已有值不覆盖）
+Aoi.orders.fillFromProduct = function (r, p) {
+  if (!p) return false;
+  var touched = false;
+  if ((!r.type || r.type === '默认类型') && p.type) { r.type = p.type; touched = true; }
+  if ((r.price == null || r.price === 0) && p.price != null) { r.price = p.price; touched = true; }
+  if (r.priceOrig == null && p.priceOrig != null) {
+    r.priceOrig = p.priceOrig;
+    r.currency = p.currency || 'jpy';
+    touched = true;
+  }
+  return touched;
+};
+
+// T4-G6：主档候选预筛（纯函数）——活动主档内与该型号归一化后互为子串或编辑距离相近者（≤8）
+Aoi.orders.productCandidates = function (activity, model) {
+  var d = Aoi.orders.ensure();
+  var meta = activity ? (d.activityMeta || {})[activity] : null;
+  var ps = (meta && meta.products) || [];
+  var a = Aoi.orders.normName(model);
+  if (!a) return [];
+  var out = [];
+  ps.forEach(function (p) {
+    if (out.length >= 8) return;
+    var hit = [Aoi.orders.normName(p.model), Aoi.orders.normName(p.nameOrig)].some(function (b) {
+      if (!b || b === a) return false; // 精确相等早在 productFillFor 命中（防御）
+      if (b.indexOf(a) >= 0 || a.indexOf(b) >= 0) return true;
+      return Math.max(a.length, b.length) <= 40 && Aoi.catalog._ed(a, b) <= Math.min(6, Math.floor(Math.max(a.length, b.length) * 0.3));
+    });
+    if (hit) out.push(p);
+  });
+  return out;
+};
+
+// T5-G7：购买人候选池（memberMeta 圈名 ∪ 历史买家）
+Aoi.orders.buyerPool = function (d) {
+  var set = {};
+  Object.keys(d.memberMeta || {}).forEach(function (k) { if (k) set[k] = 1; });
+  (d.orders || []).forEach(function (o) { if (o.buyer) set[o.buyer] = 1; });
+  return Object.keys(set);
+};
+
+// T5-G7：购买人候选预筛（纯函数）——归一化相等/互为子串/首字相同且编辑距离 ≤2（≤8）。
+// 命名注意：v3.7.0 S3 已有 buyerCandidates(d)（录入页 datalist 的以往购买人候选），本函数语义不同，改名避让。
+Aoi.orders.aiBuyerCandidates = function (pool, buyer) {
+  var a = Aoi.orders.normName(buyer);
+  if (!a) return [];
+  var out = [];
+  pool.forEach(function (name) {
+    if (out.length >= 8) return;
+    if (name === buyer) return; // 精确相等无需归一
+    var b = Aoi.orders.normName(name);
+    if (!b) return;
+    if (b === a) { out.push(name); return; }
+    if (b.indexOf(a) >= 0 || a.indexOf(b) >= 0) { out.push(name); return; }
+    if (a.charAt(0) === b.charAt(0) && Aoi.catalog._ed(a, b) <= 2) out.push(name);
+  });
+  return out;
+};
+
+// choice 判定结果的统一决策（纯函数）：#k 候选 → 高置信 auto / 中间带 review / 低置信 none；
+// 「都不是」类出口或解析失败 → none
+Aoi.orders.decideChoice = function (ans, thAuto, thShow) {
+  if (!ans || ans.type !== 'choice') return { action: 'none', idx: -1 };
+  var conf = ans.confidence == null ? 1 : ans.confidence;
+  var idx = /^#\d+$/.test(ans.choice) ? parseInt(ans.choice.slice(1), 10) - 1 : -1;
+  if (idx < 0) return { action: 'none', idx: -1 };
+  if (conf >= thAuto) return { action: 'auto', idx: idx };
+  if (conf >= thShow) return { action: 'review', idx: idx };
+  return { action: 'none', idx: idx };
+};
+
+// 购买人判断的统一问题（同一段 instructions 复用在导入与手动录入两条链路）
+Aoi.orders.buyerQuestion = function (buyer, criteria) {
+  return {
+    type: 'choice',
+    instructions: '团购表里写的购买人「' + buyer + '」和哪个现有购买人是同一个人？（昵称变体：多字少字、空格、表情符号、大小写、圈名与全名混用）都不是就是新购买人。',
+    criteria: criteria
+  };
+};
+
+// 通用人工点选弹窗（T4/T5 中间带）：items = [{ text, options:[{label,value}], apply(value) }]，
+// 点击选项记值高亮，「完成」/点遮罩关闭时逐项回调 apply。任何一项未点 = 不应用（保留原样）。
+Aoi.orders.reviewModal = function (items) {
+  return new Promise(function (resolve) {
+    var wrap = document.createElement('div');
+    wrap.className = 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4';
+    var body = items.map(function (it, k) {
+      return '<div class="border border-gray-200 rounded p-3 mb-3" data-item="' + k + '">'
+        + '<div class="text-sm mb-2">' + Aoi.escapeHtml(it.text) + '</div>'
+        + '<div class="flex flex-wrap gap-2">'
+        + it.options.map(function (o) {
+          return '<button type="button" class="rv-opt px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50" data-v="' + Aoi.escapeHtml(o.value) + '">' + Aoi.escapeHtml(o.label) + '</button>';
+        }).join('')
+        + '</div></div>';
+    }).join('');
+    wrap.innerHTML = '<div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">'
+      + '<h3 class="font-bold mb-3">导入确认——请逐项点选（不选 = 保留原样）</h3>' + body
+      + '<div class="flex justify-end mt-2"><button type="button" id="rvDone" class="px-5 py-2 btn-primary text-sm font-bold rounded">完成</button></div></div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.rv-opt') : null;
+      if (btn) {
+        var holder = btn.closest('[data-item]');
+        items[+holder.getAttribute('data-item')].value = btn.getAttribute('data-v');
+        holder.querySelectorAll('.rv-opt').forEach(function (b) { b.classList.remove('border-gray-800', 'bg-gray-100'); });
+        btn.classList.add('border-gray-800', 'bg-gray-100');
+        return;
+      }
+      if (e.target.id === 'rvDone' || e.target === wrap) {
+        wrap.remove();
+        items.forEach(function (it) { if (it.value && it.apply) it.apply(it.value); });
+        resolve(items);
+      }
+    });
+  });
+};
+
+// T4：导入订单的型号语义对齐（仅精确匹配未命中、且有候选的组送判）。
+// ≥auto 自动按主档回填并标 _aiAligned（抑制重复登记骨架）；中间带进 reviewItems 人工点选。
+Aoi.orders.alignImportProducts = async function (records, reviewItems) {
+  if (!Aoi.typesafe.available()) return;
+  var groups = {};
+  records.forEach(function (r) {
+    if (!r.model || !r.activity) return;
+    if (Aoi.orders.productFillFor(r.activity, r.model)) return;
+    var k = r.activity + '|' + r.model;
+    if (!groups[k]) groups[k] = { activity: r.activity, model: r.model, recs: [], candidates: Aoi.orders.productCandidates(r.activity, r.model) };
+    groups[k].recs.push(r);
+  });
+  var jobs = [];
+  Object.keys(groups).forEach(function (k) {
+    var g = groups[k];
+    if (!g.candidates.length) return;
+    var criteria = { '都不是已有商品': '没有同款，作为新商品登记骨架' };
+    g.candidates.forEach(function (p, i2) {
+      criteria['#' + (i2 + 1)] = '已有主档：' + p.model + (p.nameOrig ? '（原名 ' + p.nameOrig + '）' : '') + (p.type ? '，类型 ' + p.type : '');
+    });
+    jobs.push({
+      g: g,
+      state: { activity: g.activity, model: g.model, candidates: g.candidates.map(function (p) { return { model: p.model, nameOrig: p.nameOrig || '', type: p.type || '' }; }) },
+      questions: {
+        same: {
+          type: 'choice',
+          instructions: '导入表格里的型号与哪个已有商品主档是同一款商品？写法可能略有出入（全半角、空格、别名、多后缀）。都不是就选「都不是已有商品」。',
+          criteria: criteria
+        }
+      }
+    });
+  });
+  if (!jobs.length) return;
+  var answers = await Aoi.typesafe.judgeAll(jobs);
+  answers.forEach(function (a, i) {
+    var d2 = Aoi.orders.decideChoice(a && a.same, Aoi.typesafe.TH.auto, Aoi.typesafe.TH.show);
+    var g = jobs[i].g;
+    if (d2.action === 'auto') {
+      g.recs.forEach(function (r) {
+        Aoi.orders.fillFromProduct(r, g.candidates[d2.idx]);
+        r._aiAligned = g.candidates[d2.idx].model;
+      });
+    } else if (d2.action === 'review') {
+      var target = g.candidates[d2.idx];
+      reviewItems.push({
+        text: '型号「' + g.model + '」（' + g.recs.length + ' 条订单）疑似同款：',
+        options: g.candidates.map(function (p, k) { return { label: '对齐到「' + p.model + '」', value: '#' + (k + 1) }; })
+          .concat([{ label: '都不是，作为新商品', value: 'new' }]),
+        apply: function (v) {
+          if (v && v.charAt(0) === '#') {
+            var p2 = g.candidates[parseInt(v.slice(1), 10) - 1];
+            g.recs.forEach(function (r) {
+              Aoi.orders.fillFromProduct(r, p2);
+              r._aiAligned = p2.model;
+            });
+          }
+        }
+      });
+    }
+  });
+};
+
+// 购买人归一的落库动作：改为 canonical 名，原值留档 buyerRaw
+Aoi.orders.applyBuyerMerge = function (recs, canonical) {
+  recs.forEach(function (r) {
+    if (r.buyer !== canonical) {
+      r.buyerRaw = r.buyer;
+      r.buyer = canonical;
+    }
+  });
+};
+
+// T5：导入订单的购买人归一（仅池外买家、且有候选的组送判；高置信自动、中间带人工）
+Aoi.orders.normalizeImportBuyers = async function (records, reviewItems) {
+  if (!Aoi.typesafe.available()) return;
+  var pool = Aoi.orders.buyerPool(Aoi.orders.ensure());
+  var groups = {};
+  records.forEach(function (r) {
+    if (!r.buyer || pool.indexOf(r.buyer) >= 0) return;
+    var g = groups[r.buyer] || (groups[r.buyer] = { buyer: r.buyer, recs: [], candidates: Aoi.orders.aiBuyerCandidates(pool, r.buyer) });
+    g.recs.push(r);
+  });
+  var jobs = [];
+  Object.keys(groups).forEach(function (k) {
+    var g = groups[k];
+    if (!g.candidates.length) return;
+    var criteria = { '新购买人': '现有购买人里没有这个人，保留原名' };
+    g.candidates.forEach(function (name, i2) { criteria['#' + (i2 + 1)] = '现有购买人「' + name + '」'; });
+    jobs.push({ g: g, state: { buyer: g.buyer, candidates: g.candidates }, questions: { person: Aoi.orders.buyerQuestion(g.buyer, criteria) } });
+  });
+  if (!jobs.length) return;
+  var answers = await Aoi.typesafe.judgeAll(jobs);
+  answers.forEach(function (a, i) {
+    var d2 = Aoi.orders.decideChoice(a && a.person, Aoi.typesafe.TH.auto, Aoi.typesafe.TH.show);
+    var g = jobs[i].g;
+    if (d2.action === 'auto') {
+      Aoi.orders.applyBuyerMerge(g.recs, g.candidates[d2.idx]);
+    } else if (d2.action === 'review') {
+      var canonical = g.candidates[d2.idx];
+      reviewItems.push({
+        text: '购买人「' + g.buyer + '」（' + g.recs.length + ' 条）疑似同一人：',
+        options: g.candidates.map(function (name, k) { return { label: '同一人，归一为「' + name + '」', value: '#' + (k + 1) }; })
+          .concat([{ label: '保留原样', value: 'keep' }]),
+        apply: function (v) {
+          if (v && v.charAt(0) === '#') Aoi.orders.applyBuyerMerge(g.recs, g.candidates[parseInt(v.slice(1), 10) - 1]);
+        }
+      });
+    }
+  });
+};
+
+// 手动录入的静默归一（v3.19.0 T5）：仅高置信自动合并；中间带/低置信保留原样，不打断录入
+Aoi.orders.normalizeBuyersSilent = async function (buyers) {
+  var uniq = [];
+  buyers.forEach(function (b) { if (uniq.indexOf(b) < 0) uniq.push(b); });
+  var out = uniq.map(function (b) { return { buyer: b, buyerRaw: '' }; });
+  if (!Aoi.typesafe.available()) return out;
+  var pool = Aoi.orders.buyerPool(Aoi.orders.ensure());
+  var jobs = [];
+  out.forEach(function (o) {
+    if (pool.indexOf(o.buyer) >= 0) return;
+    var cands = Aoi.orders.aiBuyerCandidates(pool, o.buyer);
+    if (!cands.length) return;
+    var criteria = { '新购买人': '现有购买人里没有这个人，保留原名' };
+    cands.forEach(function (name, i2) { criteria['#' + (i2 + 1)] = '现有购买人「' + name + '」'; });
+    jobs.push({ o: o, cands: cands, state: { buyer: o.buyer, candidates: cands }, questions: { person: Aoi.orders.buyerQuestion(o.buyer, criteria) } });
+  });
+  if (!jobs.length) return out;
+  var answers = await Aoi.typesafe.judgeAll(jobs);
+  answers.forEach(function (a, i) {
+    var d2 = Aoi.orders.decideChoice(a && a.person, Aoi.typesafe.TH.auto, Aoi.typesafe.TH.show);
+    if (d2.action === 'auto') {
+      jobs[i].o.buyerRaw = jobs[i].o.buyer;
+      jobs[i].o.buyer = jobs[i].cands[d2.idx];
+    }
+  });
+  return out;
+};
+
 // 型号输入变化：命中主档商品 → 一次性回填（类型/币种/单价），手改不覆盖
 // 外币商品按主档币种走对应录入形态：主档已有人民币价 → 计算器模式同时带出；
 // 只有外币原价 → 直接输入模式（人民币价留待活动管理统一生成，与 v3.15.0 价格策略一致）
@@ -297,11 +572,18 @@ Aoi.orders.addManual = async function () {
   var prices = Aoi.orders.parseEntryOrder(currency, mode, priceForeign, priceRmb);
 
   var d = Aoi.orders.ensure();
-  buyers.forEach(function (buyer) {
+  // v3.19.0 T5：手动录入购买人静默归一（仅高置信自动合并，原名留档 buyerRaw；
+  // 中间带/低置信保留原样，不打断录入流程）
+  var buyerObjs = await Aoi.orders.normalizeBuyersSilent(buyers);
+  var buyerMerged = buyerObjs.filter(function (b) { return b.buyerRaw; }).length;
+  if (buyerMerged) {
+    Aoi.toast('购买人已按历史记录归一 ' + buyerMerged + ' 人（原名留档可追溯）', 'info');
+  }
+  buyerObjs.forEach(function (b) {
     d.orders.push({
       id: Aoi.genId(), ip: ip, activity: activity, type: type, model: model,
       price: prices.price, priceOrig: prices.priceOrig, currency: currency,
-      count: count, buyer: buyer, remark: '',
+      count: count, buyer: b.buyer, buyerRaw: b.buyerRaw || undefined, remark: '',
       status: '未到货', batchId: null
     });
   });

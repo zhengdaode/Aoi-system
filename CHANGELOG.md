@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.19.0 (2026-09-23)
+
+> **TypeSafe 导入链路三连（PLAN-TYPESAFE.md T3/T4/T5）**：表格模板识别 + 商品主档语义对齐 +
+> 购买人归一。三段式纪律不变：精确匹配优先 → AI 增强（仅对未命中的少数项，批量并发 ≤3）→
+> 人工兜底；高置信自动、中间带人工点选、低置信/失败/关闭一律回落现状。零 schema 改动
+> （新增 blob 内字段 `o.buyerRaw`/`o._aiAligned`）。
+
+### Added
+- **T3 表格模板识别（G5）**：`parseMatrix`/`parseRecords` 增可选第三参 `hints`（AI 给的行列号，
+  优先于关键字定位，不传行为不变）；新增 `Aoi.import.aiMapSheet`——双解析器都失败的 sheet 问
+  TypeSafe 两轮（①布局 choice：矩阵式/记录式/都不是 → ②行列角色：单价行/分类行/买家列/表头行/
+  购买者列/型号列/单价列/数量列），采样前 10 行×10 列、单元格 16 字，每个判断置信度 <0.6 即放弃；
+  `Aoi.import.parseSmart` 仅对失败的 sheet 送判（上限 2 个），重解析仍失败回落「未识别到订单数据」。
+  `importFile`/`importFromUrl` 零命中时先走 parseSmart。改名避让：购买人候选预筛定名
+  `aiBuyerCandidates`（v3.7.0 S3 已有同名单参函数 `buyerCandidates(d)`，勿混用）。
+- **T4 商品主档语义对齐（G6）**：`confirmImport` 对主档精确匹配未命中的型号，`productCandidates`
+  预筛（归一化子串/编辑距离 ≤30%，≤8 条）后 Choice「哪个是同款 ∪ 都不是已有商品」；≥0.85 自动按
+  主档回填缺失字段（抽取 `fillFromProduct` 与精确命中分支同语义：只补缺不覆盖）并标 `_aiAligned`
+  ——**抑制重复登记骨架**；0.5~0.85 进人工点选弹窗（`reviewModal`：逐项点选、不选=保留原样）。
+- **T5 购买人归一（G7）**：`buyerPool`（memberMeta 圈名 ∪ 历史买家）+ `aiBuyerCandidates`
+  （归一化相等/互为子串/首字相同且编辑距离 ≤2，≤8 条）→ Choice「哪位是同一人 ∪ 新购买人」；
+  ≥0.85 自动归一（`buyer` 改写、原名留档 `buyerRaw` 追溯）；0.5~0.85 进 reviewModal
+  （「同一人，归一为「xx」/保留原样」）；手动录入走 `normalizeBuyersSilent`（仅高置信自动，
+  不打断录入）。导入 toast 增「语义对齐 N 条 / 购买人归一 N 条」计数。
+
+### Tests
+- 495 → **509 例全绿**：新增 `tests/v3190-import-ai.test.js` 14 例（T3：hints 双路径/aiMapSheet
+  两轮与置信门槛/parseSmart 集成；T4：候选预筛/decideChoice 决策矩阵/fillFromProduct 语义/
+  confirmImport 对齐不重复登记；T5：候选/池/归一留档/静默归一/reviewModal 不选=保留原样）。
+
 ## v3.18.3 (2026-09-23)
 
 > **PCO 列表页竖排纯文本解析**（用户实测：整页复制 PCO 商品列表页的纯文本粘贴无法识别——

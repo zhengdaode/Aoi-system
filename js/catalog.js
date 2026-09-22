@@ -302,7 +302,35 @@ Aoi.catalog.parseText = function (text) {
     if (!name) return;
     items.push({ jpName: name, priceJpy: parseInt(m[2].replace(/,/g, ''), 10) });
   });
+  // v3.18.3：PCO 列表页整页复制是「竖排」形态——品名行（重复两次）、价格与「円」各占一行，
+  // 横排正则一条都匹配不上时按竖排策略兜底
+  if (!items.length) items = Aoi.catalog.parseTextVertical(text);
   Aoi.catalog.attachSaleDate(items, text);
+  return items;
+};
+
+// 竖排兜底（v3.18.3 用户实测 PCO 列表页纯文本）：
+//   A4クリアファイル …\n A4クリアファイル …\n 495\n 円 [\n 品切れ]
+// 遇「纯数字行 + 円行」回溯最近的非噪声行作品名（菜单/NEW/ポケモンセンターオリジナル等跳过，
+// 品名自身在页面上重复两次、取最后一次即可）；紧随的「品切れ」记入 status（校对表红字提示，
+// 排单前避开售罄款）。
+Aoi.catalog.parseTextVertical = function (text) {
+  var lines = String(text == null ? '' : text).split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var isNoise = function (s) {
+    return /^[\d,]+$/.test(s) || s === '円' || s === '品切れ' || s === 'NEW' ||
+      s === 'ポケモンセンターオリジナル' || /^[¥￥￥\s]+$/.test(s);
+  };
+  var items = [];
+  for (var i = 0; i < lines.length - 1; i++) {
+    if (!/^[\d,]{1,9}$/.test(lines[i]) || lines[i + 1].indexOf('円') !== 0) continue;
+    var j = i - 1;
+    while (j >= 0 && isNoise(lines[j])) j--;
+    var name = j >= 0 ? lines[j] : '';
+    if (!name || name.length < 2 || /^[\d,]+$/.test(name)) continue;
+    var it = { jpName: name, priceJpy: parseInt(lines[i].replace(/,/g, ''), 10) };
+    if (lines[i + 2] === '品切れ') it.status = '品切れ';
+    items.push(it);
+  }
   return items;
 };
 
@@ -853,6 +881,7 @@ Aoi.catalog.render = function () {
         + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',true)">合并</button>'
         + ' <button type="button" class="underline" onclick="Aoi.catalog.resolveSuspect(\'' + it.id + '\',false)">保留两行</button></div>'
       : '';
+    var oos = it.status === '品切れ' ? '<div class="text-[11px] text-red-500 mt-0.5">品切れ（售罄）</div>' : '';
     var typeKeys = Object.keys(d.typeMeta || {});
     var typeOpts = typeKeys.map(function (t) {
       return '<option value="' + Aoi.escapeHtml(t) + '"' + (t === it.type ? ' selected' : '') + '>' + Aoi.escapeHtml(t) + '</option>';
@@ -871,7 +900,7 @@ Aoi.catalog.render = function () {
     return '<tr data-id="' + it.id + '" class="border-b border-gray-100">'
       + '<td class="px-2 py-1 text-center"><input type="checkbox" class="cat-sel"' + (it.select ? ' checked' : '') + '></td>'
       + '<td class="px-2 py-1">' + (Aoi.safeUrl(it.image) ? '<img src="' + Aoi.escapeHtml(Aoi.safeUrl(it.image)) + '" class="w-9 h-9 object-cover rounded" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'">' : '—') + '</td>'
-      + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + suspect + '</td>'
+      + '<td class="px-2 py-1 max-w-[16rem]"><div class="text-sm">' + Aoi.escapeHtml(it.jpName) + '</div>' + unmatched + suspect + oos + '</td>'
       + '<td class="px-2 py-1"><input class="cat-cn border border-gray-300 rounded px-2 py-1 text-sm w-56" value="' + Aoi.escapeHtml(it.name) + '">' + dupNote + Aoi.catalog.aiSuggestHtml(it, 'cn') + '</td>'
       + '<td class="px-2 py-1"><select class="cat-type border border-gray-300 rounded px-1 py-1 text-sm">' + typeOpts + '</select>' + Aoi.catalog.aiSuggestHtml(it, 'type') + '</td>'
       + '<td class="px-2 py-1 text-right text-sm text-gray-500">' + (it.priceJpy != null ? '¥' + it.priceJpy.toLocaleString() : '—') + '</td>'

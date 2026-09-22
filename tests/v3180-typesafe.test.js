@@ -399,3 +399,54 @@ describe('v3.18.2 校对表真实性问题（类型表外值错显 / 类型建�
     expect(aoi.catalog.AI_PROMPT).toContain('不要硬凑');
   });
 });
+
+describe('v3.18.3 PCO 列表页竖排纯文本（品名行×2 / 价格行 / 円行分离，2026-09-23 用户实测）', () => {
+  const VERTICAL = [
+    'ぽこ あ ポケモン エキスパンションパス',
+    '発売中！第1弾は8月5日配信！',
+    'Pokemon Center ONLINE',
+    '検索', 'close', 'カテゴリから探す', 'カテゴリから探す', '新商品', 'ランキング',
+    'ぬいぐるみ・おもちゃ', 'ゲーム', 'シーズン特集',
+    '1 ~ 40 / 45件', '新着順',
+    'A4クリアファイル Pokémon Timeless Adventure アローラ',
+    'A4クリアファイル Pokémon Timeless Adventure アローラ',
+    '495', '円', 'ポケモンセンターオリジナル', 'NEW',
+    'みんなげんきになりましたよ！おひるねセット',
+    'みんなげんきになりましたよ！おひるねセット',
+    '8,250', '円', '品切れ', 'ポケモンセンターオリジナル', 'NEW',
+    'ロールクッキー Pokémon Timeless Adventure アローラ',
+    'ロールクッキー Pokémon Timeless Adventure アローラ',
+    '1,760', '円', 'ポケモンセンターオリジナル',
+    'フロントオープンキャリーケース Fire type Pokémon',
+    'フロントオープンキャリーケース Fire type Pokémon',
+    '26,400', '円', '品切れ', 'ポケモンセンターオリジナル',
+    'うたうフィギュア プリン',
+    'うたうフィギュア プリン',
+    '6,600', '円',
+    'ポケモンセンターオンライン', 'Scroll to Top', '©Pokémon.'
+  ].join('\n');
+
+  it('parseText 竖排兜底：品名+价格正确、品切れ入 status、噪声/菜单/页脚行不误收', () => {
+    const items = aoi.catalog.parseText(VERTICAL);
+    expect(items).toHaveLength(5);
+    expect(items[0]).toMatchObject({ jpName: 'A4クリアファイル Pokémon Timeless Adventure アローラ', priceJpy: 495 });
+    expect(items[1]).toMatchObject({ jpName: 'みんなげんきになりましたよ！おひるねセット', priceJpy: 8250, status: '品切れ' });
+    expect(items[2]).toMatchObject({ jpName: 'ロールクッキー Pokémon Timeless Adventure アローラ', priceJpy: 1760 });
+    expect(items[3]).toMatchObject({ jpName: 'フロントオープンキャリーケース Fire type Pokémon', priceJpy: 26400, status: '品切れ' });
+    expect(items[4]).toMatchObject({ jpName: 'うたうフィギュア プリン', priceJpy: 6600 });
+    expect(items.every((x) => x.jpName.indexOf('カテゴリ') < 0 && x.jpName !== 'NEW')).toBe(true);
+  });
+
+  it('横排（名称 3,960円 同行）行为不变——竖排只在横排为零时兜底', () => {
+    const items = aoi.catalog.parseText('ぬいぐるみ ピカチュウ　3,960円');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ jpName: 'ぬいぐるみ ピカチュウ', priceJpy: 3960 });
+    expect(items[0].status).toBeUndefined();
+  });
+
+  it('render：品切れ草稿行显示红字售罄标记', () => {
+    aoi.catalog.addToDraft([{ jpName: 'おひるねセット X', priceJpy: 8250, status: '品切れ' }]);
+    aoi.catalog.render();
+    expect(doc.querySelector('#catDraftTbody').textContent).toContain('品切れ（售罄）');
+  });
+});

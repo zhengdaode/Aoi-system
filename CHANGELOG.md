@@ -3,7 +3,8 @@
 ## v3.21.0 (2026-09-26)
 
 > **TypeSafe bot 意图端点（PLAN-F11-BOT-QA.md F11-M9 · 主仓库先行部分）**：typesafe-proxy 新增
-> `/bot-intent`，供 aoi-qqbot relay 把买家非指令消息送判意图（M10–M12 在 relay 仓库实施）。
+> `/bot-intent`，供 aoi-qqbot relay 把买家非指令消息送判意图（M10–M12 已于同日在 relay 仓库实施，
+> node:test 68→103 全绿）。
 > 与 admin 通道完全隔离：`X-Bot-Token` 共享密钥（function secrets `BOT_INTENT_TOKEN`，relay .env
 > 两侧比对，EVENT_TOKEN 同款纪律）。四问全走 choice（仓库内唯一有生产先例的契约）：意图 /
 > 是否有效诉求 / 分类 / 紧急程度，一次请求多问并行；服务端组题并归一结果（importance 映射

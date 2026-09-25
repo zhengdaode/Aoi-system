@@ -1,9 +1,14 @@
 # PLAN-F11 · QQ 机器人智能问答与问题归档（Jev 意图路由 / 转人工 / 问题时间线）· 提案
 
-> 2026-09-25 起草。基于 aoi-qqbot `relay.js` 全文、主仓库 PLAN-TYPESAFE / typesafe-proxy 代码、
-> 两台服务器 SSH 实测（见第六节）后的代码级方案。**状态：待批准**——批准后按「八、版本切分」实施，
-> 遵循 AGENTS.md 工作纪律（每改动一个 commit、测试全绿才交付）。
-> 对应需求原文 7 条，逐条分析与迭代见第二节；指令草拟见第七节（用户后续可改）。
+> 2026-09-25 起草，2026-09-26 用户批准（「其他按你计划先执行」，第九节决策点按默认方案整体通过）。
+> 基于 aoi-qqbot `relay.js` 全文、主仓库 PLAN-TYPESAFE / typesafe-proxy 代码、两台服务器 SSH 实测
+> （见第六节）后的代码级方案。
+> **状态：✅ 已实施（2026-09-26，M9–M12 代码层）**——主仓库 Edge `/bot-intent`（v3.21.0，commit e2a081d，
+> **部署 + secrets 待执行**）；aoi-qqbot relay M10/M11/M12（commit ab26a94 / b97607b / 8e78b96，
+> node:test 68→103 全绿）。真机生效前置三步：①NapCat 安装（STATUS「待用户操作 1」）；②Edge 重新部署并
+> `--secret BOT_INTENT_TOKEN=<值>`；③服务器 .env 配 `EDGE_BOT_INTENT_URL` / `BOT_INTENT_TOKEN`
+> （`BOT_INTENT_SHADOW=true` 起步，影子一周后按真实判断校准阈值再改 false）+ `systemctl restart qq-relay`。
+> 实施遵循 AGENTS.md 工作纪律（每里程碑独立 commit、测试全绿）。
 
 ---
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.21.0 (2026-09-26)
+
+> **TypeSafe bot 意图端点（PLAN-F11-BOT-QA.md F11-M9 · 主仓库先行部分）**：typesafe-proxy 新增
+> `/bot-intent`，供 aoi-qqbot relay 把买家非指令消息送判意图（M10–M12 在 relay 仓库实施）。
+> 与 admin 通道完全隔离：`X-Bot-Token` 共享密钥（function secrets `BOT_INTENT_TOKEN`，relay .env
+> 两侧比对，EVENT_TOKEN 同款纪律）。四问全走 choice（仓库内唯一有生产先例的契约）：意图 /
+> 是否有效诉求 / 分类 / 紧急程度，一次请求多问并行；服务端组题并归一结果（importance 映射
+> 紧急=100 / 重要=60 / 普通=20）。防失控沿用既有纪律：文本 ≤200 字、payload ≤8KB、bot 通道限频
+> 30 次/分钟、上游 14s 超时 + 429/529 退避重试（抽为 callUpstream 与 admin 透传共用，行为不变）。
+> 纯判断不落盘；失败归一 502，relay 侧静默回落「帮助」文案。前端与 schema 零改动。
+> 部署：`node scripts/deploy-edge.js typesafe-proxy supabase/functions/typesafe-proxy/index.ts` +
+> `--secret BOT_INTENT_TOKEN=<值>`（值不入仓库）。Edge Function 无单测先例（Deno 运行时），与
+> qq-relay Edge 同以部署探针验收；vitest 套件不受影响保持全绿。
+> 另：docs/PLAN-F11-BOT-QA.md 服务器角色勘误——106.14.28.206 系用户个人服务器，与 Aoi 无关。
+
+### Added
+- **typesafe-proxy `/bot-intent`（F11-M9）**：`POST {text, intents[]}` → `{intent, meaningful, category, importance}`；
+  意图候选由 relay 传入（当前指令词表 + 其他，≤12 项、单项 ≤12 字，服务端清洗防注入）。
+
 ## v3.20.0 (2026-09-23)
 
 > **TypeSafe 发货/到货二连（PLAN-TYPESAFE.md T6/T7）**：快递单号智能预填 + 到货清单预勾选。

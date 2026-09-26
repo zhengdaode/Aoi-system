@@ -20,6 +20,16 @@
 - **typesafe-proxy `/bot-intent`（F11-M9）**：`POST {text, intents[]}` → `{intent, meaningful, category, importance}`；
   意图候选由 relay 传入（当前指令词表 + 其他，≤12 项、单项 ≤12 字，服务端清洗防注入）。
 
+### Added
+- **QQ 工单处理台（F11-M13，通知公告页新增卡片，js/tickets.js）**：买家 QQ 私聊「转人工」的工单在网页端处理——
+  列表（近 14 天 / 新→旧 / 状态徽章 / 回复数·提醒数角标）+ 处理卡（编号/昵称/联系方式(完整QQ)/提交时间/
+  问题块/回复记录/回复框**一键同步到QQ**/状态下拉 等待查看·已转发·解决中·已解决/**设置QQ提醒**
+  （每日到点把工单摘要私发管理员，多时间点可叠加，直至清除））。新增 `Aoi.bot.requestAt(path, payload)`
+  （带路径 relay 请求，鉴权同既有 request）；`Aoi.nav` 进入通知页自动加载；bot 未接入时静默降级。
+  relay 侧配套 `/onebot/questions|question-reply|question-status|question-remind` 四端点（admin token 鉴权）+
+  转人工归档补完整 qq（服务器本地 JSONL，审计仍只记尾号）+ 分钟级提醒轮询（lastRun 落盘防重启重发）。
+  测试 vitest 515→519、relay node:test 107→112 全绿。
+
 ## v3.20.0 (2026-09-23)
 
 > **TypeSafe 发货/到货二连（PLAN-TYPESAFE.md T6/T7）**：快递单号智能预填 + 到货清单预勾选。

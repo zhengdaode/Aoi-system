@@ -34,6 +34,7 @@ const MODULES = [
   'js/member.js',
   'js/notify.js',
   'js/bot.js',
+  'js/tickets.js',
   'js/limits.js',
   'js/warehouse.js',
   'js/stats.js',

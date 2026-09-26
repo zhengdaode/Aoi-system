@@ -59,6 +59,28 @@ Aoi.bot.request = async function (payload) {
   return r.json();
 };
 
+// 带路径的 relay 请求（F11-M13 工单台等新端点共用；鉴权与 request 相同）
+Aoi.bot.requestAt = async function (path, payload) {
+  if (!Aoi.bot.config.enabled || !Aoi.bot.config.relay) throw new Error('QQ 机器人未接入');
+  if (Aoi.state.user && Aoi.state.user.isDebug) {
+    throw new Error('debug 账号没有管理员会话，无法通过 relay 鉴权');
+  }
+  var token = await Aoi.bot.sessionToken();
+  if (!token) throw new Error('管理员登录态缺失，请退出后重新登录');
+  var r = await fetch(Aoi.bot.config.relay.replace(/\/+$/, '') + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(payload || {})
+  });
+  if (!r.ok) {
+    var text = '';
+    try { text = await r.text(); } catch (e) { /* ignore */ }
+    if (r.status === 401) throw new Error('请求失败（401）：管理员会话已失效，请重新登录');
+    throw new Error('请求失败（' + r.status + '）：' + text);
+  }
+  return r.json();
+};
+
 // 私聊单发
 Aoi.bot.sendPrivate = function (qq, message) {
   return Aoi.bot.request({ user_id: qq, message: message });

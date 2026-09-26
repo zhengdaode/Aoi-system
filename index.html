@@ -185,6 +185,7 @@
             <a data-nav="view-approval" onclick="Aoi.nav('view-approval')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">事务审批</a>
             <a data-nav="view-ship" onclick="Aoi.nav('view-ship')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">发货管理</a>
             <a data-nav="view-notify" onclick="Aoi.nav('view-notify')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">通知公告</a>
+            <a data-nav="view-tickets" onclick="Aoi.nav('view-tickets')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">QQ 工单</a>
           </div>
         </div>
         <div>
@@ -1092,7 +1093,10 @@
           </div>
           <p id="notifyStat" class="mt-2 text-sm text-gray-500"></p>
         </div>
+      </div>
 
+      <!-- QQ 工单（独立视图，与通知公告并列；F11-M13） -->
+      <div id="view-tickets" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-2">QQ 工单处理台 <span class="text-xs font-normal text-gray-400">F11</span></h3>
           <p class="text-sm text-gray-500 mb-3">买家私聊「转人工」的工单在此处理：查看 / 回复（一键同步到QQ）/ 改状态 / 设置 QQ 提醒（每日到点私发摘要）</p>

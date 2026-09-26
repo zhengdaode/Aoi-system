@@ -1,6 +1,6 @@
 // Aoi-system — QQ 工单处理台（F11-M13，docs/PLAN-F11-BOT-QA.md）
 // 买家 QQ 私聊「转人工 内容」→ relay 归档为工单 → 管理员在本页查看/回复/改状态/设置 QQ 提醒。
-// 数据源：relay /onebot/questions 系列端点（admin token 鉴权，Aoi.bot.requestAt）。
+// 数据源：relay 根路由 ticketOp 协议（/onebot/* 子路径经 Edge 透传实测不可用，见 relay.js 注释）。
 // 说明：旧工单（relay 未存完整 QQ 的）不能 QQ 回复，界面会提示改为看板/群内联系。
 window.Aoi = window.Aoi || {};
 Aoi.tickets = {};
@@ -47,7 +47,7 @@ Aoi.tickets.replyText = function (row, text) {
 
 Aoi.tickets.load = async function (manual) {
   try {
-    var out = await Aoi.bot.requestAt('/onebot/questions', { days: 14, how: 'forward' });
+    var out = await Aoi.bot.request({ ticketOp: 'list', days: 14, how: 'forward' });
     Aoi.tickets.rows = out.rows || [];
     Aoi.tickets.render();
     if (manual) Aoi.toast('已刷新（近 14 天 ' + Aoi.tickets.rows.length + ' 条工单）', 'success');
@@ -161,7 +161,7 @@ Aoi.tickets.reply = async function () {
   var text = input ? input.value.trim() : '';
   if (!text) { Aoi.toast('回复内容为空', 'warning'); return; }
   try {
-    var out = await Aoi.bot.requestAt('/onebot/question-reply', { id: row.id, text: text });
+    var out = await Aoi.bot.request({ ticketOp: 'reply', id: row.id, text: text });
     Aoi.toast('已通过 QQ 发给买家', 'success');
     Aoi.tickets._replace(out.row);
     Aoi.tickets.openDetail(row.id);
@@ -176,7 +176,7 @@ Aoi.tickets.saveStatus = async function () {
   var sel = document.getElementById('ticketStatusSel');
   if (!sel) return;
   try {
-    var out = await Aoi.bot.requestAt('/onebot/question-status', { id: row.id, status: sel.value });
+    var out = await Aoi.bot.request({ ticketOp: 'status', id: row.id, status: sel.value });
     Aoi.toast('状态已保存：' + Aoi.tickets.STATUS_LABEL[sel.value], 'success');
     Aoi.tickets._replace(out.row);
     Aoi.tickets.openDetail(row.id);
@@ -196,7 +196,7 @@ Aoi.tickets.addRemind = async function () {
   times.push(time);
   times.sort();
   try {
-    var out = await Aoi.bot.requestAt('/onebot/question-remind', { id: row.id, times: times });
+    var out = await Aoi.bot.request({ ticketOp: 'remind', id: row.id, times: times });
     Aoi.toast('已设置：每日 ' + time + ' QQ 提醒', 'success');
     Aoi.tickets._replace(out.row);
     Aoi.tickets.openDetail(row.id);
@@ -210,7 +210,7 @@ Aoi.tickets.removeRemind = async function (time) {
   if (!row) return;
   var times = (row.reminders || []).map(function (r) { return r.time; }).filter(function (t) { return t !== time; });
   try {
-    var out = await Aoi.bot.requestAt('/onebot/question-remind', { id: row.id, times: times });
+    var out = await Aoi.bot.request({ ticketOp: 'remind', id: row.id, times: times });
     Aoi.toast('已清除 ' + time + ' 提醒', 'success');
     Aoi.tickets._replace(out.row);
     Aoi.tickets.openDetail(row.id);

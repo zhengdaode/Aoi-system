@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.21.1 (2026-09-26)
+
+> **工单台上线修订**：① QQ 工单处理台从「通知公告」页拆为**并列独立视图**（侧边栏新增「QQ 工单」入口）；
+> ② 工单台协议改走 relay **根路由 ticketOp**（`{ticketOp:'list'|'reply'|'status'|'remind', …}`，复用根路由
+> 鉴权/限频）——`/onebot/*` 子路径经 Edge 透传实测不可用（v11–v13 三版复现：请求未达 UPSTREAM，
+> 网关 404 not found），且路径被丢弃打根路由时触发 v4.1 的 400 bad payload（工单台首测 400 的根因）；
+> ③ Edge qq-relay 恢复 v8 纯根转发（推送链路回归），并重设 `RELAY_UPSTREAM` secret。relay 侧同步实现
+> ticketOp 分发（node:test 114 全绿）；vitest 519 全绿。
+
+### Changed
+- 侧边栏「通知公告」下新增并列入口「QQ 工单」（`view-tickets` 独立 data-view）；`Aoi.nav` 进入该页自动加载工单。
+- `js/tickets.js` 四个操作改 `Aoi.bot.request({ticketOp,…})`；移除未启用的 `Aoi.bot.requestAt`。
+
 ## v3.21.0 (2026-09-26)
 
 > **TypeSafe bot 意图端点（PLAN-F11-BOT-QA.md F11-M9 · 主仓库先行部分）**：typesafe-proxy 新增

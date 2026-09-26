@@ -94,6 +94,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'payload too large' }),
       { status: 413, headers: { ...CORS, 'Content-Type': 'application/json' } });
   }
+  // F11-M13 注：子路径透传（/onebot/xxx）在 Edge 实测不可用（网关 404 not found，请求未达
+  // UPSTREAM，v11–v13 三版复现），工单台改走根路由 ticketOp 协议（relay 侧 / 路由扩展），
+  // 本函数保持 v8 纯根转发不变。
   const r = await fetch(UPSTREAM, {
     method: 'POST',
     headers: {

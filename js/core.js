@@ -67,8 +67,8 @@ Aoi.nav = function (viewId) {
   if (viewId === 'view-overview' && Aoi.stats) Aoi.stats.render();
   // 进入买家管理页时重渲染买家列表（v3.6.0 S1）
   if (viewId === 'view-buyers' && Aoi.orders) Aoi.orders.renderBuyers();
-  // 进入通知公告页时加载 QQ 工单（F11-M13 工单处理台；bot 未接入时静默降级）
-  if (viewId === 'view-notify' && Aoi.tickets) Aoi.tickets.load();
+  // 进入 QQ 工单页时加载工单（F11-M13 工单处理台，独立视图；bot 未接入时静默降级）
+  if (viewId === 'view-tickets' && Aoi.tickets) Aoi.tickets.load();
 };
 
 // 移动端侧边栏抽屉：无参切换，true 展开 / false 收起

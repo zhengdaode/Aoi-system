@@ -102,8 +102,9 @@ Deno.serve(async (req) => {
   if (!API_KEY) return json(503, { error: 'TYPESAFE_API_KEY not configured' });
 
   // —— F11-M9：QQ bot 意图路由（与 admin 通道隔离，X-Bot-Token 共享密钥） ——
+  // Edge 内 pathname 为全路径（/functions/v1/<slug>/bot-intent），用后缀匹配兼容直连与自定义域名
   const url = new URL(req.url);
-  if (url.pathname === '/bot-intent') {
+  if (url.pathname.endsWith('/bot-intent')) {
     const botSecret = Deno.env.get('BOT_INTENT_TOKEN') ?? '';
     if (!botSecret) return json(503, { error: 'BOT_INTENT_TOKEN not configured' });
     const botToken = (req.headers.get('X-Bot-Token') ?? '').trim();

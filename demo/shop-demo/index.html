@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>谷谷商城 · C 端购物演示（F12）</title>
+<link rel="stylesheet" href="css/shop.css">
+</head>
+<body>
+<div id="phone">
+
+  <!-- 顶栏（详情类视图显示） -->
+  <header id="topbar" class="topbar hidden">
+    <button class="icon-btn" id="btnBack" aria-label="返回">‹</button>
+    <span class="title" id="topbarTitle"></span>
+    <span class="icon-btn placeholder"></span>
+  </header>
+
+  <!-- ① 登录（mock：正式版将升级为个人 token / 手机号验证码，见 PLAN-F12 第五节） -->
+  <section id="view-login" class="view">
+    <div class="logo">
+      <div class="mark">🛍️</div>
+      <h1>谷谷商城</h1>
+      <p>团期排谷 · 自助下单 · 物流跟踪</p>
+    </div>
+    <div class="field">
+      <label>团员密钥</label>
+      <input id="loginKey" type="text" placeholder="向团长获取（演示：任意输入）" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>圈名（CN）或 QQ 号</label>
+      <input id="loginId" type="text" placeholder="演示：任意输入" autocomplete="off">
+    </div>
+    <button class="btn-main" id="btnLogin">进入商城</button>
+    <div class="login-note">
+      🔒 演示说明：当前采用「密钥 + CN」免登录（与现有团员端一致）。正式版上线支付前将升级为
+      <b>个人 session token + 接口限频</b>（PLAN-F12 §5.2 P1），远期支持手机号验证码 / QQ 登录。
+      密钥仅作首次校验，不再随每次请求传输。
+    </div>
+  </section>
+
+  <!-- ② 首页：搜索 + 团期流 -->
+  <section id="view-home" class="view hidden">
+    <div class="searchbar">
+      <span class="icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="搜索团期 / 商品 / 日文原名 / IP">
+      <button class="tag" id="btnSearch">搜索</button>
+    </div>
+    <div id="homeBody"><!-- banner + 快捷分类 + 团期列表（JS 渲染） --></div>
+  </section>
+
+  <!-- ③ 团期详情：规则 + 商品网格 -->
+  <section id="view-activity" class="view hidden">
+    <div id="activityBody"><!-- JS 渲染 --></div>
+  </section>
+
+  <!-- ④ 商品详情 -->
+  <section id="view-product" class="view hidden">
+    <div id="productBody"><!-- JS 渲染 --></div>
+    <div class="pd-bar" id="pdBar"><!-- JS 渲染底栏 --></div>
+  </section>
+
+  <!-- ⑤ 购物车 -->
+  <section id="view-cart" class="view hidden">
+    <div id="cartBody"><!-- JS 渲染 --></div>
+    <div class="cart-bar" id="cartBar"><!-- JS 渲染结算条 --></div>
+  </section>
+
+  <!-- ⑥ 下单确认 -->
+  <section id="view-checkout" class="view hidden">
+    <div id="checkoutBody"><!-- JS 渲染 --></div>
+  </section>
+
+  <!-- ⑦ 订单列表 -->
+  <section id="view-orders" class="view hidden">
+    <div class="o-tabs" id="orderTabs"><!-- JS 渲染 --></div>
+    <div id="ordersBody"><!-- JS 渲染 --></div>
+  </section>
+
+  <!-- ⑧ 订单详情 -->
+  <section id="view-order" class="view hidden">
+    <div id="orderBody"><!-- JS 渲染 --></div>
+  </section>
+
+  <!-- ⑨ 我的 -->
+  <section id="view-profile" class="view hidden">
+    <div id="profileBody"><!-- JS 渲染 --></div>
+  </section>
+
+  <!-- 底部导航 -->
+  <nav id="tabbar">
+    <button class="tab active" data-tab="home"><span class="ico">🏠</span>首页</button>
+    <button class="tab" data-tab="cart"><span class="ico">🛒</span>购物车<span class="bubble hidden" id="cartBubble">0</span></button>
+    <button class="tab" data-tab="orders"><span class="ico">📋</span>订单</button>
+    <button class="tab" data-tab="profile"><span class="ico">👤</span>我的</button>
+  </nav>
+
+  <!-- 弹层 -->
+  <div id="modalRoot">
+    <div class="mask" id="modalMask"></div>
+    <div class="sheet" id="modalSheet"><!-- JS 渲染 --></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

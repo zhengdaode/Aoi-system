@@ -45,6 +45,7 @@
 **v3.18.3 PCO 列表页竖排纯文本解析（2026-09-23，见 CHANGELOG v3.18.3）**：用户实测整页复制 PCO 商品列表页纯文本无法识别——品名行重复两次、价格与「円」各占一行，横排正则零命中；新增 `Aoi.catalog.parseTextVertical` 竖排兜底（「纯数字行+円行」回溯最近非噪声行作品名，品切れ入 status、校对表红字提示），横排行为不变只在零命中时兜底；测试 492→495 全绿；
 **v3.19.0 TypeSafe 导入链路三连已实施完成（2026-09-23，见 CHANGELOG v3.19.0）**：①T3 表格模板识别——parseMatrix/parseRecords 增 hints 参数（AI 行列号优先、不传行为不变）+ aiMapSheet 两轮判断（布局→行列角色，置信 <0.6 弃）+ parseSmart（仅失败 sheet 送判 ≤2 个，仍失败回落现状 toast）；②T4 商品主档语义对齐——confirmImport 对未命中型号 productCandidates 预筛→Choice「哪款∪都不是」，≥0.85 fillFromProduct 回填并标 _aiAligned 抑制重复骨架，0.5~0.85 reviewModal 人工点选；③T5 购买人归一——buyerPool（memberMeta∪历史买家）+ aiBuyerCandidates（归一化/子串/首字+编辑距离，改名避让 v3.7.0 同名函数）→Choice「哪位∪新购买人」，≥0.85 自动归一（原名留档 buyerRaw），中间带 reviewModal，手动录入 normalizeBuyersSilent 仅高置信；测试 495→509 全绿（v3190-import-ai 14 例）；
 **v3.20.0 TypeSafe 发货/到货二连已实施完成（2026-09-23，见 CHANGELOG v3.20.0）**：①T6 快递单号智能预填——发货页粘贴整段快递信息，extractTracking 正则抽号（排除手机号、去重、带行上下文）→ TypeSafe 判归属 → ≥TH.col 预填未发货订单单号列整包保存一次（不改 shipped 状态，核对后照常「批量设发货」）；②T7 到货清单预勾选——订单管理粘贴到货清单（≤30 行）→ TypeSafe 判对应订单 → 预勾选 .row-check（只动勾选框不落库，人工核对后走「标记到货」）；共用 `Aoi.typesafe.matchToCandidates`（行→候选批量归属，行支持字符串或 {text,context}，空候选短路）；T3–T7 全部落地，剩 T8 bot 路由（随 aoi-qqbot M8）与 T9/T10（挂起待前提）；测试 509→515 全绿（v3200-ship-arrive 6 例）；
+**F12 C 端购物系统 M0 已交付（2026-09-30，调研+计划+演示，见 [docs/PLAN-F12-CEND-SHOP.md](docs/PLAN-F12-CEND-SHOP.md)）**：面向买家的淘宝式购物 C 端完成功能清单/部署评估/安全评估三份调研与 `demo/shop-demo/` 静态演示（纯 mock，jsdom 冒烟 27 例全过，零主仓库改动）。三问结论：①支付——个人无执照不可官方跳转，路线 V1「唯一金额尾数+账单 CSV 自动核销（免上传凭证）」→ V2 支付宝当面付（个人/小微可申请，notify 回调自动核销，~0.6%）→ V3 微信 H5/JSAPI 真跳转（需个体户+ICP 备案域名）；虎皮椒/V免签类个人免签通道评估后不推荐；②部署——Pages+Supabase 架构可支撑 C 端（当面付回调 Edge Function 零备案即满足），缺口：微信通道强制备案域名、国内访问质量、交易需拆独立表+RLS（单 blob 扛不住锁量/幂等）；起步成本 ≈¥60/年+0.6% 费率+个体户 0–800 一次性，小程序列 V4（个人主体不能接微信支付）；③安全——密钥+CN 查询可接受、带支付不够，升级 P1 个人 session token+服务端算价锁量（V1 门槛）→ P2 独立表+RLS+回调幂等核销（支付门槛）→ P3 手机/QQ 登录。**V1（建议 v3.22.0）待批准**，含待拍板问题 7 项；
 线上排障、数据事故取证与回退锚点见 `docs/ITERATION_LOG.md`；**遗留项与线上操作清单见 `docs/STATUS.md`「当前状态速览」**。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
@@ -80,6 +81,7 @@
 | `docs/PLAN-F6-STATS.md` | F6 团期复盘统计：审核迭代结论 + 并入主系统实现方案（v3.5.0 已实装） |
 | `docs/PLAN-F9-CATALOG-IMPORT.md` | F9 PCO 商品目录导入 + 补货监控：**主仓库侧已交付（2026-09-10，v3.8.0）**——粘贴导入+词典翻译+校对工作台+小程序模板导出；监控被 PCO 风控实测否决（自动化浏览器一律 Restricted access），载体待拍板 |
 | `docs/PLAN-F10-BOT-INTERACTION.md` | F10 QQ 机器人用户交互迭代：**已实施（2026-09-10，v3.6.3）**——QQ 绑定唯一性校验 / bot 解绑·我是谁·查单筛选·我的快递 / 网页端解绑与复制绑定指令，零 schema 改动，上线随 relay 真机部署批次 |
+| `docs/PLAN-F12-CEND-SHOP.md` | F12 C 端购物系统（买家自助商城）：**M0 已交付（2026-09-30）**——功能清单/支付三段路线/部署评估/安全评估 + 演示 `demo/shop-demo/`；V1（v3.22.0 建议）待批准 |
 | `docs/STATUS.md` | 权威状态：已完成阶段、数据模型（blob 结构）、已知限制、**遗留项与线上操作清单** |
 | `CLAUDE.md` | QQ 机器人接入专项（NapCat / relay / 安全红线） |
 | `README.md` | 功能、部署、安全、项目结构 |

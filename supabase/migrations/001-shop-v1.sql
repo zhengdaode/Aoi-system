@@ -569,12 +569,12 @@ $$;
 
 -- 权限：shop_ctx 含整份 blob 仅限 definer 内部；六个对外 RPC 仅 authenticated
 revoke execute on function public.shop_ctx() from public, anon, authenticated;
-revoke execute on function public.shop_me() from public;
-revoke execute on function public.shop_bind_cn(text) from public;
-revoke execute on function public.shop_get_catalog() from public;
-revoke execute on function public.shop_place_order(jsonb, text, text) from public;
-revoke execute on function public.shop_get_my_orders() from public;
-revoke execute on function public.shop_cancel_order(text) from public;
+revoke execute on function public.shop_me() from public, anon;
+revoke execute on function public.shop_bind_cn(text) from public, anon;
+revoke execute on function public.shop_get_catalog() from public, anon;
+revoke execute on function public.shop_place_order(jsonb, text, text) from public, anon;
+revoke execute on function public.shop_get_my_orders() from public, anon;
+revoke execute on function public.shop_cancel_order(text) from public, anon;
 grant execute on function public.shop_me() to authenticated;
 grant execute on function public.shop_bind_cn(text) to authenticated;
 grant execute on function public.shop_get_catalog() to authenticated;

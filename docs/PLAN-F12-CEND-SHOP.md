@@ -177,3 +177,51 @@
 ## 八、演示说明
 
 `demo/shop-demo/`：纯静态（无依赖、无构建、离线可开），移动端淘宝式布局——登录(密钥+CN mock) → 首页团期流 → 团期商品网格 → 商品详情 → 购物车 → 下单确认(地址/金额/支付方式) → 支付演示(V1 收款码+尾数 / V2 当面付 / V3 跳转 三种形态的示意弹窗) → 订单列表(状态 tab) → 订单详情(时间线+物流) → 我的(资料/地址簿)。购物车存 localStorage；商品图为 CSS 渐变占位（不请求外网）。仅表达交互形态与信息架构，**不代表最终实现**。
+
+---
+
+## 九、拍板与实施记录（2026-09-30，V1 = v3.22.0 已实施）
+
+> 用户拍板：①支付**直接使用 V1**（唯一尾数+账单核销）；②客群**暂时仅本团成员**；③登录**取消密钥发放**，
+> 按「QQ/微信 OAuth > 手机号验证 > 邮箱验证」的偏好调研落地；④订单数据**直接与原管理端数据库合并同步**（不拆独立表）。
+
+### 9.1 登录方案调研（回答「手机验证码需要什么部署？邮箱验证码是否可行？」）
+
+| 方案 | 部署要求 | 费用 | 结论 |
+|---|---|---|---|
+| **邮箱验证码** | Supabase Auth 原生（signInWithOtp + verifyOtp）：**零额外部署**；一次性配置 Dashboard→Authentication→Email Templates 让模板含 `{{ .Token }}`（6 位码，默认模板通常已含） | ¥0（免费档自带频控） | **V1 已实施**——QQ 邮箱可达（提醒垃圾箱） |
+| 手机验证码 | 两条路线：①Supabase Auth Phone（Twilio/MessageBird/Vonage 为 provider）——需海外信用卡充值，中国号码可达但 ~¥0.3–0.5/条、到达率一般；②国内短信（阿里云短信）——需签名+模板审核，验证码类签名个人可申请但需佐证材料（备案网站/小程序/公众号之一），¥0.045/条 | ①贵且不稳；②便宜但门槛在资质 | **暂缓**——有主体/备案后接入，作为第二优先 |
+| QQ OAuth | QQ 互联（connect.qq.com）个人开发者可申请网站应用；**硬前置 = ICP 备案域名** + 审核数日；返回 openid ≠ QQ 号（仅作登录身份，与 `memberMeta.qq` bot 绑定机制不冲突） | ¥0（域名已列 V3 成本） | **备案后升级为首选（V2）** |
+| 微信 OAuth | 网站应用需微信开放平台+企业资质；公众号网页授权需**已认证服务号**（个人主体不可认证） | 认证 ¥300/年 | **暂缓**——有主体后评估；小程序 wx.login 归 V4 |
+
+落地顺序 = 邮箱验证码（V1，唯一即刻可用）→ QQ OAuth（V2，备案域名后）→ 手机验证码（有资质后）→ 微信（有主体后）。
+
+### 9.2 数据合并模型（用户拍板：直接并入管理端同一份 blob）
+
+- `d.shopOrders[]`：C 端订单头（no/total/tail/paidTotal/status/addr 快照/remark/items）；
+- `d.orders[]`：**逐商品落单行**（buyer=CN + shopOrderId/shopOrderNo 关联）——管理端到货分批/国际费分摊/审批/发货/快递单号/团员端查询**全链路零改造**；
+- `d.shopUsers{[auth.uid]: {cn,email,boundAt}}`：登录绑定映射（一 CN 一账号，换绑找团长）；
+- 写入纪律：security definer + 服务端算价/限购/截团校验 + 写前历史快照（B1）+ `for update` 行锁（与管理端乐观锁写入串行化）；
+- 风险声明：blob 单行模型在**本团规模**（数十买家、低频下单）+ 行锁下够用；上量后仍建议拆独立表（B2 Phase 2 储备），本次拍板不做。
+
+### 9.3 V1 已实施范围（v3.22.0）
+
+- **服务端**：`supabase-schema.sql` F12 节 7 个 RPC（shop_ctx 内部 + shop_me / shop_bind_cn / shop_get_catalog / shop_place_order / shop_get_my_orders / shop_cancel_order）+ `supabase/migrations/001-shop-v1.sql`（幂等迁移）；
+- **C 端**：`shop.html` + `css/shop.css` + `js/shop.js`——邮箱 OTP 三步登录 → 绑定 CN → 橱窗（团期流/搜索/商品详情）→ 购物车（本地 + 限购夹紧）→ 下单（服务端算价）→ 收银台（尾数 + 囤货地收款码 + 转账指引，**买家零凭证上传**）→ 订单（状态 tab/时间线/快递单号/取消待付款）→ 我的；
+- **管理端**：活动管理展开区商品卡新增「上架到 C 端商城橱窗」开关（`products[].listed`，缺省下架；需登记单价才可上架）；团期开放 = `shopOpen===true` 或活动状态「进行中」；C 端下单自动生成 `type:'shop'` 通知到通知中心；
+- **鉴权**：C 端零密钥——Supabase Auth 邮箱 OTP + auth.uid()；六个对外 RPC 仅 authenticated 可执行，shop_ctx（含整 blob）revoke 全员仅 definer 内部；
+- **测试**：tests/shop-v1.test.js 17 例（纯函数/RPC 错误分支/橱窗开关持久化），全套 519→536 全绿。
+
+### 9.4 部署动作（上线前置，真机执行）
+
+1. **线上库应用迁移**：SQL Editor 执行 `supabase/migrations/001-shop-v1.sql`（或 `scripts/sb.js --migrate`）——drop-if-exists 幂等可重复；
+2. **Supabase Dashboard → Authentication → Emails**：确认「Log In / Sign Up」模板含 `{{ .Token }}`；Providers→Email 已启用；
+3. **团长配置**：设置页囤货地填收款码 URL（C 端收银台展示位）；活动管理给要卖的商品勾「上架到 C 端商城橱窗」并登记单价/限购；
+4. Pages 随 push 自动部署，C 端地址 = `https://zhengdaode.github.io/Aoi-system/shop.html`。
+
+### 9.5 遗留项（下一批）
+
+- 管理端「商城订单」卡片：待付款列表 / 手动标记已付款 / **账单 CSV 自动核销工具**（V1 支付闭环最后一环；过渡期经通知中心知悉新单）；
+- `shopOpen` 团期开关与 `shopBlurb` 团购说明的管理端 UI（现按活动状态推导）；
+- RPC 限频（Edge 层，上量前）与待付款 24h 超时关单（Edge scheduled）；
+- QQ OAuth（备案后）→ 手机验证码（资质后）→ 当面付/微信跳转（主体后）。

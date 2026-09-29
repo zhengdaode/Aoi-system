@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>谷谷商城 · 团购自助下单（F12 C 端）</title>
+<link rel="stylesheet" href="css/shop.css">
+</head>
+<body>
+<div id="phone">
+  <div id="shop-root"></div>
+
+  <!-- 顶栏（详情类视图显示） -->
+  <header id="topbar" class="topbar hidden">
+    <button class="icon-btn" id="btnBack" aria-label="返回">‹</button>
+    <span class="title" id="topbarTitle"></span>
+    <span class="icon-btn placeholder"></span>
+  </header>
+
+  <!-- ① 登录 / 绑定（邮箱验证码，取消密钥发放——PLAN-F12 拍板） -->
+  <section id="view-auth" class="view hidden">
+    <div class="logo">
+      <div class="mark">🛍️</div>
+      <h1>谷谷商城</h1>
+      <p id="authSub">团期排谷 · 自助下单 · 物流跟踪</p>
+    </div>
+
+    <!-- 步骤 1：邮箱 → 发验证码 -->
+    <div id="authStepEmail">
+      <div class="field">
+        <label>邮箱（用于接收登录验证码）</label>
+        <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <button class="btn-main" id="btnSendCode" style="width:100%;margin-top:22px;height:46px;border-radius:23px;font-size:16px">发送验证码</button>
+    </div>
+
+    <!-- 步骤 2：验证码 → 登录 -->
+    <div id="authStepCode" class="hidden">
+      <div class="field">
+        <label>验证码已发送至 <b id="authEmailEcho" style="color:var(--text)"></b>（注意垃圾箱）</label>
+        <input id="authCode" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
+      </div>
+      <button class="btn-main" id="btnVerifyCode" style="width:100%;margin-top:22px;height:46px;border-radius:23px;font-size:16px">登录</button>
+      <button class="btn-ghost" id="btnResend" style="width:100%;margin-top:10px;height:38px;border-radius:19px">重新发送</button>
+    </div>
+
+    <!-- 步骤 3：绑定圈名（首次登录） -->
+    <div id="authStepBind" class="hidden">
+      <div class="field">
+        <label>圈名（CN）——首次登录需绑定，须与团长登记一致</label>
+        <input id="bindCn" type="text" placeholder="你的圈名（CN）" autocomplete="off">
+      </div>
+      <button class="btn-main" id="btnBind" style="width:100%;margin-top:22px;height:46px;border-radius:23px;font-size:16px">绑定并进入</button>
+      <button class="btn-ghost" id="btnLogoutBind" style="width:100%;margin-top:10px;height:38px;border-radius:19px">退出登录</button>
+    </div>
+
+    <div class="login-note">
+      🔒 登录方式：邮箱验证码（本团成员专享，绑定圈名后使用）。密钥登录已取消；
+      后续将支持 QQ 登录（备案域名后）与手机验证码（见 PLAN-F12 §九）。
+    </div>
+  </section>
+
+  <!-- ② 首页：搜索 + 团期流 -->
+  <section id="view-home" class="view hidden">
+    <div class="searchbar">
+      <span class="icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="搜索团期 / 商品 / 日文原名 / IP">
+      <button class="tag" id="btnSearch">搜索</button>
+    </div>
+    <div id="homeBody"></div>
+  </section>
+
+  <!-- ③ 团期详情：说明 + 商品网格 -->
+  <section id="view-activity" class="view hidden">
+    <div id="activityBody"></div>
+  </section>
+
+  <!-- ④ 商品详情 -->
+  <section id="view-product" class="view hidden">
+    <div id="productBody"></div>
+    <div class="pd-bar" id="pdBar"></div>
+  </section>
+
+  <!-- ⑤ 购物车 -->
+  <section id="view-cart" class="view hidden">
+    <div id="cartBody"></div>
+    <div class="cart-bar" id="cartBar"></div>
+  </section>
+
+  <!-- ⑥ 下单确认 -->
+  <section id="view-checkout" class="view hidden">
+    <div id="checkoutBody"></div>
+  </section>
+
+  <!-- ⑦ 订单列表 -->
+  <section id="view-orders" class="view hidden">
+    <div class="o-tabs" id="orderTabs"></div>
+    <div id="ordersBody"></div>
+  </section>
+
+  <!-- ⑧ 订单详情 -->
+  <section id="view-order" class="view hidden">
+    <div id="orderBody"></div>
+  </section>
+
+  <!-- ⑨ 我的 -->
+  <section id="view-profile" class="view hidden">
+    <div id="profileBody"></div>
+  </section>
+
+  <nav id="tabbar">
+    <button class="tab active" data-tab="home"><span class="ico">🏠</span>首页</button>
+    <button class="tab" data-tab="cart"><span class="ico">🛒</span>购物车<span class="bubble hidden" id="cartBubble">0</span></button>
+    <button class="tab" data-tab="orders"><span class="ico">📋</span>订单</button>
+    <button class="tab" data-tab="profile"><span class="ico">👤</span>我的</button>
+  </nav>
+
+  <div id="modalRoot">
+    <div class="mask" id="modalMask"></div>
+    <div class="sheet" id="modalSheet"></div>
+  </div>
+
+  <div id="loading" class="loading-mask hidden"><div class="loading-box">加载中…</div></div>
+  <div id="toast"></div>
+</div>
+
+<script src="js/vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/shop.js"></script>
+</body>
+</html>

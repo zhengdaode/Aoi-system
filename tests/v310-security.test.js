@@ -163,9 +163,13 @@ describe('supabase-schema.sql v3.10.0 守护（p_cn 后门 / 登录防爆破 / v
     });
     expect(schema).not.toMatch(/create table if not exists team_members/);
     expect(schema).toMatch(/drop table if exists team_members;/);
-    // Supabase Auth 依赖彻底移除：无可执行 auth.uid()（赋值/查询形态）、无 auth.users 外键、无任何 create policy
-    expect(schema).not.toMatch(/:= auth\.uid\(\)/);
-    expect(schema).not.toMatch(/select auth\.uid\(\)/);
+    // Supabase Auth 依赖移除（v2 归档守护）：v3.22.0 F12 起 C 端商城经用户拍板重新引入
+    // Supabase Auth（邮箱 OTP 登录，schema 尾部 F12 节）——本守护只作用于 F12 节之前的
+    // 主体，防止 v2 邀请码体系以 auth.uid 形态复活；auth.users 外键与 create policy 仍全文件禁止
+    const f12At = schema.indexOf('-- F12 · C 端商城 RPC');
+    const preF12 = f12At === -1 ? schema : schema.slice(0, f12At);
+    expect(preF12).not.toMatch(/:= auth\.uid\(\)/);
+    expect(preF12).not.toMatch(/select auth\.uid\(\)/);
     expect(schema).not.toMatch(/references auth\.users/);
     expect(schema).not.toMatch(/create policy/);
     // drop 收敛：v2 策略在老库重跑时被移除

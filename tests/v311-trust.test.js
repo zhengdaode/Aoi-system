@@ -124,8 +124,8 @@ describe('supabase-schema.sql v3.11.0 守护（单团显式化）', () => {
     expect(schema).toMatch(/检测到多个团队行/);
   });
 
-  it('全部单团 RPC 已改走守卫（1 定义 + 9 调用 = 10 处）；硬编码 limit 1 不再回潮', () => {
-    expect((schema.match(/public\.assert_single_team\(\)/g) || [])).toHaveLength(10);
+  it('全部单团 RPC 已改走守卫（1 定义 + 13 调用 = 14 处，含 F12 shop 四 RPC）；硬编码 limit 1 不再回潮', () => {
+    expect((schema.match(/public\.assert_single_team\(\)/g) || [])).toHaveLength(14);
     expect(schema).not.toMatch(/where id = \(select id from teams limit 1\)/);
     // 旧硬编码块（join 后直接 limit 1）不得回潮；团员密钥 RPC 的 where member_key ... limit 1 为合法按键查单行
     expect(schema).not.toMatch(/left join team_data d on d\.team_id = t\.id\s*\r?\n\s*limit 1/);

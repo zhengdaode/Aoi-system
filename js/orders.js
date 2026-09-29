@@ -2239,6 +2239,7 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<div class="grid grid-cols-2 gap-1.5">'
     + '<input data-pprice="' + p.id + '" type="number" step="0.01" value="' + (p.price != null ? p.price : '') + '" placeholder="登记单价¥" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '<input data-plimit="' + p.id + '" type="number" step="1" value="' + (p.limit != null ? p.limit : '') + '" placeholder="单账号限购" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '<label class="col-span-2 flex items-center gap-1.5 text-xs text-gray-600 select-none"><input type="checkbox" data-plisted="' + p.id + '" ' + (p.listed ? 'checked' : '') + ' class="rounded border-gray-300">上架到 C 端商城橱窗（买家可见并下单，需已登记单价）</label>'
     + '<input id="' + imgId + '" data-img-paste value="' + Aoi.escapeHtml(p.refImage || '') + '" placeholder="参考图 URL" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '</div>'
@@ -2351,6 +2352,9 @@ Aoi.orders.saveActProduct = async function (pid) {
     if (limitRaw === '') delete p.limit;
     else { var l = parseInt(limitRaw, 10); if (isNaN(l)) { Aoi.toast('限购格式不正确', 'warning'); return; } p.limit = l; }
   }
+  // F12 C 端橱窗上架开关（缺省未上架；C 端 RPC 按 listed is true 过滤）
+  var listed = card ? card.querySelector('[data-plisted="' + pid + '"]') : null;
+  if (listed) p.listed = !!listed.checked;
   await Aoi.saveTeamData(d);
   Aoi.orders.renderActivities();
   Aoi.toast('已保存商品 ' + p.type + '-' + p.model, 'success');

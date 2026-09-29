@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.22.0 (2026-09-30)
+
+> **C 端商城 V1（F12 拍板后实施）**：面向买家的自助下单商城上线——邮箱验证码登录（**密钥发放取消**）→ 绑定圈名 →
+> 橱窗选购 → 购物车下单 → 唯一尾数金额+收款码支付（**买家免上传付款凭证**）→ 订单进度跟踪。
+> 订单**直接并入管理端同一份数据 blob**（shopOrders 订单头 + 逐商品 orders 行，buyer=CN）——到货分批/国际费分摊/
+> 审批/发货全链路零改造。拍板与登录方案调研（手机验证码部署要求/邮箱可行性/QQ·微信 OAuth 前置）见
+> [docs/PLAN-F12-CEND-SHOP.md](docs/PLAN-F12-CEND-SHOP.md) §九。vitest 519→536 全绿。
+
+### Added
+- **服务端**（`supabase-schema.sql` F12 节 + `supabase/migrations/001-shop-v1.sql`）：shop 系 RPC 七件——
+  `shop_me`（绑定状态/团名/收款位）、`shop_bind_cn`（CN 绑定，须在本团 orders/memberMeta 中存在，一 CN 一账号）、
+  `shop_get_catalog`（开放团期+已上架商品，服务端过滤）、`shop_place_order`（**服务端算价/限购/截团校验**，唯一尾数
+  0.01–0.99 作订单指纹，写 shopOrders 订单头 + 逐商品 orders 行 + 地址同步 + type:'shop' 通知）、
+  `shop_get_my_orders`（订单头+orders 行推导进度/快递单号）、`shop_cancel_order`（仅待付款，头行一并移除）、
+  shop_ctx（内部）。全部 security definer + 写前历史快照 + `for update` 行锁；对外六 RPC 仅 authenticated，
+  shop_ctx revoke 全员。blob 新键：`shopOrders` / `shopUsers`；orders 行新增 `shopOrderId`/`shopOrderNo`。
+- **C 端**（`shop.html` + `css/shop.css` + `js/shop.js`，第 23 个 js 模块）：邮箱 OTP 三步登录（发码/验码/绑定 CN）→
+  首页团期流+全文搜索（活动/商品/日文原名/IP）→ 团期详情/商品详情（限购/外币原价/购买须知）→ 购物车（跨团期
+  分组/步进/限购夹紧/勾选结算，localStorage `aoi_shop_cart`）→ 下单确认（地址预填上次/金额明细/备注）→ 收银台
+  （实付=商品+唯一尾数，收款码取囤货地配置，转账免上传截图）→ 订单列表（全部/待付款/已付款/已发货/已完成）+
+  详情（时间线/快递单号/取消）→ 我的。`Aoi.shop` 纯函数（splitTail/statusMeta/progressText/cartAdd/cartTotal）
+  与全部 DOM 绑定空值保护——管理端 harness 加载静默待命。
+- **管理端**：活动管理展开区商品卡新增「上架到 C 端商城橱窗」开关（`products[].listed`，缺省下架，需已登记单价；
+  随「保存」落库）。
+- **测试**：`tests/shop-v1.test.js` 17 例（纯函数/状态推导/RPC 错误分支与会话过期清理/橱窗开关渲染与持久化）；
+  `tests/helpers/aoi.js` MODULES + `js/shop.js`。
+- **文档**：PLAN-F12 §九（拍板记录/登录调研/合并模型/部署动作/遗留项）；`demo/shop-demo/` 单文件版打包
+  （`scripts/build-shop-demo.mjs`）与 ZIP/线上版三形态分发。
+
+### Changed
+- `tests/v310-security.test.js`：v2 归档守护中 auth.uid 检查改为仅作用于 schema F12 节之前主体
+  （C 端经拍板重新引入 Supabase Auth 邮箱 OTP；auth.users 外键与 create policy 仍全文件禁止）。
+- `tests/v311-trust.test.js`：assert_single_team 守卫计数 10→14（F12 shop 四 RPC 新增调用，均走守卫）。
+
+### 部署动作（上线前置）
+- 线上库执行 `supabase/migrations/001-shop-v1.sql`（幂等）；Supabase Dashboard 邮件模板确认含 `{{ .Token }}`；
+- 团长：设置页囤货地填收款码 URL；活动管理勾选商品上架。C 端地址 `https://zhengdaode.github.io/Aoi-system/shop.html`。
+
 ## v3.21.1 (2026-09-26)
 
 > **工单台上线修订**：① QQ 工单处理台从「通知公告」页拆为**并列独立视图**（侧边栏新增「QQ 工单」入口）；

@@ -44,7 +44,8 @@ const MODULES = [
   'js/typesafe.js',
   'js/species-zh.js',
   'js/catalog-dict.js',
-  'js/catalog.js'
+  'js/catalog.js',
+  'js/shop.js'
 ];
 
 const loadErrors = [];

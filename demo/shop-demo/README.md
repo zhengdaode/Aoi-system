@@ -8,6 +8,16 @@
 
 直接双击 `index.html`（或任意静态服务器指向本目录）。桌面浏览器会显示为居中手机壳，≤420px 视口即全屏移动端效果。
 
+## 打包与分享（在其他设备打开）
+
+| 形态 | 位置 | 适用 |
+|---|---|---|
+| **线上版（最省事）** | <https://zhengdaode.github.io/Aoi-system/demo/shop-demo/> | 任何设备直接开链接（随 origin push 自动部署） |
+| **单文件版** | `demo/谷谷商城-F12演示-单文件版.html` | QQ/微信直接发文件，对方双击/点开即用（CSS/JS 已内联，75KB，离线可开） |
+| **ZIP 包** | `demo/F12-shop-demo.zip` | 整个文件夹打包（gitignore 约定 zip 不入库；重打：`powershell -NoProfile -Command "Compress-Archive -Path 'demo/shop-demo/*' -DestinationPath 'demo/F12-shop-demo.zip' -Force"`） |
+
+单文件版由 `scripts/build-shop-demo.mjs` 生成——**demo 三件套有改动后重新执行** `node scripts/build-shop-demo.mjs` 即可，防错位校验内建（`</script>` 检测 + 替换命中断言）。
+
 ## 演示路径（建议顺序）
 
 1. **登录**：团员密钥 + CN/QQ 任意输入（页面上注明了正式版的鉴权升级路线）

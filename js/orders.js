@@ -2296,8 +2296,8 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<div class="flex items-start gap-2">'
     + thumb
     + '<div class="flex-1 min-w-0">'
-    + '<input data-ptype="' + p.id + '" list="actProductTypeOptions" value="' + Aoi.escapeHtml(p.type) + '" title="制品类型（可修改，下拉选类型库）" class="w-full text-xs text-gray-500 bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
-    + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-full font-semibold text-sm bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
+    + '<input data-ptype="' + p.id + '" list="actProductTypeOptions" value="' + Aoi.escapeHtml(p.type) + '" title="制品类型（可修改，下拉选类型库）" class="block w-full text-xs text-gray-500 bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
+    + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="block w-full font-semibold text-sm bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
     + (p.nameOrig ? '<div class="text-[11px] text-gray-400 mt-0.5" title="原语言名称">原名：' + Aoi.escapeHtml(p.nameOrig) + '</div>' : '')
     + '<div class="text-xs text-gray-500 mt-0.5">'
     + (s.priceAvg != null ? '参考单价 ¥' + s.priceAvg : '单价未登记')

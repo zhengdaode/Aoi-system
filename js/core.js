@@ -75,7 +75,7 @@ Aoi.nav = function (viewId) {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.24.0',
+  version: 'v3.24.1',
   buildDate: '2026-10-07',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -84,6 +84,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.24.1（2026-10-07）：修复活动商品卡型号名错位（类型改为输入框后与型号并排溢出卡片）',
     'v3.24.0（2026-10-07）：账户与设置新增「关于」选项卡（作者 / 项目地址 / 版本与更新日志）',
     'v3.23.0（2026-10-07）：QQ 工单快捷导航 / 购买计划批量状态+恢复默认 / 活动商品随订单删改自动同步 / 商品卡制品类型可改 / UI polish',
     'v3.22.0（2026-09-30）：C 端商城 V1 上线——邮箱验证码登录 → 橱窗选购 → 购物车下单 → 唯一尾数支付 → 订单跟踪',

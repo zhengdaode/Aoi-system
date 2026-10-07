@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.24.1 (2026-10-07)
+
+> **修复活动商品卡型号名错位**（v3.23.0 类型可改的回归）：卡片头部类型由 `<div>` 改为 `<input>` 后两个行内级
+> 输入框并排——活动表格处于 `.overflow-x-auto`，styles.css 对其 `td` 的 `white-space: nowrap` 使行内盒不换行，
+> 型号输入框被挤出卡片右侧悬空（实测 getBoundingClientRect：型号 x=690 越过卡片右界 703，与类型同 y）。
+> 类型/型号输入框加 `block` 块级化（各占一行，不受 nowrap 祖先影响）。本地浏览器实测修复后型号回到类型正下方、
+> 完全位于卡片内。vitest 562 全绿。
+
+### Fixed
+- `js/orders.js` `actProductCardHtml`：`data-ptype` / `data-pmodel` 输入框 class 加 `block`。
+
 ## v3.24.0 (2026-10-07)
 
 > **账户与设置新增「关于」选项卡**：点开查看项目作者 / 项目地址 / 当前版本与更新日志。零 schema 改动。vitest 558→562 全绿。

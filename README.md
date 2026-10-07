@@ -2,7 +2,7 @@
 
 > **原作者：秋洛 (QiuLuo)** · 原项目：[mossasari/Group-Buy-Management-System](https://github.com/mossasari/Group-Buy-Management-System)
 > **当前维护者：郑 (zhengdaode)** · [GitHub](https://github.com/zhengdaode)
-> **当前版本：v3.14.0**（2026-09-12）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
+> **当前版本：v3.24.0**（2026-10-07）· 变更记录见 [CHANGELOG.md](CHANGELOG.md)
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/zhengdaode/Aoi-system)
 

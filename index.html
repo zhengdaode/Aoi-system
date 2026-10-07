@@ -481,6 +481,28 @@
             <button onclick="Aoi.auth.changePassword()" class="px-4 py-2 btn-primary text-sm font-bold rounded">保存</button>
           </div>
         </div>
+
+        <!-- 关于（v3.24.0）：点开查看项目作者 / 项目地址 / 当前版本更新日志；数据源 js/core.js Aoi.ABOUT -->
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <button id="aboutToggleBtn" onclick="Aoi.about.toggle()" aria-expanded="false" class="w-full flex items-center justify-between text-left select-none">
+            <h3 class="font-bold">关于</h3>
+            <span id="aboutChevron" class="text-gray-400 text-sm transition-transform">▾</span>
+          </button>
+          <div id="aboutBody" class="hidden mt-3 text-sm">
+            <div class="flex gap-2 mb-1.5"><span class="text-gray-400 shrink-0">当前版本</span><span id="aboutVersion" class="font-semibold"></span></div>
+            <div class="flex gap-2 mb-1.5"><span class="text-gray-400 shrink-0">项目地址</span>
+              <span class="min-w-0"><a id="aboutRepoLink" href="#" target="_blank" rel="noopener" class="text-blue-600 hover:underline break-all"></a>
+              <span class="text-gray-300 mx-1">·</span><a id="aboutSiteLink" href="#" target="_blank" rel="noopener" class="text-blue-600 hover:underline break-all">线上站</a></span>
+            </div>
+            <div class="flex gap-2 mb-1.5"><span class="text-gray-400 shrink-0">项目作者</span>
+              <span>当前维护者 <b>郑 (zhengdaode)</b>；业务概念沿用原作者 <b>秋洛 (QiuLuo)</b>（CC BY-NC-SA 4.0）· <a id="aboutOrigLink" href="#" target="_blank" rel="noopener" class="text-blue-600 hover:underline">原项目</a>（代码与数据模型全量重写）</span>
+            </div>
+            <div class="flex gap-2 mb-1"><span class="text-gray-400 shrink-0">更新日志</span>
+              <span class="min-w-0"><ul id="aboutLog" class="list-disc list-inside text-gray-600 text-xs leading-relaxed"></ul>
+              <a id="aboutChangelogLink" href="#" target="_blank" rel="noopener" class="text-blue-600 hover:underline text-xs">查看完整更新日志（CHANGELOG.md）→</a></span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 信息录入 -->

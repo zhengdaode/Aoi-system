@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.24.0 (2026-10-07)
+
+> **账户与设置新增「关于」选项卡**：点开查看项目作者 / 项目地址 / 当前版本与更新日志。零 schema 改动。vitest 558→562 全绿。
+
+### Added
+- **「关于」选项卡**（`js/core.js` + `index.html`）：设置页末尾新增可点开收起的「关于」卡片——
+  当前版本（`Aoi.ABOUT.version/buildDate`）、项目地址（GitHub 仓库 + Pages 线上站）、
+  项目作者（当前维护者 郑 (zhengdaode)；业务概念沿用原作者 秋洛 (QiuLuo)，CC BY-NC-SA 4.0，附原项目链接）、
+  近五个版本更新日志摘要 + 「查看完整更新日志」跳转 CHANGELOG.md。
+- `Aoi.ABOUT` 集中数据源（发版时随 CHANGELOG 同步更新一行）+ `Aoi.about.render/toggle`；
+  `Aoi.nav` 进入设置页时自动刷新内容。
+
 ## v3.23.0 (2026-10-07)
 
 > **用户实测五项反馈迭代**：QQ 工单快捷导航 / 购买计划批量状态 + 恢复默认 / 活动商品随订单删改自动同步 /

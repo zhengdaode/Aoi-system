@@ -69,6 +69,57 @@ Aoi.nav = function (viewId) {
   if (viewId === 'view-buyers' && Aoi.orders) Aoi.orders.renderBuyers();
   // 进入 QQ 工单页时加载工单（F11-M13 工单处理台，独立视图；bot 未接入时静默降级）
   if (viewId === 'view-tickets' && Aoi.tickets) Aoi.tickets.load();
+  // 进入设置页时刷新「关于」选项卡的版本与更新日志（v3.24.0）
+  if (viewId === 'view-settings' && Aoi.about) Aoi.about.render();
+};
+
+// —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
+Aoi.ABOUT = {
+  version: 'v3.24.0',
+  buildDate: '2026-10-07',
+  repo: 'https://github.com/zhengdaode/Aoi-system',
+  site: 'https://zhengdaode.github.io/Aoi-system/',
+  changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
+  originalAuthor: '秋洛 (QiuLuo)',
+  originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
+  maintainer: '郑 (zhengdaode)',
+  log: [
+    'v3.24.0（2026-10-07）：账户与设置新增「关于」选项卡（作者 / 项目地址 / 版本与更新日志）',
+    'v3.23.0（2026-10-07）：QQ 工单快捷导航 / 购买计划批量状态+恢复默认 / 活动商品随订单删改自动同步 / 商品卡制品类型可改 / UI polish',
+    'v3.22.0（2026-09-30）：C 端商城 V1 上线——邮箱验证码登录 → 橱窗选购 → 购物车下单 → 唯一尾数支付 → 订单跟踪',
+    'v3.21.1（2026-09-26）：QQ 工单独立视图 + relay 根路由 ticketOp 协议（/onebot/* 透传实测不可用的修订）',
+    'v3.21.0（2026-09-26）：TypeSafe bot 意图端点 /bot-intent（F11-M9）'
+  ]
+};
+
+// 「关于」选项卡：toggle 展开/收起卡片体，render 填充版本/日志/链接（进入设置页时由 Aoi.nav 调用）
+Aoi.about = {
+  render: function () {
+    var a = Aoi.ABOUT;
+    var ver = document.getElementById('aboutVersion');
+    if (ver) ver.textContent = a.version + '（' + a.buildDate + '）';
+    var log = document.getElementById('aboutLog');
+    if (log) log.innerHTML = a.log.map(function (line) {
+      return '<li class="mb-1">' + Aoi.escapeHtml(line) + '</li>';
+    }).join('');
+    var set = function (id, url) {
+      var el = document.getElementById(id);
+      if (el) { el.href = url; el.textContent = url.replace(/^https?:\/\//, ''); }
+    };
+    set('aboutRepoLink', a.repo);
+    set('aboutSiteLink', a.site);
+    set('aboutChangelogLink', a.changelog);
+    set('aboutOrigLink', a.originalRepo);
+  },
+  toggle: function () {
+    var body = document.getElementById('aboutBody');
+    if (!body) return;
+    var hidden = body.classList.toggle('hidden');
+    var chev = document.getElementById('aboutChevron');
+    if (chev) chev.style.transform = hidden ? '' : 'rotate(180deg)';
+    var btn = document.getElementById('aboutToggleBtn');
+    if (btn) btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+  }
 };
 
 // 移动端侧边栏抽屉：无参切换，true 展开 / false 收起

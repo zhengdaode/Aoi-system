@@ -1189,6 +1189,16 @@
             <button onclick="Aoi.exportImage(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-auto px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">导出图片</button><button onclick="Aoi.tableExport(this)" data-table="limResultTable" data-name="限购购买计划" data-activity-from="limActivity" class="ml-2 px-3 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100">下载表格</button><button onclick="Aoi.planExport.exportAll((document.getElementById('limActivity')||{}).value)" class="ml-2 px-3 py-1 btn-outline rounded text-xs" title="按当前活动已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表（每账号一个 Sheet）</button>
           </div>
           <p id="limResultStat" class="text-sm text-gray-500 mb-2"></p>
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <span class="text-xs text-gray-400 select-none">批量操作：</span>
+            <select id="limBatchSel" class="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="已购买">已购买</option>
+              <option value="待购买">待购买</option>
+              <option value="购买失败">购买失败</option>
+            </select>
+            <button onclick="Aoi.limits.batchSetStatus((document.getElementById('limActivity')||{}).value, document.getElementById('limBatchSel').value)" class="px-3 py-1.5 btn-outline rounded text-xs font-bold">应用到全部条目</button>
+            <button onclick="Aoi.limits.resetStatuses((document.getElementById('limActivity')||{}).value)" class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 font-bold" title="全部条目重置为「待购买」（30 秒内可撤销）">一键恢复默认</button>
+          </div>
           <div class="overflow-x-auto">
             <table id="limResultTable" class="w-full text-sm data-table">
               <thead><tr class="text-left text-gray-500 border-b border-gray-200">

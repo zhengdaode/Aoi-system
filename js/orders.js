@@ -1331,6 +1331,8 @@ Aoi.orders.saveEdit = async function () {
   var type = get('eType'), model = get('eModel');
   var count = parseInt(get('eCount'), 10);
   if (!type || !model || isNaN(count) || count <= 0) { Aoi.toast('类型/型号/数量必填', 'warning'); return; }
+  // v3.23.0：旧键 (活动|类型|型号) 记录在改前，保存后清理失去全部订单的商品残留
+  var oldAct = o.activity, oldKey = o.type + '|' + o.model;
   var priceRaw = get('ePrice');
   var origRaw = get('ePriceOrig');
   o.type = type;
@@ -1343,10 +1345,12 @@ Aoi.orders.saveEdit = async function () {
   if (o.price != null && isNaN(o.price)) { Aoi.toast('人民币价格格式不正确', 'warning'); return; }
   o.priceOrig = origRaw === '' ? null : parseFloat(origRaw);
   if (o.priceOrig != null && isNaN(o.priceOrig)) { Aoi.toast('外币原价格式不正确', 'warning'); return; }
+  var pruned = Aoi.orders.pruneOrphanProducts(d, oldAct, [oldKey]);
   await Aoi.saveTeamData(d);
   Aoi.orders.closeEdit();
   Aoi.orders.render();
-  Aoi.toast('订单已更新', 'success');
+  if (pruned) Aoi.orders.renderActivities();
+  Aoi.toast('订单已更新' + (pruned ? '，同步清理无订单商品 ' + pruned + ' 个' : ''), 'success');
 };
 
 // —— 批量操作 ——
@@ -1459,12 +1463,22 @@ Aoi.orders.batchDelete = async function () {
   var idSet = {};
   ids.forEach(function (id) { idSet[id] = 1; });
   var d = Aoi.orders.ensure();
+  // v3.23.0：记录被删订单波及的 (活动, 商品键)，删除后同步清理失去全部订单的商品空卡
+  var touched = {};
+  d.orders.forEach(function (o) {
+    if (idSet[o.id]) (touched[o.activity] = touched[o.activity] || {})[o.type + '|' + o.model] = 1;
+  });
   Aoi.undo.arm('删除 ' + ids.length + ' 条订单', d);
   d.orders = d.orders.filter(function (o) { return !idSet[o.id]; });
+  var pruned = 0;
+  Object.keys(touched).forEach(function (act) {
+    pruned += Aoi.orders.pruneOrphanProducts(d, act, Object.keys(touched[act]));
+  });
   await Aoi.saveTeamData(d);
   Aoi.orders.render();
+  if (pruned) Aoi.orders.renderActivities();
   Aoi.orders.refillAllBatchSelects();
-  Aoi.toast('已删除 ' + ids.length + ' 条', 'success');
+  Aoi.toast('已删除 ' + ids.length + ' 条' + (pruned ? '，同步清理无订单商品 ' + pruned + ' 个' : '') + '（30 秒内可撤销）', 'success');
 };
 
 // —— 周边（旧预建商品池）：v3.7.0 S4 起录入统一走「登记活动商品」（addProduct），
@@ -1783,6 +1797,8 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
   var syn = e.target.closest('button[data-act-sync]');
   if (syn) { Aoi.orders.syncProductsFromOrders(syn.getAttribute('data-act-sync')); return; }
+  var pr = e.target.closest('button[data-act-prune]');
+  if (pr) { Aoi.orders.pruneNoOrderProducts(pr.getAttribute('data-act-prune')); return; }
   var es = e.target.closest('button[data-act-exportsummary]');
   if (es) { Aoi.exportSummary(es.getAttribute('data-act-exportsummary')); return; }
   var ap = e.target.closest('button[data-act-addproduct]');
@@ -2159,6 +2175,61 @@ Aoi.orders.syncProductsFromOrders = async function (activity) {
   return missing.length;
 };
 
+// 无订单商品查询（v3.23.0）：主档中「无任何订单 ∧ 不在购买计划 ∧ 未上架橱窗」的商品——
+// 订单删改后残留的空卡即属此类；keys 传 'type|model' 数组时只查这些键（订单变动波及面），
+// 不传查整个活动。手工预登记商品只要还在计划里就不会命中。
+Aoi.orders.noOrderProducts = function (d, activity, keys) {
+  var m = d.activityMeta && d.activityMeta[activity];
+  if (!m || !m.products || !m.products.length) return [];
+  var keySet = null;
+  if (keys) { keySet = {}; keys.forEach(function (k) { keySet[k] = 1; }); }
+  var hasOrder = {};
+  (d.orders || []).forEach(function (o) {
+    if (o.activity !== activity) return;
+    hasOrder[o.type + '|' + o.model] = 1;
+  });
+  var inPlan = {};
+  var plan = d.limitPlans && d.limitPlans[activity];
+  if (plan) (plan.items || []).forEach(function (a) {
+    (a.items || []).forEach(function (it) { inPlan[it.type + '|' + it.model] = 1; });
+  });
+  return m.products.filter(function (p) {
+    var k = p.type + '|' + p.model;
+    if (keySet && !keySet[k]) return false;
+    return !hasOrder[k] && !inPlan[k] && !p.listed;
+  });
+};
+
+// 把命中 keys 的无订单商品从主档移除，返回清理数量（只改内存，落库由调用方负责）
+Aoi.orders.pruneOrphanProducts = function (d, activity, keys) {
+  var m = d.activityMeta && d.activityMeta[activity];
+  if (!m || !m.products || !m.products.length) return 0;
+  var orphans = Aoi.orders.noOrderProducts(d, activity, keys);
+  if (!orphans.length) return 0;
+  var ids = {};
+  orphans.forEach(function (p) { ids[p.id] = 1; });
+  m.products = m.products.filter(function (p) { return !ids[p.id]; });
+  return orphans.length;
+};
+
+// 手动清理：整个活动的全部无订单商品（确认 + 30 秒撤销保护）
+Aoi.orders.pruneNoOrderProducts = async function (activity) {
+  var d = Aoi.orders.ensure();
+  var orphans = Aoi.orders.noOrderProducts(d, activity, null);
+  if (!orphans.length) { Aoi.toast('没有可清理的商品（仅计「无订单 且 不在购买计划 且 未上架」的商品）', 'info'); return 0; }
+  var names = orphans.slice(0, 5).map(function (p) { return p.type + '-' + p.model; }).join('、');
+  if (!(await Aoi.confirm('清理活动「' + activity + '」的 ' + orphans.length + ' 个无订单商品？\n'
+    + names + (orphans.length > 5 ? ' 等' : '')
+    + '\n仅清理「无订单 且 不在购买计划 且 未上架橱窗」的商品；30 秒内可撤销。',
+    { title: '清理无订单商品', okText: '清理', danger: true }))) return 0;
+  Aoi.undo.arm('清理无订单商品', d);
+  var n = Aoi.orders.pruneOrphanProducts(d, activity, null);
+  await Aoi.saveTeamData(d);
+  Aoi.orders.renderActivities();
+  Aoi.toast('已清理 ' + n + ' 个无订单商品（30 秒内可撤销）', 'success');
+  return n;
+};
+
 // —— 活动商品展开区（v3.7.0 S2，取代 v3.6.0 商品弹窗）：点击活动名行内展开商品卡片 ——
 
 // 展开状态（活动名 → true；重渲染后保持）
@@ -2225,7 +2296,7 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<div class="flex items-start gap-2">'
     + thumb
     + '<div class="flex-1 min-w-0">'
-    + '<div class="text-xs text-gray-400">' + Aoi.escapeHtml(p.type) + '</div>'
+    + '<input data-ptype="' + p.id + '" list="actProductTypeOptions" value="' + Aoi.escapeHtml(p.type) + '" title="制品类型（可修改，下拉选类型库）" class="w-full text-xs text-gray-500 bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
     + '<input data-pmodel="' + p.id + '" value="' + Aoi.escapeHtml(p.model) + '" placeholder="型号" class="w-full font-semibold text-sm bg-transparent border-0 border-b border-transparent focus:border-blue-400 p-0">'
     + (p.nameOrig ? '<div class="text-[11px] text-gray-400 mt-0.5" title="原语言名称">原名：' + Aoi.escapeHtml(p.nameOrig) + '</div>' : '')
     + '<div class="text-xs text-gray-500 mt-0.5">'
@@ -2268,6 +2339,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<button data-act-exportproducts="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap" title="导出该活动商品主档 xlsx（类型/型号/原名/价格/限购/参考图/链接）">导出商品列表</button>'
     + '<button data-act-miniexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="按小程序模板导出该活动全部商品（说明 6 行 + 表头 + 数据）">导出到小程序</button>'
     + '<button data-act-sync="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap">从订单同步商品</button>'
+    + '<button data-act-prune="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap" title="清理「无订单 且 不在购买计划 且 未上架」的商品主档（订单删改后的残留空卡），30 秒内可撤销">清理无订单商品</button>'
     + '<button data-act-exportsummary="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap">导出汇总表</button>'
     + '</div>';
   var form = '<div class="flex flex-wrap items-center gap-2 mb-3">'
@@ -2324,13 +2396,21 @@ Aoi.orders.saveActProduct = async function (pid) {
   var p = loc.product;
   var card = document.querySelector('[data-pcard="' + pid + '"]');
   var field = function (sel) { var el = card ? card.querySelector(sel) : null; return el ? el.value.trim() : null; };
-  var model = field('[data-pmodel="' + pid + '"]');
-  if (model != null) {
-    if (!model) { Aoi.toast('型号不能为空', 'warning'); return; }
-    var dup = loc.meta.products.some(function (x) { return x.id !== pid && x.type === p.type && x.model === model; });
-    if (dup) { Aoi.toast('已存在同型号商品「' + p.type + '-' + model + '」', 'warning'); return; }
-    p.model = model;
+  // v3.23.0：制品类型卡内可改——类型与型号先校验（查重按新 type+model）再写回，拒绝时不污染内存数据
+  var newType = field('[data-ptype="' + pid + '"]');
+  if (newType != null) {
+    if (!newType) { Aoi.toast('制品类型不能为空', 'warning'); return; }
   }
+  var newModel = field('[data-pmodel="' + pid + '"]');
+  if (newModel != null) {
+    if (!newModel) { Aoi.toast('型号不能为空', 'warning'); return; }
+  }
+  var finalType = newType != null ? newType : p.type;
+  var finalModel = newModel != null ? newModel : p.model;
+  var dup = loc.meta.products.some(function (x) { return x.id !== pid && x.type === finalType && x.model === finalModel; });
+  if (dup) { Aoi.toast('已存在同型号商品「' + finalType + '-' + finalModel + '」', 'warning'); return; }
+  if (newType != null) p.type = newType;
+  if (newModel != null) p.model = newModel;
   var img = document.getElementById('apImg_' + pid);
   if (img) {
     var rawImg = img.value.trim();

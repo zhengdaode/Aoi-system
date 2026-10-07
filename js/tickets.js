@@ -43,6 +43,28 @@ Aoi.tickets.replyText = function (row, text) {
   return String(text || '').trim();
 };
 
+// 快捷导航定位（v3.23.0）：当前工单在列表中的位置与上/下一条编号（列表顺序即渲染顺序）
+Aoi.tickets.navOf = function (id) {
+  var idx = -1;
+  Aoi.tickets.rows.forEach(function (r, i) { if (r.id === id) idx = i; });
+  return {
+    idx: idx,
+    total: Aoi.tickets.rows.length,
+    pos: idx < 0 ? '-' : (idx + 1) + '/' + Aoi.tickets.rows.length,
+    prevId: idx > 0 ? Aoi.tickets.rows[idx - 1].id : null,
+    nextId: (idx >= 0 && idx < Aoi.tickets.rows.length - 1) ? Aoi.tickets.rows[idx + 1].id : null
+  };
+};
+
+// 跳上/下一条工单（详情卡按钮与 J/K、←/→ 快捷键共用）
+Aoi.tickets.step = function (dir) {
+  if (!Aoi.tickets.current) return;
+  var nav = Aoi.tickets.navOf(Aoi.tickets.current.id);
+  var target = dir < 0 ? nav.prevId : nav.nextId;
+  if (!target) { Aoi.toast(dir < 0 ? '已经是第一条工单' : '已经是最后一条工单', 'info'); return; }
+  Aoi.tickets.openDetail(target);
+};
+
 // —— 数据 ——
 
 Aoi.tickets.load = async function (manual) {
@@ -104,11 +126,18 @@ Aoi.tickets.openDetail = function (id) {
       }).join('')
     : '<div class="text-sm text-gray-400">暂无回复</div>';
   var reminds = row.reminders || [];
+  var nav = Aoi.tickets.navOf(row.id);
+  var navBtn = 'px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed';
   el.innerHTML = [
     '<div class="bg-white rounded-lg border border-gray-200 p-6">',
     '  <div class="flex items-center justify-between mb-3">',
     '    <h4 class="font-bold font-mono">' + row.id + '</h4>',
-    '    <button onclick="Aoi.tickets.closeDetail()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>',
+    '    <div class="flex items-center gap-2">',
+    '      <button onclick="Aoi.tickets.step(-1)" title="上一条（K / ←）"' + (nav.prevId ? '' : ' disabled') + ' class="' + navBtn + '">← 上一条</button>',
+    '      <span class="text-xs text-gray-400 select-none">' + nav.pos + '</span>',
+    '      <button onclick="Aoi.tickets.step(1)" title="下一条（J / →）"' + (nav.nextId ? '' : ' disabled') + ' class="' + navBtn + '">下一条 →</button>',
+    '      <button onclick="Aoi.tickets.closeDetail()" class="text-gray-400 hover:text-gray-600 text-xl leading-none ml-1">&times;</button>',
+    '    </div>',
     '  </div>',
     '  <div class="grid grid-cols-2 gap-2 text-sm mb-3">',
     '    <div><span class="text-gray-400">昵称：</span>' + Aoi.escapeHtml(row.cn || '未绑定') + '</div>',
@@ -228,3 +257,12 @@ Aoi.tickets._replace = function (row) {
   Aoi.tickets.current = row;
   Aoi.tickets.render();
 };
+
+// 快捷键（v3.23.0）：详情卡打开时 J/→ 下一条、K/← 上一条；输入控件聚焦时不劫持
+document.addEventListener('keydown', function (e) {
+  if (!Aoi.tickets.current) return;
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowRight') { Aoi.tickets.step(1); e.preventDefault(); }
+  else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowLeft') { Aoi.tickets.step(-1); e.preventDefault(); }
+});

@@ -540,6 +540,14 @@ Aoi.limits.renderActPlan = function () {
     return;
   }
   body.innerHTML = '<p id="actPlanStat" class="text-xs text-gray-500 mb-2"></p>'
+    + '<div class="flex flex-wrap items-center gap-2 mb-2">'
+    + '<span class="text-xs text-gray-400 select-none">批量操作：</span>'
+    + '<select id="actPlanBatchSel" class="border border-gray-300 rounded px-2 py-1 text-sm">'
+    + Aoi.limits.STATUS_OPTIONS.map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('')
+    + '</select>'
+    + '<button onclick="Aoi.limits.batchSetStatus(Aoi.limits.actTarget, document.getElementById(\'actPlanBatchSel\').value)" class="px-3 py-1.5 btn-outline rounded text-xs font-bold">应用到全部条目</button>'
+    + '<button onclick="Aoi.limits.resetStatuses(Aoi.limits.actTarget)" class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100 font-bold" title="全部条目重置为「待购买」（30 秒内可撤销）">一键恢复默认</button>'
+    + '</div>'
     + '<table class="w-full text-sm data-table"><thead><tr class="text-left text-gray-500 border-b border-gray-200">'
     + '<th class="px-2 py-2 text-right w-8">行号</th><th class="px-3 py-2">账号</th><th class="px-3 py-2">购买内容</th>'
     + '<th class="px-3 py-2 text-right">件数</th><th class="px-3 py-2 text-right">金额(¥)</th><th class="px-3 py-2 text-right">外币原价</th>'
@@ -609,6 +617,48 @@ Aoi.limits.setItemStatus = async function (activity, idx, key, status) {
   item.status = status;
   await Aoi.saveTeamData(d);
   Aoi.limits.rerenderAll(activity);
+};
+
+// 批量修改购买状态 / 一键恢复默认（v3.23.0）：把已存计划全部条目统一设为指定状态；
+// 批量设为「购买失败」只改状态、不触发逐条自动重分配（单条失败的重分配仍走 setItemStatus）
+Aoi.limits.batchStatusCount = function (stored, status) {
+  var n = 0;
+  (stored.items || []).forEach(function (a) {
+    (a.items || []).forEach(function (it) { if (it.status !== status) n++; });
+  });
+  return n;
+};
+
+Aoi.limits.batchSetStatus = async function (activity, status, opts) {
+  opts = opts || {};
+  var d = Aoi.orders.ensure();
+  var stored = d.limitPlans && d.limitPlans[activity];
+  if (!stored) { Aoi.toast('该活动还没有购买计划', 'warning'); return; }
+  if (Aoi.limits.STATUS_OPTIONS.indexOf(status) < 0) { Aoi.toast('请先选择要批量设置的状态', 'warning'); return; }
+  var n = Aoi.limits.batchStatusCount(stored, status);
+  if (!n) { Aoi.toast('全部条目已是「' + status + '」，无需修改', 'info'); return; }
+  var msg = opts.reset
+    ? '把活动「' + activity + '」购买计划的 ' + n + ' 条条目全部恢复为「待购买」？（30 秒内可撤销）'
+    : '把活动「' + activity + '」购买计划的 ' + n + ' 条条目批量设为「' + status + '」？（30 秒内可撤销；批量设为失败不触发自动重分配）';
+  if (!(await Aoi.confirm(msg, {
+    title: opts.reset ? '一键恢复默认' : '批量修改购买状态',
+    okText: opts.reset ? '恢复默认' : '批量设置',
+    danger: status === '购买失败'
+  }))) return;
+  Aoi.undo.arm(opts.reset ? '购买状态恢复默认' : '批量修改购买状态', d);
+  (stored.items || []).forEach(function (a) {
+    (a.items || []).forEach(function (it) { it.status = status; });
+  });
+  await Aoi.saveTeamData(d);
+  Aoi.limits.rerenderAll(activity);
+  Aoi.toast(opts.reset
+    ? ('已恢复默认：' + n + ' 条条目重置为「待购买」')
+    : ('已批量设置 ' + n + ' 条条目为「' + status + '」'), 'success');
+};
+
+// 一键恢复默认 = 全部条目重置为「待购买」
+Aoi.limits.resetStatuses = function (activity) {
+  return Aoi.limits.batchSetStatus(activity, '待购买', { reset: true });
 };
 
 // 计划表格内控件的事件委托（限购结果表与活动计划弹窗共用）

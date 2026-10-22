@@ -71,14 +71,16 @@ Aoi.nav = function (viewId) {
   if (viewId === 'view-tickets' && Aoi.tickets) Aoi.tickets.load();
   // 进入蓄水池页时重渲染池卡与明细（v3.25.0 互购净额台账）
   if (viewId === 'view-reservoir' && Aoi.reservoir) Aoi.reservoir.renderAll();
+  // 进入排谷表页时重渲染活动列表或当前表格详情（v3.27.0 按活动排队表格）
+  if (viewId === 'view-paigu' && Aoi.paigu) Aoi.paigu.renderAll();
   // 进入设置页时刷新「关于」选项卡的版本与更新日志（v3.24.0）
   if (viewId === 'view-settings' && Aoi.about) Aoi.about.render();
 };
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.26.0',
-  buildDate: '2026-10-14',
+  version: 'v3.27.0',
+  buildDate: '2026-10-23',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -86,6 +88,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.27.0（2026-10-23）：排谷表——按活动排队表格，商品按类型分 sheet、位次×买家矩阵、五状态色标、点按/右键改状态与插排撤排、超排检测删除、排谷日志、xlsx 导出（每类型一 Sheet+日志）',
     'v3.26.0（2026-10-14）：蓄水池「未转化订单就地补价」——警告标签/行内标记点一下按参考汇率预填转化，支持保存并下一笔',
     'v3.25.2（2026-10-14）：修复蓄水池弹窗按钮点击无反应（容器 stopPropagation 拦截 document 委托点击）',
     'v3.25.1（2026-10-14）：修复跨币种单侧缺数据被按 0 抵扣——单侧币种不宣称欠款方向，总欠款以参考净额为准',
@@ -445,6 +448,7 @@ Aoi.refreshViews = function () {
   Aoi.overview.render();
   if (Aoi.limits) Aoi.limits.render();
   if (Aoi.stats) Aoi.stats.render();
+  if (Aoi.paigu) Aoi.paigu.renderAll();
 };
 
 // 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）+ 开设 IP 一览

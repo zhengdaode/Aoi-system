@@ -1793,6 +1793,8 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (ex) { Aoi.orders.toggleActivityExpand(ex.getAttribute('data-expand')); return; }
   var jump = e.target.closest('button[data-jump]');
   if (jump) { Aoi.orders.jumpToActivity(jump.getAttribute('data-jump')); return; }
+  var pg = e.target.closest('button[data-act-paigu]');
+  if (pg && window.Aoi.paigu) { Aoi.paigu.openActivity(pg.getAttribute('data-act-paigu')); Aoi.nav('view-paigu'); return; }
   var b = e.target.closest('button[data-act-buyers]');
   if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
   var syn = e.target.closest('button[data-act-sync]');
@@ -2331,6 +2333,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
   var sfx = '_' + idx;
   var head = '<div class="flex flex-wrap items-center gap-2 mb-3">'
     + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded hover:bg-gray-900 whitespace-nowrap">查订单</button>'
+    + '<button data-act-paigu="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs border-gray-300 text-gray-500 hover:bg-gray-100 whitespace-nowrap" title="打开该活动的排谷表（商品按类型分表排队，v3.27.0）">排谷表</button>'
     + '<input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="w-48 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (trackings.length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
     + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (plan ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'

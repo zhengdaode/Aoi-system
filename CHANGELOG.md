@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.27.0 (2026-10-23)
+
+> **排谷表 · 按活动排队表格**（新功能，与订单管理平行，业务组导航）：参考谷圈排谷表惯例落地的排队台账——
+> 活动列表点开 → 商品**按类型分 sheet**（毛绒/发卡/…，空类型归「未分类」），每个 sheet 是**位次×商品列矩阵**：
+> 列头=参考图+型号+单价（人民币价优先、缺则外币原价+币种），行=排队位次（最少 10 行、位次列吸附），
+> 格=买家排位（圈名首字圆形占位+圈名，**底色=付款状态**）。状态对齐图例五档：未付款(黄)→已下定(绿)→
+> 已付款(蓝)→已付尾款(粉)→已发货(青)。**点排位（电脑可右键）弹操作菜单**：状态即点即改/上移下移/
+> 查看买家信息/撤排；**点空格插排**（勾选该列未入排订单和/或手动填买家名，插入后顺延）；表头「添加订单」
+> 勾选未入排订单按商品列追加队尾（一单只入一个排位）；手动排位仅队列虚拟**不建订单**。**超排检测**：
+> 排位数超出限购计划 `limits['type|model']` 的位次标红，可一键「删除超排」（图中「删除超排」术语落地）。
+> 排谷日志每操作留痕（每活动一份，上限 300 条）；**导出 xlsx** 复用汇总表导出链路——每类型一个 Sheet
+> （种类/参考图内嵌/单价/位次行带状态色填充）+ 排谷日志 Sheet。买家信息弹窗现显示 memberMeta.qq /
+> 送达地址/该活动订单（QQ 小程序账号系统接入后在此补联系方式）；悬空订单（订单管理删除后）标 ⚠ 可转手动
+> 排位。状态独立不回写订单 `shipped` 与交费审批。数据 blob 新键 `d.paigu[activity]={slots,log}` 零 schema。
+> 术语对照表见 `docs/PLAN-PAIGU.md`。vitest 624→661 全绿（+37）。
+
+### Added
+- `js/paigu.js`（第 27 模块 `window.Aoi.paigu`）：纯计算（`activityProducts` 主档∪订单∪排位列聚合 /
+  `sheetTypes` / `membership` 订单防重 / `activityStats` 超排统计 / `buyerInfo`）+ 数据动作
+  （`enqueueOrders` / `insertSlot` 插排顺延 / `setStatus` / `moveSlot` / `removeSlot` / `unlinkSlot` /
+  `purgeOver`，统一 undo 快照→改 d→saveTeamData→重渲染→toast）+ 渲染（活动列表 / 表格详情：类型 tab +
+  位次矩阵）+ 弹层（排位操作菜单 / 添加订单 / 插排 / 买家信息 / 排谷日志，`[data-pact]` 委托 +
+  contextmenu 右键 + Esc/遮罩捕获关层）+ `buildWorkbook` 纯函数与 `exportActivity`（exceljs/SheetJS
+  双通道，图片走 imageCandidates 候选链内嵌）。
+- `index.html`：业务组导航「排谷表」项（订单管理之后）+ `view-paigu` 骨架（列表容器/买家 datalist/弹窗壳）
+  + `js/paigu.js` 引入。
+- `js/core.js`：`Aoi.nav` 进入钩子 `view-paigu → Aoi.paigu.renderAll()`；`Aoi.refreshViews` 联动；
+  `Aoi.ABOUT` v3.27.0。
+- `js/orders.js`：活动管理展开区新增「排谷表」跳转按钮（`data-act-paigu`，点活动直达对应表格）。
+- `css/styles.css`：`.pq-*` 状态底色/图例色块/位次列吸附（sticky）/排位格/状态菜单按钮 + `#paiguModal`
+  ≤640px 贴底 bottom sheet（同 productModal 先例）。
+- `tests/v3270-paigu.test.js`：37 例（接线/纯计算/数据动作/弹层交互/导出），harness MODULES 注册 `js/paigu.js`。
+- `docs/PLAN-PAIGU.md`：方案与图示术语对照表。
+
 ## v3.26.0 (2026-10-14)
 
 > **蓄水池「未转化订单就地补价」**：外币订单没当场算人民币、计入蓄水池后目录里挂「未转¥」提醒却点不了，

@@ -46,6 +46,7 @@ const MODULES = [
   'js/catalog-dict.js',
   'js/catalog.js',
   'js/reservoir.js',
+  'js/paigu.js',
   'js/shop.js'
 ];
 

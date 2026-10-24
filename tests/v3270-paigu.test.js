@@ -176,16 +176,18 @@ describe('纯计算（类型聚合 / 归属 / 统计 / 买家信息）', () => {
 });
 
 describe('数据动作（入排防重 / 插排顺延 / 改状态 / 调序 / 撤排 / 超排）', () => {
-  it('enqueueOrders：o3 入排队尾（默认未付款）+ 落库 + 日志', async () => {
+  it('enqueueOrders：o3 入排队尾（默认未付款）+ 落库 + 日志（v3.29.1 按件数拆位：count=2 → 2 个排位）', async () => {
     const r = await P().enqueueOrders(ACT, ['o3']);
     expect(r).toEqual({ added: 1, skipped: 0 });
     const arr = aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒'];
-    expect(arr).toHaveLength(1);
+    expect(arr).toHaveLength(2); // o3 count=2 → 两个连续排位
     expect(arr[0].orderId).toBe('o3');
+    expect(arr[1].orderId).toBe('o3');
     expect(arr[0].buyer).toBe('C.tough');
     expect(arr[0].status).toBe('未付款');
     expect(aoi.saveTeamData).toHaveBeenCalledWith(aoi.state.data);
     expect(aoi.state.data.paigu[ACT].log[0].text).toContain('添加 1 笔订单入排');
+    expect(aoi.state.data.paigu[ACT].log[0].text).toContain('2 个排位');
   });
 
   it('enqueueOrders 防重：已排订单跳过；全部已排时不落库', async () => {
@@ -211,12 +213,13 @@ describe('数据动作（入排防重 / 插排顺延 / 改状态 / 调序 / 撤�
     expect(aoi.state.data.paigu[ACT].log[0].text).toContain('第 1 位');
   });
 
-  it('insertSlot 带未入排订单 + 手动名：一并插入且订单防重', async () => {
+  it('insertSlot 带未入排订单 + 手动名：一并插入且订单防重（v3.29.1 按件数拆位）', async () => {
     const n = await P().insertSlot(ACT, '毛绒|圣诞节植绒', '手动甲', 1, ['o3', 'o1']);
-    expect(n).toBe(2); // o3 入列；o1 已在排被跳过；手动甲入列
+    expect(n).toBe(3); // o3 count=2 → 2 位；o1 已在排被跳过；手动甲 1 位
     const arr = aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒'];
     expect(arr[0].orderId).toBe('o3');
-    expect(arr[1].buyer).toBe('手动甲');
+    expect(arr[1].orderId).toBe('o3');
+    expect(arr[2].buyer).toBe('手动甲');
   });
 
   it('setStatus：状态写入 + 日志含方向；非法状态与未知排位被拒', async () => {
@@ -332,9 +335,10 @@ describe('弹层交互（统一委托 [data-pact] / 右键 / Esc / 遮罩）', (
     doc.querySelector('[data-pact="insert-save"]').click();
     await new Promise((r) => setTimeout(r, 0));
     const arr = aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒'];
-    expect(arr).toHaveLength(2);
+    expect(arr).toHaveLength(3); // o3 count=2 → 2 位 + 手动乙
     expect(arr[0].orderId).toBe('o3');
-    expect(arr[1].buyer).toBe('手动乙');
+    expect(arr[1].orderId).toBe('o3');
+    expect(arr[2].buyer).toBe('手动乙');
     expect(doc.getElementById('paiguModal').classList.contains('hidden')).toBe(true);
   });
 
@@ -346,7 +350,7 @@ describe('弹层交互（统一委托 [data-pact] / 右键 / Esc / 遮罩）', (
     doc.querySelector('.pq-add-check[data-order="o3"]').checked = true;
     doc.querySelector('[data-pact="add-orders-save"]').click();
     await new Promise((r) => setTimeout(r, 0));
-    expect(aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒']).toHaveLength(1);
+    expect(aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒']).toHaveLength(2); // o3 count=2 → 2 位
     expect(doc.getElementById('paiguModal').classList.contains('hidden')).toBe(true);
   });
 

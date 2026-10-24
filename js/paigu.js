@@ -160,28 +160,47 @@ Aoi.paigu.syncProductKey = function (d, activity, oldKey, newKey) {
   return arr.length;
 };
 
-// 订单编辑（买家 / 类型 / 型号 / 活动）：同步该订单在排谷表中的排位（一单一排位不变）。
-// 买家名跟随订单；商品键或活动变化时移出原列、追加到目标活动目标列尾（队列语义：在该商品重新排队）。
+// 订单编辑（买家 / 类型 / 型号 / 活动）：同步该订单在排谷表中的全部排位。
+// v3.29.1：一笔订单按件数可占多个排位（同 orderId），改名逐位同步、迁列/换活动逐位跟随且相对顺序不变。
 // 返回是否有改动。只改内存，落库由调用方（orders.js）统一负责。
 Aoi.paigu.syncOrder = function (d, o) {
   if (!d || !o || !o.id) return false;
-  var m = Aoi.paigu.membership(d)[o.id];
-  if (!m) return false;
+  var hits = [];
+  Object.keys(d.paigu || {}).forEach(function (activity) {
+    var t = d.paigu[activity];
+    Object.keys(t.slots || {}).forEach(function (key) {
+      (t.slots[key] || []).forEach(function (s) {
+        if (s.orderId === o.id) hits.push({ activity: activity, key: key, slot: s });
+      });
+    });
+  });
+  if (!hits.length) return false;
   var changed = false;
-  var fromT = pqTable(d, m.activity);
-  var label = '「' + (m.slot.buyer || '未名') + '」';
-  if (o.buyer && m.slot.buyer !== o.buyer) { m.slot.buyer = o.buyer; changed = true; }
+  var label = '「' + (o.buyer || hits[0].slot.buyer || '未名') + '」';
+  hits.forEach(function (h) {
+    if (o.buyer && h.slot.buyer !== o.buyer) { h.slot.buyer = o.buyer; changed = true; }
+  });
   var newKey = (o.type || '') + '|' + (o.model || '');
-  if (m.key !== newKey || m.activity !== o.activity) {
-    fromT.slots[m.key].splice(m.idx, 1);
-    if (!(fromT.slots[m.key] || []).length) delete fromT.slots[m.key];
+  var moved = 0, fromDesc = null;
+  hits.forEach(function (h) {
+    if (h.activity === o.activity && h.key === newKey) return;
+    var arr = d.paigu[h.activity].slots[h.key] || [];
+    var i = arr.indexOf(h.slot);
+    if (i >= 0) arr.splice(i, 1);
+    if (!arr.length) delete d.paigu[h.activity].slots[h.key];
     var toT = pqTable(d, o.activity);
-    (toT.slots[newKey] = toT.slots[newKey] || []).push(m.slot);
-    pqPushLog(toT, label + '订单修改：排位迁入「' + newKey.replace('|', ' / ') + '」'
-      + (m.activity !== o.activity ? '（自活动 ' + m.activity + '）' : '（原列 ' + m.key.replace('|', ' / ') + '）'));
+    (toT.slots[newKey] = toT.slots[newKey] || []).push(h.slot);
+    moved++;
+    if (!fromDesc) fromDesc = (h.activity !== o.activity ? '自活动 ' + h.activity : '原列 ' + h.key.replace('|', ' / '));
     changed = true;
+  });
+  var toT = pqTable(d, o.activity);
+  if (moved) {
+    pqPushLog(toT, label + '订单修改：' + moved + ' 个排位迁入「' + newKey.replace('|', ' / ') + '」（' + fromDesc + '）');
+  } else if (changed) {
+    pqPushLog(toT, label + '订单修改：买家名同步');
   }
-  if (changed) { fromT.updatedAt = new Date().toISOString(); pqTable(d, o.activity).updatedAt = new Date().toISOString(); }
+  if (changed) toT.updatedAt = new Date().toISOString();
   return changed;
 };
 
@@ -211,7 +230,8 @@ Aoi.paigu.buyerInfo = function (d, activity, buyer) {
 
 // —— 数据动作（undo 快照 + saveTeamData + 重渲染）——
 
-// 勾选已有订单入排（按商品列追加队尾；一单只入一个排位，已在排的跳过）
+// 勾选已有订单入排（按商品列追加队尾；一单只入排一次，已在排的跳过）。
+// v3.29.1：入排粒度=购买件数——count=N 的订单拆成 N 个连续排位（同 orderId），不再一笔只占一格。
 Aoi.paigu.enqueueOrders = async function (activity, orderIds) {
   var d = pqData();
   if (!d) return { added: 0, skipped: 0 };
@@ -226,22 +246,29 @@ Aoi.paigu.enqueueOrders = async function (activity, orderIds) {
   var skipped = (orderIds || []).length - fresh.length;
   if (!fresh.length) { Aoi.toast('勾选订单都已入排，无需重复添加', 'warning'); return { added: 0, skipped: skipped }; }
   Aoi.undo.arm('排谷表添加订单', d);
+  var units = 0;
   fresh.forEach(function (o) {
     var key = o.type + '|' + o.model;
-    (t.slots[key] = t.slots[key] || []).push({
-      id: Aoi.genId(), orderId: o.id, buyer: o.buyer || '未名',
-      status: Aoi.paigu.STATUSES[0], addedAt: pqNow()
-    });
+    var arr = t.slots[key] = t.slots[key] || [];
+    var n = Math.max(1, parseInt(o.count, 10) || 1);
+    for (var u = 0; u < n; u++) {
+      arr.push({
+        id: Aoi.genId(), orderId: o.id, buyer: o.buyer || '未名',
+        status: Aoi.paigu.STATUSES[0], addedAt: pqNow()
+      });
+    }
+    units += n;
   });
-  pqPushLog(t, '添加 ' + fresh.length + ' 笔订单入排' + (skipped ? '，跳过 ' + skipped + ' 笔已排' : ''));
+  pqPushLog(t, '添加 ' + fresh.length + ' 笔订单入排（按件数拆 ' + units + ' 个排位）' + (skipped ? '，跳过 ' + skipped + ' 笔已排' : ''));
   t.updatedAt = new Date().toISOString();
   await Aoi.saveTeamData(d);
   Aoi.paigu.renderAll();
-  Aoi.toast('已添加 ' + fresh.length + ' 笔入排（30 秒内可撤销）', 'success');
+  Aoi.toast('已添加 ' + units + ' 个排位（' + fresh.length + ' 笔订单，30 秒内可撤销）', 'success');
   return { added: fresh.length, skipped: skipped };
 };
 
-// 插排：手动买家名（仅队列虚拟排位，不建订单）与/或未入排订单，插到第 idx 位（1 基），后续顺延
+// 插排：手动买家名（仅队列虚拟排位，不建订单）与/或未入排订单，插到第 idx 位（1 基），后续顺延。
+// v3.29.1：订单按件数拆位（count=N → N 个连续排位，同 orderId）
 Aoi.paigu.insertSlot = async function (activity, key, buyer, idx, orderIds) {
   var d = pqData();
   if (!d) return 0;
@@ -251,7 +278,11 @@ Aoi.paigu.insertSlot = async function (activity, key, buyer, idx, orderIds) {
   (orderIds || []).forEach(function (oid) {
     if (mem[oid]) return;
     var o = Aoi.paigu.orderById(d, oid);
-    if (o) news.push({ id: Aoi.genId(), orderId: o.id, buyer: o.buyer || '未名', status: Aoi.paigu.STATUSES[0], addedAt: pqNow() });
+    if (!o) return;
+    var n = Math.max(1, parseInt(o.count, 10) || 1);
+    for (var u = 0; u < n; u++) {
+      news.push({ id: Aoi.genId(), orderId: o.id, buyer: o.buyer || '未名', status: Aoi.paigu.STATUSES[0], addedAt: pqNow() });
+    }
   });
   if (buyer) news.push({ id: Aoi.genId(), buyer: buyer, status: Aoi.paigu.STATUSES[0], addedAt: pqNow() });
   if (!news.length) { Aoi.toast('勾选订单或填写买家名', 'warning'); return 0; }
@@ -259,12 +290,12 @@ Aoi.paigu.insertSlot = async function (activity, key, buyer, idx, orderIds) {
   var arr = t.slots[key] = t.slots[key] || [];
   var at = Math.max(0, Math.min((parseInt(idx, 10) || arr.length + 1) - 1, arr.length));
   news.forEach(function (s, i) { arr.splice(at + i, 0, s); });
-  pqPushLog(t, '插排 ' + news.length + ' 笔至「' + key.replace('|', ' / ') + '」第 ' + (at + 1) + ' 位'
+  pqPushLog(t, '插排 ' + news.length + ' 位至「' + key.replace('|', ' / ') + '」第 ' + (at + 1) + ' 位'
     + (buyer ? '（含手动排位 ' + buyer + '）' : ''));
   t.updatedAt = new Date().toISOString();
   await Aoi.saveTeamData(d);
   Aoi.paigu.renderAll();
-  Aoi.toast('已插入 ' + news.length + ' 笔，后续位次顺延（30 秒内可撤销）', 'success');
+  Aoi.toast('已插入 ' + news.length + ' 位，后续位次顺延（30 秒内可撤销）', 'success');
   return news.length;
 };
 
@@ -663,7 +694,7 @@ Aoi.paigu.modalAddOrders = function (activity) {
   var mem = Aoi.paigu.membership(d);
   var orders = (d.orders || []).filter(function (o) { return o.activity === activity; });
   var html = '<h3 class="font-bold mb-1">添加订单入排（' + Aoi.escapeHtml(activity) + '）</h3>'
-    + '<p class="text-xs text-gray-400 mb-3">勾选未入排的订单，确认后按其商品列追加队尾；已在排的置灰。手动排位请点表格空格插入。</p>';
+    + '<p class="text-xs text-gray-400 mb-3">勾选未入排的订单，确认后按其商品列追加队尾（按购买件数拆位，买 N 件占 N 格）；已在排的置灰。手动排位请点表格空格插入。</p>';
   if (!orders.length) {
     html += '<p class="text-sm text-gray-400 mb-3">该活动还没有订单。可到「订单管理」录入/导入，或点表格空格手动排位。</p>';
   } else {
@@ -673,7 +704,7 @@ Aoi.paigu.modalAddOrders = function (activity) {
       html += '<label class="flex items-center gap-2 px-3 py-2 text-sm ' + (inq ? 'opacity-40' : 'hover:bg-gray-50') + '">'
         + '<input type="checkbox" class="pq-add-check" data-order="' + o.id + '"' + (inq ? ' disabled' : '') + '>'
         + '<span class="flex-1 min-w-0">' + Aoi.escapeHtml(o.type + ' / ' + o.model) + '</span>'
-        + '<span class="text-xs text-gray-400">' + Aoi.escapeHtml(o.buyer || '未名') + '</span>'
+        + '<span class="text-xs text-gray-400">' + Aoi.escapeHtml(o.buyer || '未名') + (o.count > 1 ? ' ×' + o.count : '') + '</span>'
         + (inq ? '<span class="px-1.5 rounded-full text-[10px] bg-green-50 text-green-700 border border-green-200">已排</span>' : '')
         + '</label>';
     });

@@ -160,20 +160,13 @@ Aoi.paigu.syncProductKey = function (d, activity, oldKey, newKey) {
   return arr.length;
 };
 
-// 订单编辑（买家 / 类型 / 型号 / 活动）：同步该订单在排谷表中的全部排位。
+// 订单编辑（买家 / 类型 / 型号 / 活动 / 件数）：同步该订单在排谷表中的全部排位。
 // v3.29.1：一笔订单按件数可占多个排位（同 orderId），改名逐位同步、迁列/换活动逐位跟随且相对顺序不变。
+// v3.29.2：件数对账——count 变化时自动补足/裁剪该订单的排位。
 // 返回是否有改动。只改内存，落库由调用方（orders.js）统一负责。
 Aoi.paigu.syncOrder = function (d, o) {
   if (!d || !o || !o.id) return false;
-  var hits = [];
-  Object.keys(d.paigu || {}).forEach(function (activity) {
-    var t = d.paigu[activity];
-    Object.keys(t.slots || {}).forEach(function (key) {
-      (t.slots[key] || []).forEach(function (s) {
-        if (s.orderId === o.id) hits.push({ activity: activity, key: key, slot: s });
-      });
-    });
-  });
+  var hits = pqOrderSlotLocs(d, o.id);
   if (!hits.length) return false;
   var changed = false;
   var label = '「' + (o.buyer || hits[0].slot.buyer || '未名') + '」';
@@ -200,7 +193,93 @@ Aoi.paigu.syncOrder = function (d, o) {
   } else if (changed) {
     pqPushLog(toT, label + '订单修改：买家名同步');
   }
+  // v3.29.2 件数对账（改列/换活动后重定位再对账）
+  var locs2 = pqOrderSlotLocs(d, o.id);
+  var want = Math.max(1, parseInt(o.count, 10) || 1);
+  if (locs2.length && locs2.length !== want && pqReconcileSlots(d, o, locs2, want)) {
+    pqPushLog(pqTable(d, o.activity), label + '件数对账：排位 ' + locs2.length + ' → ' + want + ' 位（订单 ' + want + ' 件）');
+    changed = true;
+  }
   if (changed) toT.updatedAt = new Date().toISOString();
+  return changed;
+};
+
+// 该订单全部排位定位（跨活动；v3.29.2 抽出复用）
+function pqOrderSlotLocs(d, orderId) {
+  var hits = [];
+  Object.keys(d.paigu || {}).forEach(function (activity) {
+    var t = d.paigu[activity];
+    Object.keys(t.slots || {}).forEach(function (key) {
+      (t.slots[key] || []).forEach(function (s) {
+        if (s.orderId === orderId) hits.push({ activity: activity, key: key, slot: s });
+      });
+    });
+  });
+  return hits;
+}
+
+// v3.29.2 件数对账：把该订单的排位数对齐到 want——
+// 缺少 → 复制首个排位（买家/状态）插在该订单最后一个排位之后；多余 → 从其排位尾部裁剪。
+// 只处理已在排的订单（未入排订单不自动入排）。返回是否改动。
+function pqReconcileSlots(d, o, locs, want) {
+  var have = locs.length;
+  var changed = false;
+  if (have < want) {
+    var last = locs[locs.length - 1];
+    var arr = d.paigu[last.activity] && d.paigu[last.activity].slots[last.key];
+    if (!arr) return false;
+    var at = arr.indexOf(last.slot) + 1;
+    for (var i = have; i < want; i++) {
+      var proto = locs[0].slot;
+      arr.splice(at + (i - have), 0, {
+        id: Aoi.genId(), orderId: o.id,
+        buyer: o.buyer || proto.buyer || '未名',
+        status: proto.status || Aoi.paigu.STATUSES[0],
+        addedAt: pqNow()
+      });
+      changed = true;
+    }
+  } else {
+    for (var j = have - 1; j >= want; j--) {
+      var h = locs[j];
+      var a2 = d.paigu[h.activity] && d.paigu[h.activity].slots[h.key];
+      if (!a2) continue;
+      var i2 = a2.indexOf(h.slot);
+      if (i2 >= 0) a2.splice(i2, 1);
+      if (!a2.length) delete d.paigu[h.activity].slots[h.key];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+// v3.29.2 全量对账（renderAll 首次遇到新数据对象时跑一次并落库）：
+// 修复 v3.29.1 之前入排的旧数据——一笔 count=N 的订单只占 1 格 → 自动补足到 N 格。
+Aoi.paigu.repairAll = function (d) {
+  if (!d || !d.orders || !d.paigu) return false;
+  var byOrder = {};
+  Object.keys(d.paigu).forEach(function (activity) {
+    var t = d.paigu[activity];
+    Object.keys(t.slots || {}).forEach(function (key) {
+      (t.slots[key] || []).forEach(function (s) {
+        if (!s.orderId) return;
+        (byOrder[s.orderId] = byOrder[s.orderId] || []).push({ activity: activity, key: key, slot: s });
+      });
+    });
+  });
+  var changed = false;
+  d.orders.forEach(function (o) {
+    var locs = byOrder[o.id];
+    if (!locs || !locs.length) return;
+    var want = Math.max(1, parseInt(o.count, 10) || 1);
+    if (locs.length === want) return;
+    if (pqReconcileSlots(d, o, locs, want)) {
+      var t = pqTable(d, o.activity);
+      pqPushLog(t, '「' + (o.buyer || '未名') + '」件数对账：排位 ' + locs.length + ' → ' + want + ' 位（订单 ' + want + ' 件）');
+      t.updatedAt = new Date().toISOString();
+      changed = true;
+    }
+  });
   return changed;
 };
 
@@ -441,11 +520,18 @@ Aoi.paigu.pageCount = function (d, activity, type) {
   return Math.max(1, Math.ceil(total / Aoi.paigu.PAGE_SIZE));
 };
 
+var pqRepairFor = null; // v3.29.2：已跑过全量对账的数据对象（数据更换/撤销恢复后重跑）
+
 Aoi.paigu.renderAll = function () {
   var body = document.getElementById('paiguBody');
   if (!body) return;
   var d = pqData();
   if (!d) { body.innerHTML = ''; return; }
+  // v3.29.2：件数对账——已在排订单的排位数对齐订单 count（修复旧数据"买 2 件只占 1 格"）；有改动即落库
+  if (pqRepairFor !== d) {
+    pqRepairFor = d;
+    if (Aoi.paigu.repairAll(d)) Aoi.saveTeamData(d);
+  }
   body.innerHTML = pqView.activity ? pqDetailHtml(d, pqView.activity) : pqListHtml(d);
   // 买家名候选（datalist）：memberMeta 圈名 ∪ 全部订单买家
   var dl = document.getElementById('paiguBuyerOptions');

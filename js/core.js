@@ -109,7 +109,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.29.1',
+  version: 'v3.29.2',
   buildDate: '2026-10-25',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -118,6 +118,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.29.2（2026-10-25）：排谷表件数对账——打开排谷表自动把已入排订单的排位数对齐订单件数（修复旧数据「买 2 件只占 1 格」，第 1、2 行均显示买家）；订单编辑改件数即时补足/裁剪排位',
     'v3.29.1（2026-10-25）：排谷表入排粒度修复——按购买件数拆位，count=N 的订单占 N 个连续排位（此前一笔只占一格）；订单编辑同步跟随该订单全部排位',
     'v3.29.0（2026-10-24）：排谷表交互升级——「已排/库存」行、悬浮位次名词（买家-状态-共排N位-第M名）、同列拖动换位（鼠标拖拽+触屏长按）与右键编辑位次（上移/下移x位/顶部/底部+列聚焦动画）、每页 20 行翻页',
     'v3.28.1（2026-10-24）：排谷表重复购买口径修订——同一商品的同一购买者不合并不标数量，多排位逐位分开显示（页面与导出均取消 ×N 标注）',

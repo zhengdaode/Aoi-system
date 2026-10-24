@@ -508,16 +508,13 @@ function pqSheetHtml(d, activity, type) {
       var s = arr[i - 1];
       if (s) {
         var dangling = s.orderId && !Aoi.paigu.orderById(d, s.orderId);
-        // v3.28.0：同一买家在本商品列占用多个排位时标注 ×N（重复购买计数，含手动排位）
-        var dupN = 0;
-        if (s.buyer) arr.forEach(function (x) { if (x.buyer === s.buyer) dupN++; });
+        // v3.28.1：重复购买不合并不标数量——同一买家多排位逐位分开显示（仅悬空订单仍标 ⚠）
         html += '<td class="paigu-cell ' + Aoi.paigu.STATUS_CLS[s.status || Aoi.paigu.STATUSES[0]] + (over ? ' pq-over' : '')
           + '" data-pact="slot" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id
           + '" title="' + Aoi.escapeHtml((s.buyer || '未名') + ' · ' + (s.status || Aoi.paigu.STATUSES[0])
-            + (dupN > 1 ? ' · 共排 ' + dupN + ' 位' : '') + (dangling ? ' · 订单已删除' : '')) + '">'
+            + (dangling ? ' · 订单已删除' : '')) + '">'
           + '<span class="pq-avatar">' + Aoi.escapeHtml((s.buyer || '?').charAt(0)) + '</span>'
           + '<span class="pq-name">' + Aoi.escapeHtml(s.buyer || '未名') + '</span>'
-          + (dupN > 1 ? '<span class="pq-qty" title="该买家在本商品共排 ' + dupN + ' 位">×' + dupN + '</span>' : '')
           + (dangling ? '<span class="pq-warn" title="原订单已被删除">⚠</span>' : '')
           + '</td>';
       } else {
@@ -722,10 +719,6 @@ Aoi.paigu.buildWorkbook = function (d, activity) {
       var queued = (t.slots[col.key] || []).length;
       var stockOver = col.stock != null && queued > col.stock;
       sh.put(3, ci + 1, c(col.stock != null ? col.stock : '', { center: true, color: stockOver ? 'FF0000' : undefined }));
-      // 同买家重复排位计数（导出格文本附 ×N）
-      var dupN = {};
-      (t.slots[col.key] || []).forEach(function (s) { if (s.buyer) dupN[s.buyer] = (dupN[s.buyer] || 0) + 1; });
-      col._dupN = dupN;
     });
     var maxLen = Aoi.paigu.MIN_ROWS;
     cols.forEach(function (col) { maxLen = Math.max(maxLen, (t.slots[col.key] || []).length); });
@@ -734,8 +727,8 @@ Aoi.paigu.buildWorkbook = function (d, activity) {
       cols.forEach(function (col, ci) {
         var s = (t.slots[col.key] || [])[i - 1];
         if (!s) return;
-        var dup = s.buyer ? (col._dupN[s.buyer] || 0) : 0;
-        sh.put(i + 3, ci + 1, c((s.buyer || '未名') + (dup > 1 ? ' ×' + dup : ''), {
+        // v3.28.1：重复购买不合并不标数量，每个排位格只写买家名
+        sh.put(i + 3, ci + 1, c(s.buyer || '未名', {
           fill: Aoi.paigu.STATUS_FILL[s.status || Aoi.paigu.STATUSES[0]] || 'FFFFFF',
           center: true, border: true
         }));

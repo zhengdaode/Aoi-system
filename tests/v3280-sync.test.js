@@ -1,7 +1,8 @@
-// v3.28.0 全局返回/刷新 + 商品库存同步排谷表 + 三端同步（活动管理 ↔ 订单 ↔ 排谷表）+ 重复购买 ×N 标注
+// v3.28.0 全局返回/刷新 + 商品库存同步排谷表 + 三端同步（活动管理 ↔ 订单 ↔ 排谷表）；v3.28.1 重复购买口径修订：
+// 同一商品的同一购买者不合并不标数量，多排位逐位分开显示（页面与导出均不出现 ×N）。
 // 口径：商品卡改类型/型号 → 同活动同旧键订单改写、限购键与排谷表列键迁移（syncProductKey）；
 // 订单编辑（saveEdit）→ 排谷表对应排位跟随（买家名/列/活动，syncOrder）；库存 stock 存商品主档，
-// 排谷表「库存」行展示（已排>库存标红）；同买家同商品列多排位显示 ×N（页面与导出同口径）。
+// 排谷表「库存」行展示（已排>库存标红）。
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { aoi, doc, win } from './helpers/aoi.js';
 
@@ -229,27 +230,34 @@ describe('排谷表页面：库存行 + 重复购买 ×N 标注', () => {
     expect(th.textContent).toBe('—'); // 未设置库存占位
   });
 
-  it('同买家同商品列多排位 → 每个排位显示 ×N（pq-qty）', () => {
+  it('同买家同商品列多排位 → 逐位分开显示，不合并不标 ×N（v3.28.1 口径）', () => {
     const d = aoi.state.data;
     d.paigu[ACT].slots['毛绒|皮卡丘土王'].push({ id: 's3', buyer: '一枚小混子', status: '未付款', addedAt: '10-21 10:00' });
     P().renderAll();
     P().openActivity(ACT);
-    const qtys = [...doc.querySelectorAll('#paiguBody .pq-qty')];
-    expect(qtys).toHaveLength(2);
-    qtys.forEach((el) => expect(el.textContent).toBe('×2'));
-    // 不同买家排位无标记
-    expect(doc.querySelector('[data-slot="s2"] .pq-qty')).toBeNull();
+    // 无 ×N 标记
+    expect(doc.querySelectorAll('#paiguBody .pq-qty')).toHaveLength(0);
+    // 逐位分开：两个排位格独立存在，各显示买家名本身
+    const cells = [
+      doc.querySelector('[data-slot="s1"]'),
+      doc.querySelector('[data-slot="s3"]')
+    ];
+    cells.forEach((el) => {
+      expect(el).not.toBeNull();
+      expect(el.textContent).toContain('一枚小混子');
+    });
   });
 
-  it('单排位买家无 ×N 标记', () => {
+  it('单排位买家显示无任何数量标注', () => {
     P().renderAll();
     P().openActivity(ACT);
     expect(doc.querySelectorAll('#paiguBody .pq-qty')).toHaveLength(0);
+    expect(doc.querySelector('[data-slot="s1"]').textContent).toContain('一枚小混子');
   });
 });
 
-describe('导出（buildWorkbook）：库存行 + ×N 同口径', () => {
-  it('库存行在第 4 行；同买家重复排位导出格文本附 ×N', () => {
+describe('导出（buildWorkbook）：库存行 + 重复购买不合并（v3.28.1）', () => {
+  it('库存行在第 4 行；同买家重复排位逐位分开、格文本不附 ×N', () => {
     const d = aoi.state.data;
     d.activityMeta[ACT].products[0].stock = 2;
     d.paigu[ACT].slots['毛绒|皮卡丘土王'].push({ id: 's3', buyer: '一枚小混子', status: '未付款', addedAt: '10-21 10:00' });
@@ -257,10 +265,10 @@ describe('导出（buildWorkbook）：库存行 + ×N 同口径', () => {
     const mz = desc.sheets[0];
     expect(mz.rows[3][0].v).toBe('库存');
     expect(mz.rows[3][1].v).toBe(2);
-    expect(mz.rows[4][1].v).toBe('一枚小混子 ×2');   // 第 1 位
-    expect(mz.rows[5][1].v).toBe('草莓头那个莹');     // 第 2 位
-    expect(mz.rows[6][1].v).toBe('一枚小混子 ×2');   // 第 3 位
-    expect(mz.rows[3][1].s.color).toBe('FF0000');    // 已排 3 > 库存 2 → 标红
+    expect(mz.rows[4][1].v).toBe('一枚小混子');   // 第 1 位，不合并不附 ×N
+    expect(mz.rows[5][1].v).toBe('草莓头那个莹'); // 第 2 位
+    expect(mz.rows[6][1].v).toBe('一枚小混子');   // 第 3 位，独立成格
+    expect(mz.rows[3][1].s.color).toBe('FF0000'); // 已排 3 > 库存 2 → 标红
   });
 });
 

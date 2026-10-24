@@ -109,7 +109,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.28.0',
+  version: 'v3.28.1',
   buildDate: '2026-10-24',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -118,6 +118,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.28.1（2026-10-24）：排谷表重复购买口径修订——同一商品的同一购买者不合并不标数量，多排位逐位分开显示（页面与导出均取消 ×N 标注）',
     'v3.28.0（2026-10-24）：全局返回上一步/页面刷新；商品库存数量同步排谷表；商品改类型/型号与订单编辑自动同步排谷表；修复同买家重复排位无数量标注（×N）与商品改类型后旧 sheet 残留',
     'v3.27.0（2026-10-23）：排谷表——按活动排队表格，商品按类型分 sheet、位次×买家矩阵、五状态色标、点按/右键改状态与插排撤排、超排检测删除、排谷日志、xlsx 导出（每类型一 Sheet+日志）',
     'v3.26.0（2026-10-14）：蓄水池「未转化订单就地补价」——警告标签/行内标记点一下按参考汇率预填转化，支持保存并下一笔',

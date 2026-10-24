@@ -409,7 +409,7 @@ describe('导出（buildWorkbook 纯函数 / exceljs 通道）', () => {
     expect(mz.rows[0][1].v).toBe('皮卡丘土王');
     expect(mz.rows[1][1].s.img).toContain('p1.jpg');   // 参考图内嵌标记
     expect(mz.rows[2][1].v).toBe('JP¥5500');            // 主档外币原价+币种符号
-    expect(mz.rows[3][0].v).toBe('库存');               // v3.28.0：库存行（未设置时空串）
+    expect(mz.rows[3][0].v).toBe('已排/库存');          // v3.29.0：已排/库存行（2 排位/未设置库存）
     // 第 1 位 = s1 一枚小混子（已下定=绿 BBF7D0）；第 2 位 = s2（未付款=黄 FEF3C7）
     expect(mz.rows[4][0].v).toBe(1);
     expect(mz.rows[4][1].v).toBe('一枚小混子');

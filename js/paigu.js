@@ -24,7 +24,8 @@ Aoi.paigu.STATUS_FILL = {
   '已付尾款': 'FBCFE8', '已发货': 'A5F3FC'
 };
 Aoi.paigu.UNTYPED = '未分类';
-Aoi.paigu.MIN_ROWS = 10;   // 位次行最少渲染 10 行（排谷表惯例），排满自动增长
+Aoi.paigu.MIN_ROWS = 10;     // 位次行最少渲染 10 行（排谷表惯例，第 1 页）
+Aoi.paigu.PAGE_SIZE = 20;    // v3.29.0：每页最多 20 行，超出分页（位次号跨页连续）
 Aoi.paigu.LOG_CAP = 300;   // 每活动日志条数上限（新的在前）
 
 // —— 数据骨架 ——
@@ -287,23 +288,42 @@ Aoi.paigu.setStatus = async function (activity, slotId, status) {
   return loc.slot;
 };
 
-// 上移/下移一位（同商品列内交换）
-Aoi.paigu.moveSlot = async function (activity, slotId, delta) {
+// 上移/下移一位（同商品列内交换；v3.29.0 起为 moveSlotBy 的 ±1 包装）
+Aoi.paigu.moveSlot = function (activity, slotId, delta) {
+  return Aoi.paigu.moveSlotBy(activity, slotId, delta);
+};
+
+// v3.29.0：按相对位数移动（正=下移，负=上移；越界钳制到列边界）
+Aoi.paigu.moveSlotBy = function (activity, slotId, delta) {
   var d = pqData();
-  if (!d) return false;
+  if (!d) return Promise.resolve(false);
   var loc = pqSlotById(d, activity, slotId);
-  if (!loc) return false;
+  if (!loc) return Promise.resolve(false);
+  var len = (pqTable(d, activity).slots[loc.key] || []).length;
+  return Aoi.paigu.moveSlotTo(activity, slotId, loc.idx + 1 + (parseInt(delta, 10) || 0), len);
+};
+
+// v3.29.0：移动到第 toIdx 位（1 基；顶部=1，底部=列长；拖动与右键编辑位次共用）。
+// 语义：移出原位后插入第 toIdx 行（该行原排位及后续顺延一位）
+Aoi.paigu.moveSlotTo = function (activity, slotId, toIdx, lenHint) {
+  var d = pqData();
+  if (!d) return Promise.resolve(false);
+  var loc = pqSlotById(d, activity, slotId);
+  if (!loc) return Promise.resolve(false);
   var arr = pqTable(d, activity).slots[loc.key];
-  var to = loc.idx + (delta < 0 ? -1 : 1);
-  if (to < 0 || to >= arr.length) return false;
+  var len = lenHint || arr.length;
+  var to = Math.max(1, Math.min(parseInt(toIdx, 10) || loc.idx + 1, len));
+  if (to - 1 === loc.idx) return Promise.resolve(false);
   Aoi.undo.arm('排谷表调序', d);
-  var tmp = arr[loc.idx]; arr[loc.idx] = arr[to]; arr[to] = tmp;
+  arr.splice(loc.idx, 1);
+  arr.splice(to - 1, 0, loc.slot);
   var t = pqTable(d, activity);
-  pqPushLog(t, '「' + (loc.slot.buyer || '未名') + '」调序：第 ' + (loc.idx + 1) + ' 位 → 第 ' + (to + 1) + ' 位');
+  pqPushLog(t, '「' + (loc.slot.buyer || '未名') + '」调序：第 ' + (loc.idx + 1) + ' 位 → 第 ' + to + ' 位');
   t.updatedAt = new Date().toISOString();
-  await Aoi.saveTeamData(d);
-  Aoi.paigu.renderAll();
-  return true;
+  return Aoi.saveTeamData(d).then(function () {
+    Aoi.paigu.renderAll();
+    return true;
+  });
 };
 
 // 撤排：移出队列（订单本身不动，30 秒撤销）
@@ -367,17 +387,28 @@ Aoi.paigu.purgeOver = async function (activity) {
 
 // —— 视图状态与渲染（view-paigu；由 Aoi.nav 进入时调用）——
 
-var pqView = { activity: null, type: null, legendOpen: false };
+var pqView = { activity: null, type: null, legendOpen: false, page: 1 };
 
 Aoi.paigu.openActivity = function (activity) {
-  pqView.activity = activity; pqView.type = null;
+  pqView.activity = activity; pqView.type = null; pqView.page = 1;
   Aoi.paigu.renderAll();
 };
 Aoi.paigu.backToList = function () {
-  pqView.activity = null; pqView.type = null;
+  pqView.activity = null; pqView.type = null; pqView.page = 1;
   Aoi.paigu.renderAll();
 };
-Aoi.paigu.setType = function (type) { pqView.type = type; Aoi.paigu.renderAll(); };
+Aoi.paigu.setType = function (type) { pqView.type = type; pqView.page = 1; Aoi.paigu.renderAll(); };
+Aoi.paigu.setPage = function (n) { pqView.page = n; Aoi.paigu.renderAll(); };
+
+// 当前类型 sheet 的总页数（每页 PAGE_SIZE 行；位次总数最少按 MIN_ROWS 计）
+Aoi.paigu.pageCount = function (d, activity, type) {
+  var t = pqTable(d, activity);
+  var total = Aoi.paigu.MIN_ROWS;
+  Aoi.paigu.productsOfType(d, activity, type).forEach(function (c) {
+    total = Math.max(total, (t.slots[c.key] || []).length);
+  });
+  return Math.max(1, Math.ceil(total / Aoi.paigu.PAGE_SIZE));
+};
 
 Aoi.paigu.renderAll = function () {
   var body = document.getElementById('paiguBody');
@@ -429,7 +460,7 @@ function pqLegendHtml() {
     + '<span class="inline-flex items-center gap-1"><i class="pq-swatch pq-over"></i>超排（可删除）</span>'
     + '</span>'
     + '<span class="text-gray-300">·</span>'
-    + '<span>点排位（电脑可右键）改状态 / 调序 / 撤排；点空格插排</span>'
+    + '<span>点排位（电脑可右键）改状态 / 编辑位次 / 撤排；同一列内拖动排位可直接换位（触屏长按后拖动）；点空格插排</span>'
     + '</div>';
 }
 
@@ -468,8 +499,15 @@ function pqSheetHtml(d, activity, type) {
   var t = pqTable(d, activity);
   var cols = Aoi.paigu.productsOfType(d, activity, type);
   if (!cols.length) return '<div class="mt-3 text-sm text-gray-400">该类型暂无商品与排位。</div>';
-  var maxLen = Aoi.paigu.MIN_ROWS;
-  cols.forEach(function (c) { maxLen = Math.max(maxLen, (t.slots[c.key] || []).length); });
+  // v3.29.0 分页：每页 PAGE_SIZE 行（位次号跨页连续），第 1 页最少 MIN_ROWS 行
+  var totalRows = Aoi.paigu.MIN_ROWS;
+  cols.forEach(function (c) { totalRows = Math.max(totalRows, (t.slots[c.key] || []).length); });
+  var pages = Math.max(1, Math.ceil(totalRows / Aoi.paigu.PAGE_SIZE));
+  if (pqView.page > pages) pqView.page = pages;
+  if (pqView.page < 1) pqView.page = 1;
+  var page = pqView.page;
+  var from = (page - 1) * Aoi.paigu.PAGE_SIZE + 1;
+  var to = Math.min(totalRows, page * Aoi.paigu.PAGE_SIZE);
   var html = '<div class="overflow-x-auto mt-3"><table class="paigu-sheet text-sm"><thead>';
   // 表头行 1：商品（参考图 + 型号）
   html += '<tr><th class="pq-pos">种类</th>';
@@ -489,17 +527,18 @@ function pqSheetHtml(d, activity, type) {
     html += '<th class="paigu-head paigu-head-price">' + Aoi.escapeHtml(price) + '</th>';
   });
   html += '</tr>';
-  // 表头行 3（v3.28.0）：库存（活动商品主档 stock；已排位次超过库存标红提示）
-  html += '<tr><th class="pq-pos">库存</th>';
+  // 表头行 3（v3.29.0）：已排/库存（已排队位数 / 商品主档 stock；已排超过库存标红提示）
+  html += '<tr><th class="pq-pos">已排/库存</th>';
   cols.forEach(function (c) {
     var queued = (t.slots[c.key] || []).length;
     var over = c.stock != null && queued > c.stock;
+    var label = queued + '/' + (c.stock != null ? c.stock : '—');
     html += '<th class="paigu-head paigu-head-stock' + (over ? ' pq-stock-over' : '') + '" title="'
       + Aoi.escapeHtml('已排 ' + queued + ' / 库存' + (c.stock != null ? ' ' + c.stock : ' 未设置')) + '">'
-      + (c.stock != null ? c.stock : '—') + (over ? ' ⚠' : '') + '</th>';
+      + Aoi.escapeHtml(label) + (over ? ' ⚠' : '') + '</th>';
   });
   html += '</tr></thead><tbody>';
-  for (var i = 1; i <= maxLen; i++) {
+  for (var i = from; i <= to; i++) {
     html += '<tr><td class="pq-pos">' + i + '</td>';
     cols.forEach(function (c) {
       var arr = t.slots[c.key] || [];
@@ -508,11 +547,16 @@ function pqSheetHtml(d, activity, type) {
       var s = arr[i - 1];
       if (s) {
         var dangling = s.orderId && !Aoi.paigu.orderById(d, s.orderId);
-        // v3.28.1：重复购买不合并不标数量——同一买家多排位逐位分开显示（仅悬空订单仍标 ⚠）
+        // 悬浮位次名词（v3.29.0）：买家-状态-共排N位-第i名——表格横向过宽时不用拉回位次列对照
+        var dup = 0;
+        if (s.buyer) arr.forEach(function (x) { if (x.buyer === s.buyer) dup++; });
+        var tip = (s.buyer || '未名') + '-' + (s.status || Aoi.paigu.STATUSES[0])
+          + (dup > 1 ? '-共排' + dup + '位' : '') + '-第' + i + '名'
+          + (dangling ? '-订单已删除' : '');
         html += '<td class="paigu-cell ' + Aoi.paigu.STATUS_CLS[s.status || Aoi.paigu.STATUSES[0]] + (over ? ' pq-over' : '')
-          + '" data-pact="slot" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id
-          + '" title="' + Aoi.escapeHtml((s.buyer || '未名') + ' · ' + (s.status || Aoi.paigu.STATUSES[0])
-            + (dangling ? ' · 订单已删除' : '')) + '">'
+          + '" draggable="true" data-pact="slot" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id
+          + '" data-key="' + Aoi.escapeHtml(c.key) + '" data-idx="' + i
+          + '" title="' + Aoi.escapeHtml(tip) + '">'
           + '<span class="pq-avatar">' + Aoi.escapeHtml((s.buyer || '?').charAt(0)) + '</span>'
           + '<span class="pq-name">' + Aoi.escapeHtml(s.buyer || '未名') + '</span>'
           + (dangling ? '<span class="pq-warn" title="原订单已被删除">⚠</span>' : '')
@@ -526,6 +570,16 @@ function pqSheetHtml(d, activity, type) {
     html += '</tr>';
   }
   html += '</tbody></table></div>';
+  // v3.29.0 翻页条（单页不显示）
+  if (pages > 1) {
+    html += '<div class="flex items-center justify-center gap-3 mt-3 text-xs text-gray-500">'
+      + '<button data-pact="page-prev" data-activity="' + Aoi.escapeHtml(activity) + '" data-type="' + Aoi.escapeHtml(type)
+      + '" class="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100' + (page <= 1 ? ' opacity-40 pointer-events-none' : '') + '">‹ 上一页</button>'
+      + '<span>第 <b>' + page + '</b> / ' + pages + ' 页 · 每页 ' + Aoi.paigu.PAGE_SIZE + ' 位</span>'
+      + '<button data-pact="page-next" data-activity="' + Aoi.escapeHtml(activity) + '" data-type="' + Aoi.escapeHtml(type)
+      + '" class="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-100' + (page >= pages ? ' opacity-40 pointer-events-none' : '') + '">下一页 ›</button>'
+      + '</div>';
+  }
   return html;
 }
 
@@ -543,9 +597,30 @@ function pqCloseModal() {
   if (modal) modal.classList.add('hidden');
   var box = document.getElementById('paiguModalBox');
   if (box) box.innerHTML = '';
+  pqUnfocusColumn(); // v3.29.0：弹层关闭时清除列聚焦动画
 }
 
-// 排位操作菜单：状态即点即改 + 调序 / 买家信息 / 转手动 / 撤排
+// —— v3.29.0 列聚焦动画：位次菜单打开时该列轻微放大、其余变暗（CSS 过渡平滑） ——
+
+function pqFocusColumn(slotId) {
+  pqUnfocusColumn();
+  var td = document.querySelector('[data-pact="slot"][data-slot="' + slotId + '"]');
+  var table = td && td.closest ? td.closest('table.paigu-sheet') : null;
+  if (!table) return;
+  var ci = td.cellIndex;
+  table.classList.add('pq-focusing');
+  Array.prototype.forEach.call(table.rows, function (row) {
+    if (row.cells[ci]) row.cells[ci].classList.add('pq-focus');
+  });
+}
+function pqUnfocusColumn() {
+  document.querySelectorAll('table.paigu-sheet.pq-focusing').forEach(function (table) {
+    table.classList.remove('pq-focusing');
+    table.querySelectorAll('.pq-focus').forEach(function (cell) { cell.classList.remove('pq-focus'); });
+  });
+}
+
+// 排位操作菜单：状态即点即改 + 编辑位次 / 买家信息 / 转手动 / 撤排（打开时列聚焦动画）
 Aoi.paigu.modalSlotMenu = function (activity, slotId) {
   var d = pqData();
   var loc = pqSlotById(d, activity, slotId);
@@ -561,15 +636,25 @@ Aoi.paigu.modalSlotMenu = function (activity, slotId) {
     return '<button data-pact="set-status" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '" data-status="' + st
       + '" class="pq-status-btn ' + Aoi.paigu.STATUS_CLS[st] + (cur ? ' pq-status-cur' : '') + '">' + st + (cur ? ' ✓' : '') + '</button>';
   }).join('');
+  // v3.29.0 编辑位次：上移x位 / 下移x位 / 上移到顶部 / 下移到底部（也可直接长按/拖拽该格到目标行）
+  var moveBox = '<div class="mt-3 p-2.5 border border-gray-200 rounded bg-gray-50">'
+    + '<p class="text-xs font-semibold text-gray-500 mb-1.5">编辑位次（当前第 ' + (loc.idx + 1) + ' 位）——拖动排位也可直接换位置</p>'
+    + '<div class="flex flex-wrap items-center gap-1.5">'
+    + '<input id="pqMoveN" type="number" min="1" step="1" value="1" class="w-16 border border-gray-300 rounded px-2 py-1 text-sm">'
+    + '<span class="text-xs text-gray-400">位</span>'
+    + '<button class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-move" data-dir="up" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">↑ 上移</button>'
+    + '<button class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-move" data-dir="down" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">↓ 下移</button>'
+    + '<button class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-move" data-dir="top" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">⤒ 上移到顶部</button>'
+    + '<button class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-move" data-dir="bottom" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">⤓ 下移到底部</button>'
+    + '</div></div>';
   var ops = '<div class="flex flex-wrap gap-2 mt-4">'
-    + '<button class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-up" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">↑ 上移一位</button>'
-    + '<button class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="slot-down" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">↓ 下移一位</button>'
     + '<button class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="buyer-info" data-activity="' + Aoi.escapeHtml(activity) + '" data-buyer="' + Aoi.escapeHtml(s.buyer || '') + '">查看买家信息</button>'
     + (dangling ? '<button class="px-3 py-1.5 border border-amber-200 rounded text-xs text-amber-700 hover:bg-amber-50" data-pact="slot-unlink" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">转为手动排位</button>' : '')
     + '<button class="px-3 py-1.5 border border-red-200 rounded text-xs text-red-600 hover:bg-red-50" data-pact="slot-remove" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id + '">撤排（订单不动）</button>'
     + '<button class="px-3 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="modal-close">关闭</button>'
     + '</div>';
-  pqOpenModal(head + '<div class="grid grid-cols-5 gap-1.5">' + statusBtns + '</div>' + ops);
+  pqOpenModal(head + '<div class="grid grid-cols-5 gap-1.5">' + statusBtns + '</div>' + moveBox + ops);
+  pqFocusColumn(slotId); // v3.29.0：画面聚焦——该列放大、其余变暗
 };
 
 // 添加订单入排：该活动全部订单，未排的勾选（确认后按商品列追加队尾），已排的置灰
@@ -708,17 +793,17 @@ Aoi.paigu.buildWorkbook = function (d, activity) {
     sh.put(0, 0, c('种类', { bold: true, center: true, fill: HEAD_FILL }));
     sh.put(1, 0, c('参考图', { bold: true, center: true }));
     sh.put(2, 0, c('单价', { bold: true, center: true, fill: HEAD_FILL }));
-    sh.put(3, 0, c('库存', { bold: true, center: true, fill: HEAD_FILL }));
+    sh.put(3, 0, c('已排/库存', { bold: true, center: true, fill: HEAD_FILL }));
     cols.forEach(function (col, ci) {
       sh.put(0, ci + 1, c(col.model, { bold: true, center: true, wrap: true, fill: HEAD_FILL }));
       if (col.refImage) imgCell(sh, 1, ci + 1, col.refImage);
       var label = col.price != null ? '¥' + col.price
         : (col.priceOrig != null ? Aoi.currencySymbol(col.currency || 'cny') + col.priceOrig : '');
       sh.put(2, ci + 1, c(label, { center: true }));
-      // v3.28.0：库存行（主档 stock；已排位次超库存标红）
+      // v3.29.0：已排/库存行（已排队位数 / 主档 stock；已排超库存标红）
       var queued = (t.slots[col.key] || []).length;
       var stockOver = col.stock != null && queued > col.stock;
-      sh.put(3, ci + 1, c(col.stock != null ? col.stock : '', { center: true, color: stockOver ? 'FF0000' : undefined }));
+      sh.put(3, ci + 1, c(queued + '/' + (col.stock != null ? col.stock : '—'), { center: true, color: stockOver ? 'FF0000' : undefined }));
     });
     var maxLen = Aoi.paigu.MIN_ROWS;
     cols.forEach(function (col) { maxLen = Math.max(maxLen, (t.slots[col.key] || []).length); });
@@ -779,6 +864,23 @@ document.addEventListener('click', function (e) {
   else if (act === 'switch-type') { Aoi.paigu.setType(el.getAttribute('data-type')); }
   else if (act === 'legend-toggle') { pqView.legendOpen = !pqView.legendOpen; Aoi.paigu.renderAll(); }
   else if (act === 'slot') { Aoi.paigu.modalSlotMenu(activity, slotId); }
+  else if (act === 'page-prev' || act === 'page-next') {
+    var dpg = pqData();
+    var pages = dpg ? Aoi.paigu.pageCount(dpg, activity || pqView.activity, el.getAttribute('data-type') != null ? el.getAttribute('data-type') : pqView.type) : 1;
+    var next = pqView.page + (act === 'page-prev' ? -1 : 1);
+    Aoi.paigu.setPage(Math.max(1, Math.min(next, pages)));
+  }
+  else if (act === 'slot-move') {
+    // v3.29.0 编辑位次：上移/下移 x 位、顶部、底部
+    var nInp = document.getElementById('pqMoveN');
+    var n = Math.max(1, parseInt(nInp && nInp.value, 10) || 1);
+    var dir = el.getAttribute('data-dir');
+    var p;
+    if (dir === 'top') p = Aoi.paigu.moveSlotTo(activity, slotId, 1);
+    else if (dir === 'bottom') p = Aoi.paigu.moveSlotTo(activity, slotId, 1e9);
+    else p = Aoi.paigu.moveSlotBy(activity, slotId, dir === 'up' ? -n : n);
+    p.then(function (ok) { if (ok) pqCloseModal(); });
+  }
   else if (act === 'insert') { Aoi.paigu.modalInsert(activity, el.getAttribute('data-key'), el.getAttribute('data-idx')); }
   else if (act === 'add-orders') { Aoi.paigu.modalAddOrders(activity || pqView.activity); }
   else if (act === 'add-orders-save') {
@@ -802,8 +904,6 @@ document.addEventListener('click', function (e) {
   else if (act === 'set-status') {
     Aoi.paigu.setStatus(activity, slotId, el.getAttribute('data-status')).then(function (s) { if (s) pqCloseModal(); });
   }
-  else if (act === 'slot-up') { Aoi.paigu.moveSlot(activity, slotId, -1).then(function (ok) { if (ok) pqCloseModal(); }); }
-  else if (act === 'slot-down') { Aoi.paigu.moveSlot(activity, slotId, 1).then(function (ok) { if (ok) pqCloseModal(); }); }
   else if (act === 'slot-remove') { Aoi.paigu.removeSlot(activity, slotId).then(function () { pqCloseModal(); }); }
   else if (act === 'slot-unlink') { Aoi.paigu.unlinkSlot(activity, slotId).then(function () { pqCloseModal(); }); }
   else if (act === 'buyer-info') { Aoi.paigu.modalBuyer(activity, el.getAttribute('data-buyer')); }
@@ -829,3 +929,118 @@ document.addEventListener('keydown', function (e) {
 document.addEventListener('click', function (e) {
   if (e.target && e.target.id === 'paiguModal') pqCloseModal();
 }, true);
+
+// —— v3.29.0 拖动排序：同一商品列内上下拖动换位（桌面按住拖拽 / 触屏长按 350ms 后拖动） ——
+
+var pqDrag = null; // { activity, slot, key } 拖拽中的排位
+function pqDragClearMarks() {
+  document.querySelectorAll('.pq-drop').forEach(function (el) { el.classList.remove('pq-drop'); });
+  document.querySelectorAll('.pq-dragging').forEach(function (el) { el.classList.remove('pq-dragging'); });
+}
+function pqDragTargetCell(x, y, target) {
+  // 鼠标拖放事件 target 就在光标下（优先用）；触屏事件 target 固定为起始元素，改走 elementFromPoint
+  var cell = target && target.closest ? target.closest('td[data-key]') : null;
+  if (!cell && document.elementFromPoint) {
+    var under = document.elementFromPoint(x, y);
+    cell = under && under.closest ? under.closest('td[data-key]') : null;
+  }
+  if (!cell || cell.getAttribute('data-activity') !== pqDrag.activity || cell.getAttribute('data-key') !== pqDrag.key) return null;
+  return cell;
+}
+function pqDragCommit(cell) {
+  var drag = pqDrag;
+  pqDrag = null;
+  pqDragClearMarks();
+  if (!drag || !cell) return;
+  var toIdx = parseInt(cell.getAttribute('data-idx'), 10);
+  if (toIdx) Aoi.paigu.moveSlotTo(drag.activity, drag.slot, toIdx);
+}
+
+// 桌面端：HTML5 拖放（排位格 draggable=true）
+document.addEventListener('dragstart', function (e) {
+  var el = e.target.closest ? e.target.closest('[data-pact="slot"]') : null;
+  if (!el) return;
+  pqDrag = {
+    activity: el.getAttribute('data-activity'),
+    slot: el.getAttribute('data-slot'),
+    key: el.getAttribute('data-key')
+  };
+  el.classList.add('pq-dragging');
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', pqDrag.slot); } catch (err) { /* jsdom 无 DataTransfer */ }
+  }
+});
+document.addEventListener('dragover', function (e) {
+  if (!pqDrag) return;
+  var cell = pqDragTargetCell(e.clientX, e.clientY, e.target);
+  if (!cell) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.pq-drop').forEach(function (el) { el.classList.remove('pq-drop'); });
+  cell.classList.add('pq-drop');
+});
+document.addEventListener('drop', function (e) {
+  if (!pqDrag) return;
+  var cell = pqDragTargetCell(e.clientX, e.clientY, e.target);
+  if (cell) e.preventDefault();
+  pqDragCommit(cell);
+});
+document.addEventListener('dragend', function () {
+  pqDrag = null;
+  pqDragClearMarks();
+});
+
+// 触屏端：长按 350ms 进入拖动，手指移动选目标行，松手落位
+var pqTouch = null;
+document.addEventListener('touchstart', function (e) {
+  if (e.touches.length !== 1) return;
+  var el = e.target.closest ? e.target.closest('[data-pact="slot"]') : null;
+  if (!el) return;
+  var t = e.touches[0];
+  pqTouch = {
+    el: el,
+    x: t.clientX, y: t.clientY,
+    active: false,
+    timer: setTimeout(function () {
+      if (!pqTouch) return;
+      pqTouch.active = true;
+      pqDrag = {
+        activity: pqTouch.el.getAttribute('data-activity'),
+        slot: pqTouch.el.getAttribute('data-slot'),
+        key: pqTouch.el.getAttribute('data-key')
+      };
+      pqTouch.el.classList.add('pq-dragging');
+    }, 350)
+  };
+}, { passive: true });
+document.addEventListener('touchmove', function (e) {
+  if (!pqTouch) return;
+  var t = e.touches[0];
+  if (!pqTouch.active) {
+    if (Math.abs(t.clientX - pqTouch.x) > 10 || Math.abs(t.clientY - pqTouch.y) > 10) {
+      clearTimeout(pqTouch.timer);
+      pqTouch = null;
+    }
+    return;
+  }
+  e.preventDefault(); // 拖动中阻止页面滚动
+  document.querySelectorAll('.pq-drop').forEach(function (el) { el.classList.remove('pq-drop'); });
+  var cell = pqDragTargetCell(t.clientX, t.clientY);
+  if (cell) cell.classList.add('pq-drop');
+}, { passive: false });
+document.addEventListener('touchend', function (e) {
+  if (!pqTouch) return;
+  clearTimeout(pqTouch.timer);
+  var wasActive = pqTouch.active;
+  pqTouch = null;
+  if (!wasActive) return;
+  e.preventDefault(); // 拖动结束不触发点击（否则会误开排位菜单）
+  var t = e.changedTouches[0];
+  pqDragCommit(pqDragTargetCell(t.clientX, t.clientY));
+}, { passive: false });
+document.addEventListener('touchcancel', function () {
+  if (pqTouch) { clearTimeout(pqTouch.timer); pqTouch = null; }
+  pqDrag = null;
+  pqDragClearMarks();
+});

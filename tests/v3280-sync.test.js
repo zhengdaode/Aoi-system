@@ -209,7 +209,7 @@ describe('saveEdit：订单编辑同步排谷表排位', () => {
   });
 });
 
-describe('排谷表页面：库存行 + 重复购买 ×N 标注', () => {
+describe('排谷表页面：已排/库存行（v3.29.0 格式）+ 重复购买分开显示', () => {
   it('库存行展示主档 stock；已排位次超过库存标红（pq-stock-over + ⚠）', () => {
     const d = aoi.state.data;
     d.activityMeta[ACT].products[0].stock = 1; // 已排 2 位 > 库存 1
@@ -218,16 +218,17 @@ describe('排谷表页面：库存行 + 重复购买 ×N 标注', () => {
     let th = doc.querySelector('.paigu-head-stock');
     expect(th).not.toBeNull();
     expect(th.classList.contains('pq-stock-over')).toBe(true);
+    expect(th.textContent).toContain('2/1');
     expect(th.textContent).toContain('⚠');
     d.activityMeta[ACT].products[0].stock = 10;
     P().renderAll();
     th = doc.querySelector('.paigu-head-stock');
     expect(th.classList.contains('pq-stock-over')).toBe(false);
-    expect(th.textContent).toContain('10');
+    expect(th.textContent).toContain('2/10');
     d.activityMeta[ACT].products[0].stock = null;
     P().renderAll();
     th = doc.querySelector('.paigu-head-stock');
-    expect(th.textContent).toBe('—'); // 未设置库存占位
+    expect(th.textContent).toBe('2/—'); // 未设置库存占位（已排数仍显示）
   });
 
   it('同买家同商品列多排位 → 逐位分开显示，不合并不标 ×N（v3.28.1 口径）', () => {
@@ -263,8 +264,8 @@ describe('导出（buildWorkbook）：库存行 + 重复购买不合并（v3.28.
     d.paigu[ACT].slots['毛绒|皮卡丘土王'].push({ id: 's3', buyer: '一枚小混子', status: '未付款', addedAt: '10-21 10:00' });
     const desc = P().buildWorkbook(d, ACT);
     const mz = desc.sheets[0];
-    expect(mz.rows[3][0].v).toBe('库存');
-    expect(mz.rows[3][1].v).toBe(2);
+    expect(mz.rows[3][0].v).toBe('已排/库存');
+    expect(mz.rows[3][1].v).toBe('3/2');
     expect(mz.rows[4][1].v).toBe('一枚小混子');   // 第 1 位，不合并不附 ×N
     expect(mz.rows[5][1].v).toBe('草莓头那个莹'); // 第 2 位
     expect(mz.rows[6][1].v).toBe('一枚小混子');   // 第 3 位，独立成格

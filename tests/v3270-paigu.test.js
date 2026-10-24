@@ -401,7 +401,7 @@ describe('弹层交互（统一委托 [data-pact] / 右键 / Esc / 遮罩）', (
 });
 
 describe('导出（buildWorkbook 纯函数 / exceljs 通道）', () => {
-  it('每类型一个 Sheet + 排谷日志：种类/参考图/单价三行头 + 位次行买家与状态填充', () => {
+  it('每类型一个 Sheet + 排谷日志：种类/参考图/单价/库存四行头 + 位次行买家与状态填充（v3.28.0 表头加库存行）', () => {
     const desc = P().buildWorkbook(aoi.state.data, ACT);
     expect(desc.sheets.map((s) => s.name)).toEqual(['毛绒', '发卡', '未分类', '排谷日志']);
     const mz = desc.sheets[0];
@@ -409,13 +409,14 @@ describe('导出（buildWorkbook 纯函数 / exceljs 通道）', () => {
     expect(mz.rows[0][1].v).toBe('皮卡丘土王');
     expect(mz.rows[1][1].s.img).toContain('p1.jpg');   // 参考图内嵌标记
     expect(mz.rows[2][1].v).toBe('JP¥5500');            // 主档外币原价+币种符号
+    expect(mz.rows[3][0].v).toBe('库存');               // v3.28.0：库存行（未设置时空串）
     // 第 1 位 = s1 一枚小混子（已下定=绿 BBF7D0）；第 2 位 = s2（未付款=黄 FEF3C7）
-    expect(mz.rows[3][0].v).toBe(1);
-    expect(mz.rows[3][1].v).toBe('一枚小混子');
-    expect(mz.rows[3][1].s.fill).toBe('BBF7D0');
-    expect(mz.rows[4][1].v).toBe('草莓头那个莹');
-    expect(mz.rows[4][1].s.fill).toBe('FEF3C7');
-    expect(mz.rows).toHaveLength(13); // 表头 3 行 + 位次 10 行
+    expect(mz.rows[4][0].v).toBe(1);
+    expect(mz.rows[4][1].v).toBe('一枚小混子');
+    expect(mz.rows[4][1].s.fill).toBe('BBF7D0');
+    expect(mz.rows[5][1].v).toBe('草莓头那个莹');
+    expect(mz.rows[5][1].s.fill).toBe('FEF3C7');
+    expect(mz.rows).toHaveLength(14); // 表头 4 行 + 位次 10 行
     const lg = desc.sheets[3];
     expect(lg.rows[1][1].v).toBe('seed 日志');
   });

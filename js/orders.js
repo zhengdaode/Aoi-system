@@ -1346,11 +1346,14 @@ Aoi.orders.saveEdit = async function () {
   o.priceOrig = origRaw === '' ? null : parseFloat(origRaw);
   if (o.priceOrig != null && isNaN(o.priceOrig)) { Aoi.toast('外币原价格式不正确', 'warning'); return; }
   var pruned = Aoi.orders.pruneOrphanProducts(d, oldAct, [oldKey]);
+  // v3.28.0：订单编辑同步排谷表排位（买家名 / 类型型号列 / 活动归属跟随订单）
+  var paiguSynced = Aoi.paigu && Aoi.paigu.syncOrder ? Aoi.paigu.syncOrder(d, o) : false;
   await Aoi.saveTeamData(d);
   Aoi.orders.closeEdit();
   Aoi.orders.render();
   if (pruned) Aoi.orders.renderActivities();
-  Aoi.toast('订单已更新' + (pruned ? '，同步清理无订单商品 ' + pruned + ' 个' : ''), 'success');
+  if (paiguSynced && Aoi.paigu) Aoi.paigu.renderAll();
+  Aoi.toast('订单已更新' + (pruned ? '，同步清理无订单商品 ' + pruned + ' 个' : '') + (paiguSynced ? '，排谷表排位已同步' : ''), 'success');
 };
 
 // —— 批量操作 ——
@@ -2137,7 +2140,7 @@ Aoi.orders.registerProduct = async function (activity, input) {
     var filled = [];
     [['refImage', input.refImage], ['refUrl', input.refUrl], ['price', input.price],
      ['priceOrig', input.priceOrig], ['currency', input.currency], ['limit', input.limit],
-     ['nameOrig', input.nameOrig]].forEach(function (pair) {
+     ['nameOrig', input.nameOrig], ['stock', input.stock]].forEach(function (pair) {
       if ((existing[pair[0]] == null || existing[pair[0]] === '') && pair[1] != null && pair[1] !== '') {
         existing[pair[0]] = pair[1];
         filled.push(pair[0]);
@@ -2157,6 +2160,7 @@ Aoi.orders.registerProduct = async function (activity, input) {
   if (input.currency) p.currency = input.currency;
   if (input.limit != null && !isNaN(input.limit)) p.limit = input.limit;
   if (input.nameOrig) p.nameOrig = String(input.nameOrig).trim();
+  if (input.stock != null && !isNaN(input.stock)) p.stock = input.stock;
   m.products.push(p);
   await Aoi.saveTeamData(d);
   return p;
@@ -2312,6 +2316,7 @@ Aoi.orders.actProductCardHtml = function (activity, p) {
     + '<div class="grid grid-cols-2 gap-1.5">'
     + '<input data-pprice="' + p.id + '" type="number" step="0.01" value="' + (p.price != null ? p.price : '') + '" placeholder="登记单价¥" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '<input data-plimit="' + p.id + '" type="number" step="1" value="' + (p.limit != null ? p.limit : '') + '" placeholder="单账号限购" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
+    + '<input data-pstock="' + p.id + '" type="number" step="1" value="' + (p.stock != null ? p.stock : '') + '" placeholder="库存数量" title="库存数量（同步显示在排谷表「库存」行）" class="w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '<label class="col-span-2 flex items-center gap-1.5 text-xs text-gray-600 select-none"><input type="checkbox" data-plisted="' + p.id + '" ' + (p.listed ? 'checked' : '') + ' class="rounded border-gray-300">上架到 C 端商城橱窗（买家可见并下单，需已登记单价）</label>'
     + '<input id="' + imgId + '" data-img-paste value="' + Aoi.escapeHtml(p.refImage || '') + '" placeholder="参考图 URL" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
     + '<input data-purl="' + p.id + '" value="' + Aoi.escapeHtml(p.refUrl || '') + '" placeholder="跳转链接（空=平台链接）" class="col-span-2 w-full border border-gray-300 rounded px-2 py-1 text-xs">'
@@ -2350,6 +2355,7 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<input id="apNewModel' + sfx + '" placeholder="型号" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<input id="apNewPrice' + sfx + '" type="number" step="0.01" placeholder="单价¥（选填）" class="w-28 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<input id="apNewLimit' + sfx + '" type="number" step="1" placeholder="限购（选填）" class="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="apNewStock' + sfx + '" type="number" step="1" placeholder="库存（选填）" class="w-24 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<input id="apNewImage' + sfx + '" data-img-paste placeholder="参考图 URL（可上传/粘贴）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
     + '<button type="button" onclick="Aoi.img.openPicker(\'apNewImage' + sfx + '\')" class="px-2 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap">图片…</button>'
     + '<input id="apNewUrl' + sfx + '" placeholder="跳转链接（空=平台链接）" class="w-44 border border-gray-300 rounded px-2 py-1.5 text-sm">'
@@ -2377,14 +2383,16 @@ Aoi.orders.addActProduct = async function (btn) {
   var get = function (id) { var el = document.getElementById(id + sfx); return el ? el.value.trim() : ''; };
   var priceRaw = get('apNewPrice');
   var limitRaw = get('apNewLimit');
+  var stockRaw = get('apNewStock');
   var p = await Aoi.orders.registerProduct(activity, {
     type: get('apNewType'), model: get('apNewModel'),
     refImage: get('apNewImage'), refUrl: get('apNewUrl'),
     price: priceRaw === '' ? null : parseFloat(priceRaw),
-    limit: limitRaw === '' ? null : parseInt(limitRaw, 10)
+    limit: limitRaw === '' ? null : parseInt(limitRaw, 10),
+    stock: stockRaw === '' ? null : parseInt(stockRaw, 10)
   });
   if (!p) return;
-  ['apNewType', 'apNewModel', 'apNewPrice', 'apNewLimit', 'apNewImage', 'apNewUrl'].forEach(function (id) {
+  ['apNewType', 'apNewModel', 'apNewPrice', 'apNewLimit', 'apNewStock', 'apNewImage', 'apNewUrl'].forEach(function (id) {
     var el = document.getElementById(id + sfx); if (el) el.value = '';
   });
   Aoi.orders.renderActivities();
@@ -2412,8 +2420,20 @@ Aoi.orders.saveActProduct = async function (pid) {
   var finalModel = newModel != null ? newModel : p.model;
   var dup = loc.meta.products.some(function (x) { return x.id !== pid && x.type === finalType && x.model === finalModel; });
   if (dup) { Aoi.toast('已存在同型号商品「' + finalType + '-' + finalModel + '」', 'warning'); return; }
+  // v3.28.0：类型/型号变更 → 同步同活动订单（同旧键改写为新键）、购买计划限购键与排谷表列键
+  var oldKey = p.type + '|' + p.model;
   if (newType != null) p.type = newType;
   if (newModel != null) p.model = newModel;
+  var newKey = p.type + '|' + p.model;
+  var syncedOrders = 0, movedSlots = 0;
+  if (newKey !== oldKey) {
+    (d.orders || []).forEach(function (o) {
+      if (o.activity === loc.activity && o.type + '|' + o.model === oldKey) { o.type = p.type; o.model = p.model; syncedOrders++; }
+    });
+    var plan = d.limitPlans && d.limitPlans[loc.activity];
+    if (plan && plan.limits && plan.limits[oldKey] != null) { plan.limits[newKey] = plan.limits[oldKey]; delete plan.limits[oldKey]; }
+    if (Aoi.paigu && Aoi.paigu.syncProductKey) movedSlots = Aoi.paigu.syncProductKey(d, loc.activity, oldKey, newKey);
+  }
   var img = document.getElementById('apImg_' + pid);
   if (img) {
     var rawImg = img.value.trim();
@@ -2435,12 +2455,21 @@ Aoi.orders.saveActProduct = async function (pid) {
     if (limitRaw === '') delete p.limit;
     else { var l = parseInt(limitRaw, 10); if (isNaN(l)) { Aoi.toast('限购格式不正确', 'warning'); return; } p.limit = l; }
   }
+  // v3.28.0：库存数量（同步显示在排谷表「库存」行）
+  var stockRaw = field('[data-pstock="' + pid + '"]');
+  if (stockRaw != null) {
+    if (stockRaw === '') delete p.stock;
+    else { var stk = parseInt(stockRaw, 10); if (isNaN(stk) || stk < 0) { Aoi.toast('库存格式不正确（非负整数）', 'warning'); return; } p.stock = stk; }
+  }
   // F12 C 端橱窗上架开关（缺省未上架；C 端 RPC 按 listed is true 过滤）
   var listed = card ? card.querySelector('[data-plisted="' + pid + '"]') : null;
   if (listed) p.listed = !!listed.checked;
   await Aoi.saveTeamData(d);
   Aoi.orders.renderActivities();
-  Aoi.toast('已保存商品 ' + p.type + '-' + p.model, 'success');
+  if (Aoi.paigu && (movedSlots || syncedOrders)) Aoi.paigu.renderAll();
+  Aoi.toast('已保存商品 ' + p.type + '-' + p.model
+    + (syncedOrders ? '，同步订单 ' + syncedOrders + ' 笔' : '')
+    + (movedSlots ? '，排谷表迁移 ' + movedSlots + ' 位' : ''), 'success');
 };
 
 Aoi.orders.removeActProduct = async function (pid) {

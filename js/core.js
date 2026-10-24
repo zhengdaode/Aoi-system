@@ -49,8 +49,18 @@ Aoi.showScreen = function (screenId) {
   if (target) target.classList.remove('hidden');
 };
 
-// 应用内视图切换（sidebar 导航）：只显示目标 view，高亮对应导航项
-Aoi.nav = function (viewId) {
+// 应用内视图切换（sidebar 导航）：只显示目标 view，高亮对应导航项。
+// v3.28.0：切换时把来源视图压入导航历史（上限 20），供头部「返回」回退；
+// opts.back=true 表示本次切换本身来自返回，不再入栈。
+Aoi.navHistory = [];
+
+Aoi.nav = function (viewId, opts) {
+  var cur = document.querySelector('[data-view]:not(.hidden)');
+  var curId = cur ? cur.getAttribute('id') : null;
+  if (curId && curId !== viewId && !(opts && opts.back)) {
+    Aoi.navHistory.push(curId);
+    if (Aoi.navHistory.length > 20) Aoi.navHistory.shift();
+  }
   document.querySelectorAll('[data-view]').forEach(function (el) {
     el.classList.add('hidden');
   });
@@ -60,6 +70,11 @@ Aoi.nav = function (viewId) {
     el.classList.toggle('nav-active', el.getAttribute('data-nav') === viewId);
   });
   Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
+  Aoi.renderView(viewId);
+};
+
+// 分视图刷新逻辑（nav 进入 / 头部「刷新」共用；数据可能在其他视图被修改）
+Aoi.renderView = function (viewId) {
   // 数据可能在其他视图被修改，回到限购页时刷新活动下拉与商品表
   if (viewId === 'view-limits' && Aoi.limits) Aoi.limits.render();
   // 进入总览时刷新总览 KPI 与「团期复盘」（v3.7.0 S6：复盘统计自独立 tab 并入总览）
@@ -77,10 +92,25 @@ Aoi.nav = function (viewId) {
   if (viewId === 'view-settings' && Aoi.about) Aoi.about.render();
 };
 
+// v3.28.0：返回上一步视图（历史栈空则提示；回退本身不入栈）
+Aoi.navBack = function () {
+  var prev = Aoi.navHistory.pop();
+  if (!prev) { Aoi.toast('没有更早的页面了', 'info'); return; }
+  Aoi.nav(prev, { back: true });
+};
+
+// v3.28.0：刷新当前视图（重渲染当前可见 view 的内容）
+Aoi.navRefresh = function () {
+  var cur = document.querySelector('[data-view]:not(.hidden)');
+  if (!cur) return;
+  Aoi.renderView(cur.getAttribute('id'));
+  Aoi.toast('已刷新当前页面', 'success');
+};
+
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.27.0',
-  buildDate: '2026-10-23',
+  version: 'v3.28.0',
+  buildDate: '2026-10-24',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -88,6 +118,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.28.0（2026-10-24）：全局返回上一步/页面刷新；商品库存数量同步排谷表；商品改类型/型号与订单编辑自动同步排谷表；修复同买家重复排位无数量标注（×N）与商品改类型后旧 sheet 残留',
     'v3.27.0（2026-10-23）：排谷表——按活动排队表格，商品按类型分 sheet、位次×买家矩阵、五状态色标、点按/右键改状态与插排撤排、超排检测删除、排谷日志、xlsx 导出（每类型一 Sheet+日志）',
     'v3.26.0（2026-10-14）：蓄水池「未转化订单就地补价」——警告标签/行内标记点一下按参考汇率预填转化，支持保存并下一笔',
     'v3.25.2（2026-10-14）：修复蓄水池弹窗按钮点击无反应（容器 stopPropagation 拦截 document 委托点击）',

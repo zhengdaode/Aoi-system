@@ -227,7 +227,11 @@
             <p id="myRole" class="text-sm text-gray-500 mt-0.5"></p>
           </div>
         </div>
-        <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline shrink-0">退出登录</button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="Aoi.navBack()" class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" title="返回上一步页面">‹ 返回</button>
+          <button onclick="Aoi.navRefresh()" class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" title="刷新当前页面">↻ 刷新</button>
+          <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline">退出登录</button>
+        </div>
       </header>
 
       <!-- 总览 -->

@@ -463,6 +463,18 @@ textarea:hover:not(:focus) {
 .pq-empty:hover { background: var(--surface-card); color: var(--primary); }
 .pq-over { box-shadow: inset 0 0 0 2px #f87171; }
 .pq-warn { margin-left: 0.25rem; font-size: 0.68rem; }
+/* v3.28.0：同买家重复排位 ×N 数量标记 / 库存行超排红标 */
+.pq-qty {
+  margin-left: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7c2d12;
+  background: rgba(251, 191, 36, 0.35);
+  border-radius: 9999px;
+  padding: 0 0.3rem;
+  vertical-align: middle;
+}
+.paigu-head-stock.pq-stock-over { color: #dc2626; font-weight: 700; }
 
 /* 排位操作菜单（右键/点按）：状态即点即改按钮 */
 .pq-status-btn {

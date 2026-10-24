@@ -82,7 +82,7 @@ Aoi.paigu.activityProducts = function (d, activity) {
   var agg = {};
   function put(key, patch) {
     if (!agg[key]) {
-      agg[key] = { key: key, type: '', model: '', refImage: '', refUrl: '', price: null, priceOrig: null, currency: null, master: false };
+      agg[key] = { key: key, type: '', model: '', refImage: '', refUrl: '', price: null, priceOrig: null, currency: null, stock: null, master: false };
     }
     Object.keys(patch).forEach(function (k) {
       if (patch[k] !== undefined && patch[k] !== null && patch[k] !== '') agg[key][k] = patch[k];
@@ -93,7 +93,8 @@ Aoi.paigu.activityProducts = function (d, activity) {
       type: p.type, model: p.model, refImage: p.refImage || '', refUrl: p.refUrl || '',
       price: p.price != null ? p.price : null,
       priceOrig: p.priceOrig != null ? p.priceOrig : null,
-      currency: p.currency || null, master: true
+      currency: p.currency || null, master: true,
+      stock: p.stock != null ? p.stock : null
     });
   });
   (d.orders || []).forEach(function (o) {
@@ -138,6 +139,49 @@ Aoi.paigu.membership = function (d) {
     });
   });
   return map;
+};
+
+// —— v3.28.0 三端同步（活动管理 ↔ 订单 ↔ 排谷表；由 orders.js 在商品键变更 / 订单编辑时调用）——
+
+// 商品键（类型|型号）变更：把旧键下的排位整体迁到新键列尾（并入目标列），旧键清理，日志留痕。
+// 返回迁移排位数。只改内存，落库由调用方（orders.js）统一负责。
+Aoi.paigu.syncProductKey = function (d, activity, oldKey, newKey) {
+  if (!d || !oldKey || !newKey || oldKey === newKey) return 0;
+  var t = d.paigu && d.paigu[activity];
+  if (!t || !t.slots) return 0;
+  var arr = t.slots[oldKey];
+  if (!arr || !arr.length) { delete t.slots[oldKey]; return 0; }
+  var target = t.slots[newKey] = t.slots[newKey] || [];
+  arr.forEach(function (s) { target.push(s); });
+  delete t.slots[oldKey];
+  pqPushLog(t, '商品键变更「' + oldKey.replace('|', ' / ') + '」→「' + newKey.replace('|', ' / ') + '」：迁移 ' + arr.length + ' 个排位');
+  t.updatedAt = new Date().toISOString();
+  return arr.length;
+};
+
+// 订单编辑（买家 / 类型 / 型号 / 活动）：同步该订单在排谷表中的排位（一单一排位不变）。
+// 买家名跟随订单；商品键或活动变化时移出原列、追加到目标活动目标列尾（队列语义：在该商品重新排队）。
+// 返回是否有改动。只改内存，落库由调用方（orders.js）统一负责。
+Aoi.paigu.syncOrder = function (d, o) {
+  if (!d || !o || !o.id) return false;
+  var m = Aoi.paigu.membership(d)[o.id];
+  if (!m) return false;
+  var changed = false;
+  var fromT = pqTable(d, m.activity);
+  var label = '「' + (m.slot.buyer || '未名') + '」';
+  if (o.buyer && m.slot.buyer !== o.buyer) { m.slot.buyer = o.buyer; changed = true; }
+  var newKey = (o.type || '') + '|' + (o.model || '');
+  if (m.key !== newKey || m.activity !== o.activity) {
+    fromT.slots[m.key].splice(m.idx, 1);
+    if (!(fromT.slots[m.key] || []).length) delete fromT.slots[m.key];
+    var toT = pqTable(d, o.activity);
+    (toT.slots[newKey] = toT.slots[newKey] || []).push(m.slot);
+    pqPushLog(toT, label + '订单修改：排位迁入「' + newKey.replace('|', ' / ') + '」'
+      + (m.activity !== o.activity ? '（自活动 ' + m.activity + '）' : '（原列 ' + m.key.replace('|', ' / ') + '）'));
+    changed = true;
+  }
+  if (changed) { fromT.updatedAt = new Date().toISOString(); pqTable(d, o.activity).updatedAt = new Date().toISOString(); }
+  return changed;
 };
 
 // 活动统计（列表页卡片）：排位总数 / 超排数
@@ -444,6 +488,16 @@ function pqSheetHtml(d, activity, type) {
       : (c.priceOrig != null ? Aoi.currencySymbol(c.currency || 'cny') + c.priceOrig : '—');
     html += '<th class="paigu-head paigu-head-price">' + Aoi.escapeHtml(price) + '</th>';
   });
+  html += '</tr>';
+  // 表头行 3（v3.28.0）：库存（活动商品主档 stock；已排位次超过库存标红提示）
+  html += '<tr><th class="pq-pos">库存</th>';
+  cols.forEach(function (c) {
+    var queued = (t.slots[c.key] || []).length;
+    var over = c.stock != null && queued > c.stock;
+    html += '<th class="paigu-head paigu-head-stock' + (over ? ' pq-stock-over' : '') + '" title="'
+      + Aoi.escapeHtml('已排 ' + queued + ' / 库存' + (c.stock != null ? ' ' + c.stock : ' 未设置')) + '">'
+      + (c.stock != null ? c.stock : '—') + (over ? ' ⚠' : '') + '</th>';
+  });
   html += '</tr></thead><tbody>';
   for (var i = 1; i <= maxLen; i++) {
     html += '<tr><td class="pq-pos">' + i + '</td>';
@@ -454,11 +508,16 @@ function pqSheetHtml(d, activity, type) {
       var s = arr[i - 1];
       if (s) {
         var dangling = s.orderId && !Aoi.paigu.orderById(d, s.orderId);
+        // v3.28.0：同一买家在本商品列占用多个排位时标注 ×N（重复购买计数，含手动排位）
+        var dupN = 0;
+        if (s.buyer) arr.forEach(function (x) { if (x.buyer === s.buyer) dupN++; });
         html += '<td class="paigu-cell ' + Aoi.paigu.STATUS_CLS[s.status || Aoi.paigu.STATUSES[0]] + (over ? ' pq-over' : '')
           + '" data-pact="slot" data-activity="' + Aoi.escapeHtml(activity) + '" data-slot="' + s.id
-          + '" title="' + Aoi.escapeHtml((s.buyer || '未名') + ' · ' + (s.status || Aoi.paigu.STATUSES[0]) + (dangling ? ' · 订单已删除' : '')) + '">'
+          + '" title="' + Aoi.escapeHtml((s.buyer || '未名') + ' · ' + (s.status || Aoi.paigu.STATUSES[0])
+            + (dupN > 1 ? ' · 共排 ' + dupN + ' 位' : '') + (dangling ? ' · 订单已删除' : '')) + '">'
           + '<span class="pq-avatar">' + Aoi.escapeHtml((s.buyer || '?').charAt(0)) + '</span>'
           + '<span class="pq-name">' + Aoi.escapeHtml(s.buyer || '未名') + '</span>'
+          + (dupN > 1 ? '<span class="pq-qty" title="该买家在本商品共排 ' + dupN + ' 位">×' + dupN + '</span>' : '')
           + (dangling ? '<span class="pq-warn" title="原订单已被删除">⚠</span>' : '')
           + '</td>';
       } else {
@@ -648,25 +707,35 @@ Aoi.paigu.buildWorkbook = function (d, activity) {
     var sh = new Sheet(sheetName(type || Aoi.paigu.UNTYPED));
     sh.cols = [{ w: 6 }];
     cols.forEach(function () { sh.cols.push({ w: 18 }); });
-    sh.freeze = { r: 3, c: 1 };
+    sh.freeze = { r: 4, c: 1 };
     sh.put(0, 0, c('种类', { bold: true, center: true, fill: HEAD_FILL }));
     sh.put(1, 0, c('参考图', { bold: true, center: true }));
     sh.put(2, 0, c('单价', { bold: true, center: true, fill: HEAD_FILL }));
+    sh.put(3, 0, c('库存', { bold: true, center: true, fill: HEAD_FILL }));
     cols.forEach(function (col, ci) {
       sh.put(0, ci + 1, c(col.model, { bold: true, center: true, wrap: true, fill: HEAD_FILL }));
       if (col.refImage) imgCell(sh, 1, ci + 1, col.refImage);
       var label = col.price != null ? '¥' + col.price
         : (col.priceOrig != null ? Aoi.currencySymbol(col.currency || 'cny') + col.priceOrig : '');
       sh.put(2, ci + 1, c(label, { center: true }));
+      // v3.28.0：库存行（主档 stock；已排位次超库存标红）
+      var queued = (t.slots[col.key] || []).length;
+      var stockOver = col.stock != null && queued > col.stock;
+      sh.put(3, ci + 1, c(col.stock != null ? col.stock : '', { center: true, color: stockOver ? 'FF0000' : undefined }));
+      // 同买家重复排位计数（导出格文本附 ×N）
+      var dupN = {};
+      (t.slots[col.key] || []).forEach(function (s) { if (s.buyer) dupN[s.buyer] = (dupN[s.buyer] || 0) + 1; });
+      col._dupN = dupN;
     });
     var maxLen = Aoi.paigu.MIN_ROWS;
     cols.forEach(function (col) { maxLen = Math.max(maxLen, (t.slots[col.key] || []).length); });
     for (var i = 1; i <= maxLen; i++) {
-      sh.put(i + 2, 0, c(i, { center: true }));
+      sh.put(i + 3, 0, c(i, { center: true }));
       cols.forEach(function (col, ci) {
         var s = (t.slots[col.key] || [])[i - 1];
         if (!s) return;
-        sh.put(i + 2, ci + 1, c(s.buyer || '未名', {
+        var dup = s.buyer ? (col._dupN[s.buyer] || 0) : 0;
+        sh.put(i + 3, ci + 1, c((s.buyer || '未名') + (dup > 1 ? ' ×' + dup : ''), {
           fill: Aoi.paigu.STATUS_FILL[s.status || Aoi.paigu.STATUSES[0]] || 'FFFFFF',
           center: true, border: true
         }));

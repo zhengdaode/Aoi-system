@@ -165,7 +165,7 @@
     <aside id="sidebar" class="w-60 bg-white border-r border-gray-200 p-5 flex flex-col shrink-0 fixed inset-y-0 left-0 z-50 -translate-x-full transition-transform duration-200 md:static md:translate-x-0">
       <div class="mb-6 px-2 flex items-start justify-between">
         <div>
-          <h1 class="font-serif text-xl font-bold leading-tight flex items-center gap-2">
+          <h1 onclick="Aoi.nav('view-home')" title="返回主页面" class="font-serif text-xl font-bold leading-tight flex items-center gap-2 cursor-pointer hover:opacity-80">
             <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
             Aoi System
           </h1>
@@ -216,6 +216,40 @@
       </nav>
     </aside>
     <div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-black bg-opacity-40 hidden md:hidden" onclick="Aoi.toggleSidebar(false)"></div>
+    <!-- 工作台侧栏（v3.30.0）：小红书创作平台式外壳，进入工作台时取代默认侧栏 -->
+    <aside id="wbSidebar" class="hidden w-60 bg-white border-r border-gray-200 p-5 shrink-0 fixed inset-y-0 left-0 z-50 overflow-y-auto md:static">
+      <div class="mb-5 px-2">
+        <button onclick="Aoi.nav('view-home')" title="返回主页面" class="font-serif text-xl font-bold flex items-center gap-2 hover:opacity-80">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+          Aoi System
+        </button>
+        <p class="text-xs text-gray-500 mt-1">工作台</p>
+      </div>
+      <button onclick="Aoi.nav('view-entry')" data-nav="view-entry" class="w-full mb-5 px-4 py-2.5 btn-primary font-bold rounded-lg text-white flex items-center justify-center gap-2" title="登记活动商品 / 录入订单，开启新的拼团">
+        <span class="text-lg leading-none">＋</span> 创建拼团
+      </button>
+      <nav class="space-y-1">
+        <a data-nav="view-overview" onclick="Aoi.nav('view-overview')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">🏠 首页</a>
+        <a data-nav="view-settings" onclick="Aoi.nav('view-settings')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">📒 账号与设置</a>
+        <div>
+          <button id="wbBuilderToggle" onclick="Aoi.workbench.toggleBuilder()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
+            <span>🧰 Builder hub</span><span id="wbBuilderChevron" class="text-gray-400 text-xs">▾</span>
+          </button>
+          <div id="wbBuilderItems" class="hidden pl-2 space-y-0.5"></div>
+        </div>
+        <div>
+          <button id="wbDataToggle" onclick="Aoi.workbench.toggleData()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
+            <span>📊 数据看板</span><span id="wbDataChevron" class="text-gray-400 text-xs">▾</span>
+          </button>
+          <div id="wbDataItems" class="hidden pl-2 space-y-0.5">
+            <a data-nav="view-wbsort" onclick="Aoi.nav('view-wbsort')" class="block px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">设置自定义排序</a>
+          </div>
+        </div>
+        <a data-nav="view-fun" onclick="Aoi.nav('view-fun')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">🎪 娱乐活动工具</a>
+        <a data-nav="view-idea" onclick="Aoi.nav('view-idea')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">💡 创意工坊</a>
+        <p class="px-3 pt-4 text-sm text-gray-300 select-none cursor-default" title="尽情期待">尽情期待</p>
+      </nav>
+    </aside>
     <main class="flex-1 p-6">
       <header class="flex items-center justify-between mb-8">
         <div class="flex items-center gap-3">
@@ -223,11 +257,12 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
           </button>
           <div>
-            <h2 class="font-serif text-2xl font-bold">Aoi System</h2>
+            <button onclick="Aoi.nav('view-home')" title="返回主页面" class="text-left font-serif text-2xl font-bold hover:opacity-80">Aoi System</button>
             <p id="myRole" class="text-sm text-gray-500 mt-0.5"></p>
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
+          <div id="hdrAvatar" onclick="Aoi.home && Aoi.home.avatarPlaceholder()" title="用户中心（端口预留）" class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 select-none cursor-pointer">A</div>
           <button onclick="Aoi.navBack()" class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" title="返回上一步页面">‹ 返回</button>
           <button onclick="Aoi.navRefresh()" class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" title="刷新当前页面">↻ 刷新</button>
           <button onclick="Aoi.auth.logout()" class="text-sm text-gray-500 hover:text-gray-700 hover:underline">退出登录</button>
@@ -330,6 +365,60 @@
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 主页面（v3.30.0）：默认界面。格子与中央面板由 Aoi.home.render 生成 -->
+      <div id="view-home" data-view class="hidden relative min-h-screen">
+        <div class="hq flex items-center justify-between px-6 pt-4" style="--rd:420ms">
+          <div class="font-serif text-xl font-bold px-4 py-1.5 rounded bg-blue-100 select-none">Aoi System</div>
+          <div class="flex items-center gap-2">
+            <button onclick="Aoi.home.langPlaceholder()" class="px-3 py-1.5 rounded text-sm border border-red-200 text-red-500 hover:bg-red-50" title="端口预留">切换语言</button>
+            <button id="homeAvatar" onclick="Aoi.home.avatarPlaceholder()" title="用户中心（端口预留）" class="w-9 h-9 rounded-full bg-green-200 flex items-center justify-center text-sm font-bold text-gray-700 select-none">A</button>
+          </div>
+        </div>
+        <div id="homeGrid" class="home-grid"></div>
+        <button id="homeGear" onclick="Aoi.home.toggleEdit()" title="编辑自定义功能快捷跳转"
+          class="fixed bottom-5 right-5 w-11 h-11 rounded-full bg-teal-200 text-teal-700 text-xl shadow-md hover:scale-110 transition-transform select-none">⚙</button>
+      </div>
+
+      <!-- 功能面板（v3.30.0 图2）：左上返回 + 按类型彩色分组的全部功能 -->
+      <div id="view-launcher" data-view class="hidden">
+        <div class="px-6 pt-4">
+          <button onclick="Aoi.home.launcherBack()" class="px-4 py-1.5 bg-gray-200 text-gray-600 text-sm rounded hover:bg-gray-300" title="返回上一个界面（不重播启动动画）">‹ 返回</button>
+        </div>
+        <div id="launcherBody" class="px-8 pb-12 pt-4"></div>
+      </div>
+
+      <!-- 数据看板 → 设置自定义排序（v3.30.0）：Steam 库式分类，隐藏仅影响展示 -->
+      <div id="view-wbsort" data-view class="hidden grid gap-4">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-1">设置自定义排序</h3>
+          <p class="text-sm text-gray-500 mb-3">像 Steam 库一样把已开启的功能分进自定义分类；取消勾选「展示」可只在导航中隐藏该功能——功能本身与数据记录不受影响。设置保存在本设备（localStorage）。</p>
+          <div class="flex items-center gap-2">
+            <input id="wbNewColl" placeholder="新分类名称" class="border border-gray-300 rounded px-3 py-2 text-sm w-48">
+            <button onclick="Aoi.workbench.addCollectionFromInput()" class="px-4 py-2 btn-primary text-sm font-bold rounded">新建分类</button>
+          </div>
+        </div>
+        <div class="grid gap-4 md:grid-cols-[220px,1fr]">
+          <div id="wbCollList" class="bg-white rounded-lg border border-gray-200 p-4 self-start"></div>
+          <div id="wbFeatList" class="bg-white rounded-lg border border-gray-200 p-4"></div>
+        </div>
+      </div>
+
+      <!-- 娱乐活动工具（v3.30.0 端口预留） -->
+      <div id="view-fun" data-view class="hidden grid gap-4">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-1">娱乐活动工具</h3>
+          <p class="text-sm text-gray-500">新功能端口预留，暂未填充内容——尽情期待</p>
+        </div>
+      </div>
+
+      <!-- 创意工坊（v3.30.0 端口预留） -->
+      <div id="view-idea" data-view class="hidden grid gap-4">
+        <div class="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 class="font-bold mb-1">创意工坊</h3>
+          <p class="text-sm text-gray-500">新功能端口预留，暂未填充内容——尽情期待</p>
         </div>
       </div>
 
@@ -1385,6 +1474,11 @@
   <datalist id="oActivityOptions"></datalist>
   <datalist id="oModelOptions"></datalist>
 
+  <!-- 启动动画遮罩（v3.30.0）：黑屏白字「你好」→ 呼吸边框启动按钮 + 背景渐白 → 主页 UI 显现；点击任意处跳过 -->
+  <div id="bootAnim" class="hidden fixed inset-0 bg-black flex items-center justify-center cursor-pointer" style="z-index:1000" title="点击任意处跳过">
+    <span id="bootHello" class="font-serif font-bold text-white text-7xl select-none">你好</span>
+  </div>
+
   <script src="js/config.js"></script>
   <script src="js/core.js"></script>
   <script src="js/data.js"></script>
@@ -1412,5 +1506,7 @@
   <script src="js/catalog.js"></script>
   <script src="js/reservoir.js"></script>
   <script src="js/paigu.js"></script>
+  <script src="js/workbench.js"></script>
+  <script src="js/home.js"></script>
 </body>
 </html>

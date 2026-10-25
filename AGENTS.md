@@ -57,11 +57,12 @@
 **v3.29.0 排谷表交互升级四连已实施完成（2026-10-24，见 CHANGELOG v3.29.0）**：①库存行改「已排/库存」双值（3/8，未设置 3/—，超库存仍红 ⚠，导出同步）；②排位悬浮提示改位次名词「买家-状态-共排N位-第M名」（同买家多排位才带共排，悬空加订单已删除）；③同列拖动换位（桌面 HTML5 拖拽 + 触屏长按 350ms，落位前高亮目标行）+ 右键「编辑位次」（上移/下移 x 位/顶部/底部，`Aoi.paigu.moveSlotTo/moveSlotBy`，moveSlot ±1 包装保留）+ 列聚焦动画（该列 scale 1.045、其余 opacity .3、0.25s 过渡，关层恢复）；④每列每页 20 行、超出翻页条（位次号跨页连续、切活动/类型重置、导出全量不受影响）；测试 676→689 全绿（+13：tests/v3290-paigu-ux.test.js，v3270/v3280 断言同步）。
 **v3.29.1 排谷表入排粒度修复已实施完成（2026-10-25，见 CHANGELOG v3.29.1）**：用户实测「买 2 个导入后只占一格」——根因是入排/插排按订单笔数而非购买件数生成排位。现按件数拆位（count=N → N 个连续排位同 orderId，买 2 件占 2 格），添加订单弹窗补 ×件数；syncOrder 跟随订单全部排位（改名逐位、迁列/换活动保序），防重仍按订单；测试 689→695 全绿（+6：tests/v3291-count-slots.test.js）。
 **v3.29.2 排谷表件数对账已实施完成（2026-10-25，见 CHANGELOG v3.29.2）**：用户复测 v3.29.1 后旧数据仍只占 1 格——补全量对账：renderAll 每个数据对象首次遇到时跑 `Aoi.paigu.repairAll`（已在排订单排位数对齐 count，缺的按现有排位买家/状态补在其最后一格后、多的裁尾，未入排订单不动，幂等+日志+落库），syncOrder 改件数即时补足/裁剪；测试 695→702 全绿（+7：tests/v3292-repair.test.js）。
+**v3.30.0 主页面 + 工作台已实施完成（2026-10-26，见 CHANGELOG v3.30.0）**：①主页面 `view-home`（第 28 模块 js/home.js）代替总览成为默认界面——启动动画（黑屏白字「你好」1.5s → 黑字呼吸透明边框启动按钮+背景渐白 → 再 1.5s 后 UI 先中间后四周 `.hq`/`--rd` 显现，点击任意处跳过，每次启动只播一次）；中央深色面板 = 待办四芯片（口径同总览）+ 临近出荷（已到货未发按批次聚合最近 3 个）+「你好/开始工作」呼吸渐变按钮进工作台；14 格自定义快捷跳转（空格浅边框+悬浮加号，右下齿轮编辑，`localStorage['aoi_home_shortcuts']`）；功能面板 `view-launcher`（图2：左上返回单步回退、业务青/基础数据绿/工具琥珀三色分组，兼作快捷格选择器）；顶栏「切换语言」「用户头像」延展端口；侧栏与主头部 logo 点击返回主页面。②工作台 `wbSidebar`（第 27 模块 js/workbench.js，小红书式）——创建拼团（→信息录入）/首页=总览/账号与设置复用原视图，Builder hub 展开=业务+基础数据+工具合集（`Aoi.workbench.FEATURES` 17 项注册表），数据看板展开→「设置自定义排序」（view-wbsort，Steam 库式分类：自建分类+归属调整+「展示」勾选隐藏仅影响导航、数据记录不受影响，`localStorage['aoi_wb_layout']`），娱乐活动工具/创意工坊端口占位，「尽情期待」不可点击文字。③外壳模式 `Aoi.setShell`（classic/home/workbench）+ `Aoi.applyShellForView` 导航挂钩。零 schema 改动；测试 702→730 全绿（+28：tests/v3300-home-workbench.test.js）。
 **下一轮计划（待批准）：见 [docs/PLAN-NEXT.md](docs/PLAN-NEXT.md)** —— v3.3.0 审查后产出的「新功能 × 后端」双路线规划（B1–B7 后端 / F1–F8 功能 + 版本切分），批准后按其版本切分实施。
 
 ## 技术栈与架构速览
 
-- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 27 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
+- 前端：`index.html`（页面骨架 + 全部 screen）+ `js/` 下 29 个功能模块（挂全局 `window.Aoi` 命名空间，无模块打包）。
   核心模块：`core.js`（路由/通用）、`data.js`（Supabase 读写）、`auth.js`、`team.js`、`member.js`（团员端）、
   `orders.js`（订单/活动/批次/类型/商品主档）、`calc.js`（汇率换算）、`intl.js`（国际运费分摊）、`approval.js`（交费审批）、
   `shipping.js`、`warehouse.js`、`notify.js`（通知 + QQ 推送入口）、`bot.js`（OneBot v11 客户端）、`import.js`、

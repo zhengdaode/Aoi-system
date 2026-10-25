@@ -47,6 +47,8 @@ const MODULES = [
   'js/catalog.js',
   'js/reservoir.js',
   'js/paigu.js',
+  'js/workbench.js',
+  'js/home.js',
   'js/shop.js'
 ];
 

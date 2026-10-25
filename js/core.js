@@ -70,6 +70,8 @@ Aoi.nav = function (viewId, opts) {
     el.classList.toggle('nav-active', el.getAttribute('data-nav') === viewId);
   });
   Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
+  // v3.30.0：外壳模式挂钩（回主页强制 home 全屏外壳；其余视图沿用当前外壳）
+  if (Aoi.applyShellForView) Aoi.applyShellForView(viewId);
   Aoi.renderView(viewId);
 };
 
@@ -90,6 +92,12 @@ Aoi.renderView = function (viewId) {
   if (viewId === 'view-paigu' && Aoi.paigu) Aoi.paigu.renderAll();
   // 进入设置页时刷新「关于」选项卡的版本与更新日志（v3.24.0）
   if (viewId === 'view-settings' && Aoi.about) Aoi.about.render();
+  // v3.30.0：主页面 / 功能面板 / 工作台自定义排序与占位页
+  if (viewId === 'view-home' && Aoi.home) Aoi.home.render();
+  if (viewId === 'view-launcher' && Aoi.home) Aoi.home.renderLauncher();
+  if (viewId === 'view-wbsort' && Aoi.workbench) Aoi.workbench.renderSort();
+  if (viewId === 'view-fun' && Aoi.workbench) Aoi.workbench.renderPlaceholder();
+  if (viewId === 'view-idea' && Aoi.workbench) Aoi.workbench.renderPlaceholder();
 };
 
 // v3.28.0：返回上一步视图（历史栈空则提示；回退本身不入栈）
@@ -109,8 +117,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.29.2',
-  buildDate: '2026-10-25',
+  version: 'v3.30.0',
+  buildDate: '2026-10-26',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -118,6 +126,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.30.0（2026-10-26）：主页面 + 工作台——主页面代替总览成为默认界面（启动动画：黑屏「你好」→ 呼吸边框启动按钮 → UI 先中间后四周显现，点击跳过）；中心待办与临近出荷 + 「你好/开始工作」进工作台；14 格自定义快捷跳转 + 功能面板；工作台侧栏（创建拼团/首页=总览/账号与设置/Builder hub/数据看板自定义排序/娱乐活动工具/创意工坊端口）',
     'v3.29.2（2026-10-25）：排谷表件数对账——打开排谷表自动把已入排订单的排位数对齐订单件数（修复旧数据「买 2 件只占 1 格」，第 1、2 行均显示买家）；订单编辑改件数即时补足/裁剪排位',
     'v3.29.1（2026-10-25）：排谷表入排粒度修复——按购买件数拆位，count=N 的订单占 N 个连续排位（此前一笔只占一格）；订单编辑同步跟随该订单全部排位',
     'v3.29.0（2026-10-24）：排谷表交互升级——「已排/库存」行、悬浮位次名词（买家-状态-共排N位-第M名）、同列拖动换位（鼠标拖拽+触屏长按）与右键编辑位次（上移/下移x位/顶部/底部+列聚焦动画）、每页 20 行翻页',
@@ -484,6 +493,7 @@ Aoi.refreshViews = function () {
   if (Aoi.limits) Aoi.limits.render();
   if (Aoi.stats) Aoi.stats.render();
   if (Aoi.paigu) Aoi.paigu.renderAll();
+  if (Aoi.home) Aoi.home.render();
 };
 
 // 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）+ 开设 IP 一览

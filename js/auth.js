@@ -154,6 +154,8 @@ Aoi.enterApp = async function () {
   Aoi.overview.render();
   Aoi.limits.render();
   Aoi.showScreen('screen-app');
+  // v3.30.0：主页面代替总览成为默认界面；每次启动（页面加载）播一次启动动画
+  if (Aoi.home) Aoi.home.enter(true);
 };
 
 // 启动：检查管理员是否已初始化 → 初始化页 / 登录页 / 恢复会话

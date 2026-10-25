@@ -239,7 +239,7 @@ describe('工作台', () => {
     expect(doc.getElementById('wbSidebar').classList.contains('hidden')).toBe(false);
   });
 
-  it('侧栏含创建拼团 / 账号与设置 / 数据看板 / 娱乐活动工具 / 创意工坊 / 尽情期待', () => {
+  it('侧栏含创建拼团 / 账号与设置 / 数据看板 / 娱乐活动工具 / 创意工坊 / 敬请期待', () => {
     const sb = doc.getElementById('wbSidebar').innerHTML;
     expect(sb).toContain('创建拼团');
     expect(sb).toContain('账号与设置');
@@ -247,7 +247,7 @@ describe('工作台', () => {
     expect(sb).toContain('设置自定义排序');
     expect(sb).toContain('娱乐活动工具');
     expect(sb).toContain('创意工坊');
-    expect(sb).toContain('尽情期待');
+    expect(sb).toContain('敬请期待');
   });
 
   it('Builder hub 展开 = 业务+基础数据+工具 全部功能合集', () => {

@@ -650,9 +650,11 @@ textarea:hover:not(:focus) {
 }
 .home-hello-text .ht-b {
   position: absolute;
-  inset: 0;
-  opacity: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   white-space: nowrap;
+  opacity: 0;
 }
 .home-hello:hover .ht-a { opacity: 0; }
 .home-hello:hover .ht-b { opacity: 1; }

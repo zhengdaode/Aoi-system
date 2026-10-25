@@ -274,8 +274,8 @@ Aoi.home = (function () {
   }
 
   // —— 顶栏占位端口（暂不填充内容）——
-  function langPlaceholder() { Aoi.toast('切换语言：端口预留，多语言支持尽情期待', 'info'); }
-  function avatarPlaceholder() { Aoi.toast('用户中心：端口预留，尽情期待', 'info'); }
+  function langPlaceholder() { Aoi.toast('切换语言：端口预留，多语言支持敬请期待', 'info'); }
+  function avatarPlaceholder() { Aoi.toast('用户中心：端口预留，敬请期待', 'info'); }
 
   // 事件委托：主页格子 / 功能面板卡片 / 启动动画跳过
   document.addEventListener('click', function (e) {

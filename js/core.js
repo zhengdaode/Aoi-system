@@ -75,29 +75,51 @@ Aoi.nav = function (viewId, opts) {
   Aoi.renderView(viewId);
 };
 
-// 分视图刷新逻辑（nav 进入 / 头部「刷新」共用；数据可能在其他视图被修改）
+// 分视图渲染注册表（v3.30.2）：每个视图在「导航进入 / 头部刷新 / 撤销恢复」时如何重渲染。
+// 此前只有部分视图在此有分支（历史逐版本增量补的），订单 / 国际计算 / 审批 / 发货等核心
+// 业务页缺席——它们只在登录时渲染一次，跨页改动不可见、「↻ 刷新」在那些页是空操作。
+// 现全部视图统一登记，nav / 刷新 / 撤销三处同源；登录首次渲染仍走 enterApp 不变。
+// 各渲染函数均为「读静态 HTML 上的选中态 → 重建 tbody」式重画，批次下拉经
+// orders.refillBatchSelect 自带选中保持，重渲染不丢用户的筛选 / 选中状态。
+Aoi.VIEW_RENDERERS = {
+  // —— 业务 ——
+  'view-orders': function () { if (!Aoi.orders) return; Aoi.orders.render(); Aoi.orders.refillDatalists(); Aoi.orders.refillBatches(); },
+  'view-intl': function () { if (!Aoi.intl) return; Aoi.intl.refillBatches(); Aoi.intl.render(); },
+  'view-approval': function () { if (!Aoi.approval) return; Aoi.approval.refillBatches(); Aoi.approval.render(); if (Aoi.orders) Aoi.orders.renderCnChanges(); },
+  'view-ship': function () { if (!Aoi.ship) return; Aoi.ship.refillBatches(); Aoi.ship.render(); },
+  'view-activities': function () { if (Aoi.orders) Aoi.orders.renderActivities(); },
+  'view-batches': function () { if (Aoi.orders) Aoi.orders.renderBatches(); },
+  'view-types': function () { if (Aoi.orders) Aoi.orders.renderTypes(); },
+  // —— 基础数据 ——
+  'view-entry': function () { if (Aoi.orders) Aoi.orders.refillDatalists(); },
+  'view-limits': function () { if (Aoi.limits) Aoi.limits.render(); },
+  'view-buyers': function () { if (Aoi.orders) Aoi.orders.renderBuyers(); },
+  'view-warehouse': function () { if (!Aoi.warehouse) return; Aoi.warehouse.render(); Aoi.warehouse.renderTransfers(); },
+  'view-calc': function () { if (Aoi.calc) Aoi.calc.fillForm(); },
+  // —— 工具 ——
+  'view-catalog': function () { if (Aoi.catalog) Aoi.catalog.render(); },
+  'view-notify': function () { if (!Aoi.notify) return; Aoi.notify.refillBatches(); Aoi.notify.render(); },
+  'view-overview': function () { if (Aoi.overview) Aoi.overview.render(); if (Aoi.stats) Aoi.stats.render(); },
+  'view-reservoir': function () { if (Aoi.reservoir) Aoi.reservoir.renderAll(); },
+  'view-paigu': function () { if (Aoi.paigu) Aoi.paigu.renderAll(); },
+  // —— 外壳 / 设置 ——
+  'view-settings': function () { if (Aoi.about) Aoi.about.render(); },
+  'view-home': function () { if (Aoi.home) Aoi.home.render(); },
+  'view-launcher': function () { if (Aoi.home) Aoi.home.renderLauncher(); },
+  'view-wbsort': function () { if (Aoi.workbench) Aoi.workbench.renderSort(); },
+  'view-fun': function () { if (Aoi.workbench) Aoi.workbench.renderPlaceholder(); },
+  'view-idea': function () { if (Aoi.workbench) Aoi.workbench.renderPlaceholder(); },
+  // 工单页是异步 relay 拉取，撤销恢复等纯本地场景不应触发网络（见 refreshViews 的排除）
+  'view-tickets': function () { if (Aoi.tickets) Aoi.tickets.load(); }
+};
+
+// 分视图刷新逻辑（nav 进入 / 头部「刷新」/ 撤销恢复共用；数据可能在其他视图被修改，
+// 进入任何视图都按注册表重画一遍）。返回是否确有渲染器执行（无注册项返回 false）。
 Aoi.renderView = function (viewId) {
-  // 数据可能在其他视图被修改，回到限购页时刷新活动下拉与商品表
-  if (viewId === 'view-limits' && Aoi.limits) Aoi.limits.render();
-  // 进入总览时刷新总览 KPI 与「团期复盘」（v3.7.0 S6：复盘统计自独立 tab 并入总览）
-  if (viewId === 'view-overview' && Aoi.overview) Aoi.overview.render();
-  if (viewId === 'view-overview' && Aoi.stats) Aoi.stats.render();
-  // 进入买家管理页时重渲染买家列表（v3.6.0 S1）
-  if (viewId === 'view-buyers' && Aoi.orders) Aoi.orders.renderBuyers();
-  // 进入 QQ 工单页时加载工单（F11-M13 工单处理台，独立视图；bot 未接入时静默降级）
-  if (viewId === 'view-tickets' && Aoi.tickets) Aoi.tickets.load();
-  // 进入蓄水池页时重渲染池卡与明细（v3.25.0 互购净额台账）
-  if (viewId === 'view-reservoir' && Aoi.reservoir) Aoi.reservoir.renderAll();
-  // 进入排谷表页时重渲染活动列表或当前表格详情（v3.27.0 按活动排队表格）
-  if (viewId === 'view-paigu' && Aoi.paigu) Aoi.paigu.renderAll();
-  // 进入设置页时刷新「关于」选项卡的版本与更新日志（v3.24.0）
-  if (viewId === 'view-settings' && Aoi.about) Aoi.about.render();
-  // v3.30.0：主页面 / 功能面板 / 工作台自定义排序与占位页
-  if (viewId === 'view-home' && Aoi.home) Aoi.home.render();
-  if (viewId === 'view-launcher' && Aoi.home) Aoi.home.renderLauncher();
-  if (viewId === 'view-wbsort' && Aoi.workbench) Aoi.workbench.renderSort();
-  if (viewId === 'view-fun' && Aoi.workbench) Aoi.workbench.renderPlaceholder();
-  if (viewId === 'view-idea' && Aoi.workbench) Aoi.workbench.renderPlaceholder();
+  var fn = Aoi.VIEW_RENDERERS[viewId];
+  if (!fn) return false;
+  fn();
+  return true;
 };
 
 // v3.28.0：返回上一步视图（历史栈空则提示；回退本身不入栈）
@@ -107,18 +129,18 @@ Aoi.navBack = function () {
   Aoi.nav(prev, { back: true });
 };
 
-// v3.28.0：刷新当前视图（重渲染当前可见 view 的内容）
+// v3.28.0：刷新当前视图（v3.30.2 起走统一注册表，全部视图均有效；仅确有重渲染时提示成功）
 Aoi.navRefresh = function () {
   var cur = document.querySelector('[data-view]:not(.hidden)');
   if (!cur) return;
-  Aoi.renderView(cur.getAttribute('id'));
-  Aoi.toast('已刷新当前页面', 'success');
+  var done = Aoi.renderView(cur.getAttribute('id'));
+  Aoi.toast(done ? '已刷新当前页面' : '当前页面暂无可刷新内容', done ? 'success' : 'info');
 };
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.30.1',
-  buildDate: '2026-10-26',
+  version: 'v3.30.2',
+  buildDate: '2026-10-29',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -126,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.30.2（2026-10-29）：修复「↻ 刷新」在订单/国际计算/审批/发货等页点击无效与跨页数据不同步——分视图渲染注册表 VIEW_RENDERERS 统一全部 24 视图（导航/刷新/撤销三处同源），进页即重渲染（批次下拉带选中保持、工单页撤销不触发网络），navRefresh 仅确有重渲染时提示成功',
     'v3.30.1（2026-10-26）：主页「开始工作」悬浮文字居中修复；「尽情期待」改「敬请期待」',
     'v3.30.0（2026-10-26）：主页面 + 工作台——主页面代替总览成为默认界面（启动动画：黑屏「你好」→ 呼吸边框启动按钮 → UI 先中间后四周显现，点击跳过）；中心待办与临近出荷 + 「你好/开始工作」进工作台；14 格自定义快捷跳转 + 功能面板；工作台侧栏（创建拼团/首页=总览/账号与设置/Builder hub/数据看板自定义排序/娱乐活动工具/创意工坊端口）',
     'v3.29.2（2026-10-25）：排谷表件数对账——打开排谷表自动把已入排订单的排位数对齐订单件数（修复旧数据「买 2 件只占 1 格」，第 1、2 行均显示买家）；订单编辑改件数即时补足/裁剪排位',
@@ -475,26 +498,13 @@ Aoi.undo.clear = function () {
   if (bar) bar.classList.add('hidden');
 };
 
-// 刷新所有视图（撤销恢复后调用）
+// 刷新所有视图（撤销恢复后调用）：与导航 / 头部「刷新」共用 VIEW_RENDERERS 注册表全量重画。
+// view-tickets 除外——工单页是异步 relay 拉取，撤销是纯本地数据恢复，不应触发网络请求。
 Aoi.refreshViews = function () {
-  Aoi.orders.render();
-  Aoi.orders.refillDatalists();
-  Aoi.orders.refillBatches();
-  Aoi.orders.renderBatches();
-  Aoi.orders.renderActivities();
-  Aoi.orders.renderTypes();
-  Aoi.intl.refillBatches();
-  Aoi.approval.refillBatches();
-  Aoi.ship.refillBatches();
-  Aoi.warehouse.render();
-  Aoi.warehouse.renderTransfers();
-  Aoi.orders.renderCnChanges();
-  Aoi.orders.renderBuyers();
-  Aoi.overview.render();
-  if (Aoi.limits) Aoi.limits.render();
-  if (Aoi.stats) Aoi.stats.render();
-  if (Aoi.paigu) Aoi.paigu.renderAll();
-  if (Aoi.home) Aoi.home.render();
+  Object.keys(Aoi.VIEW_RENDERERS).forEach(function (id) {
+    if (id === 'view-tickets') return;
+    Aoi.VIEW_RENDERERS[id]();
+  });
 };
 
 // 总览首页：登录后待办统计（待审核 / 待催缴 / 待发货 / 未到货）+ 开设 IP 一览

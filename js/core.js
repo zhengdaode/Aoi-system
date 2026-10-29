@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.30.2',
+  version: 'v3.30.3',
   buildDate: '2026-10-29',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.30.3（2026-10-29）：工作台侧栏分组改名——「Builder hub」→「基础功能列表」、「数据看板」→「自定义排序」（元素 id/注册表/布局数据不变，纯显示层）',
     'v3.30.2（2026-10-29）：修复「↻ 刷新」在订单/国际计算/审批/发货等页点击无效与跨页数据不同步——分视图渲染注册表 VIEW_RENDERERS 统一全部 24 视图（导航/刷新/撤销三处同源），进页即重渲染（批次下拉带选中保持、工单页撤销不触发网络），navRefresh 仅确有重渲染时提示成功',
     'v3.30.1（2026-10-26）：主页「开始工作」悬浮文字居中修复；「尽情期待」改「敬请期待」',
     'v3.30.0（2026-10-26）：主页面 + 工作台——主页面代替总览成为默认界面（启动动画：黑屏「你好」→ 呼吸边框启动按钮 → UI 先中间后四周显现，点击跳过）；中心待办与临近出荷 + 「你好/开始工作」进工作台；14 格自定义快捷跳转 + 功能面板；工作台侧栏（创建拼团/首页=总览/账号与设置/Builder hub/数据看板自定义排序/娱乐活动工具/创意工坊端口）',

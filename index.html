@@ -233,13 +233,13 @@
         <a data-nav="view-settings" onclick="Aoi.nav('view-settings')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">📒 账号与设置</a>
         <div>
           <button id="wbBuilderToggle" onclick="Aoi.workbench.toggleBuilder()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-            <span>🧰 Builder hub</span><span id="wbBuilderChevron" class="text-gray-400 text-xs">▾</span>
+            <span>🧰 基础功能列表</span><span id="wbBuilderChevron" class="text-gray-400 text-xs">▾</span>
           </button>
           <div id="wbBuilderItems" class="hidden pl-2 space-y-0.5"></div>
         </div>
         <div>
           <button id="wbDataToggle" onclick="Aoi.workbench.toggleData()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-            <span>📊 数据看板</span><span id="wbDataChevron" class="text-gray-400 text-xs">▾</span>
+            <span>📊 自定义排序</span><span id="wbDataChevron" class="text-gray-400 text-xs">▾</span>
           </button>
           <div id="wbDataItems" class="hidden pl-2 space-y-0.5">
             <a data-nav="view-wbsort" onclick="Aoi.nav('view-wbsort')" class="block px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">设置自定义排序</a>
@@ -390,7 +390,7 @@
         <div id="launcherBody" class="px-8 pb-12 pt-4"></div>
       </div>
 
-      <!-- 数据看板 → 设置自定义排序（v3.30.0）：Steam 库式分类，隐藏仅影响展示 -->
+      <!-- 工作台「自定义排序」→ 设置自定义排序（v3.30.0，v3.30.3 分组改名）：Steam 库式分类，隐藏仅影响展示 -->
       <div id="view-wbsort" data-view class="hidden grid gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="font-bold mb-1">设置自定义排序</h3>

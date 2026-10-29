@@ -1,11 +1,11 @@
 // Aoi-system — 工作台（v3.30.0）：小红书创作平台式侧栏外壳。
-// 首页=总览 / 账号与设置沿用原视图；Builder hub = 业务+基础数据+工具合集；
-// 数据看板展开【设置自定义排序】（Steam 库式分类，隐藏仅影响展示、不影响数据记录）；
+// 首页=总览 / 账号与设置沿用原视图；基础功能列表（原 Builder hub）= 业务+基础数据+工具合集；
+// 自定义排序展开【设置自定义排序】（Steam 库式分类，隐藏仅影响展示、不影响数据记录）；
 // 娱乐活动工具 / 创意工坊 为端口预留；「敬请期待」为不可点击文字。
 window.Aoi = window.Aoi || {};
 
 Aoi.workbench = (function () {
-  // 功能注册表：工作台 Builder hub、主页快捷跳转、功能面板、自定义排序共用的单一数据源
+  // 功能注册表：工作台基础功能列表、主页快捷跳转、功能面板、自定义排序共用的单一数据源
   var FEATURES = [
     { id: 'view-entry', label: '信息录入', group: '业务' },
     { id: 'view-orders', label: '订单管理', group: '业务' },
@@ -91,7 +91,7 @@ Aoi.workbench = (function () {
   // 展示中的功能 = 未被隐藏的注册功能（隐藏只影响导航展示，功能本身与数据记录不受影响）
   function visibleFeatures() { return FEATURES.filter(function (f) { return !isHidden(f.id); }); }
 
-  // Builder hub 展开区：先用户自建分类（按创建顺序），再「未分类」按 业务→基础数据→工具 排列
+  // 基础功能列表展开区：先用户自建分类（按创建顺序），再「未分类」按 业务→基础数据→工具 排列
   function buildNav() {
     var box = el('wbBuilderItems');
     if (!box) return;
@@ -113,7 +113,7 @@ Aoi.workbench = (function () {
       html += '<p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mt-3 mb-1 px-2">未分类</p>';
       html += loose.map(navRow).join('');
     }
-    box.innerHTML = html || '<p class="text-xs text-gray-400 px-2 py-2">功能已全部隐藏——可在「数据看板 → 设置自定义排序」恢复展示</p>';
+    box.innerHTML = html || '<p class="text-xs text-gray-400 px-2 py-2">功能已全部隐藏——可在工作台「自定义排序」恢复展示</p>';
   }
   function navRow(f) {
     var extra = f.id === 'view-catalog' ? ';Aoi.catalog.renderAll()' : '';
@@ -129,7 +129,7 @@ Aoi.workbench = (function () {
     Aoi.nav('view-overview');
   }
 
-  // —— 数据看板 → 设置自定义排序（Steam 库式分类面板）——
+  // —— 自定义排序 → 设置自定义排序（Steam 库式分类面板）——
   function renderSort() {
     var list = el('wbFeatList');
     var collBox = el('wbCollList');
@@ -180,7 +180,7 @@ Aoi.workbench = (function () {
     Aoi.toast('已新建分类', 'success');
   }
 
-  // 侧栏分组展开/收起（Builder hub / 数据看板，同小红书案例的展开属性）
+  // 侧栏分组展开/收起（基础功能列表 / 自定义排序，同小红书案例的展开属性）
   function toggleBuilder() {
     var box = el('wbBuilderItems');
     var chev = el('wbBuilderChevron');

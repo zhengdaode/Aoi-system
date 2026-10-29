@@ -1,7 +1,7 @@
 // v3.30.0 主页面 + 工作台测试
 // 覆盖：外壳模式切换 / 主页面渲染（待办、临近出荷）/ 自定义快捷跳转（14 格 + localStorage）/
-// 启动动画（时间线 + 点击跳过 + 不重播）/ 功能面板 / 工作台侧栏（Builder hub 合集、
-// 数据看板自定义排序、隐藏仅影响展示）
+// 启动动画（时间线 + 点击跳过 + 不重播）/ 功能面板 / 工作台侧栏（基础功能列表合集、
+// 自定义排序、隐藏仅影响展示）
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { aoi, win, doc } from './helpers/aoi.js';
 
@@ -239,18 +239,19 @@ describe('工作台', () => {
     expect(doc.getElementById('wbSidebar').classList.contains('hidden')).toBe(false);
   });
 
-  it('侧栏含创建拼团 / 账号与设置 / 数据看板 / 娱乐活动工具 / 创意工坊 / 敬请期待', () => {
+  it('侧栏含创建拼团 / 账号与设置 / 自定义排序 / 娱乐活动工具 / 创意工坊 / 敬请期待', () => {
     const sb = doc.getElementById('wbSidebar').innerHTML;
     expect(sb).toContain('创建拼团');
     expect(sb).toContain('账号与设置');
-    expect(sb).toContain('数据看板');
+    expect(sb).toContain('基础功能列表');
+    expect(sb).toContain('自定义排序');
     expect(sb).toContain('设置自定义排序');
     expect(sb).toContain('娱乐活动工具');
     expect(sb).toContain('创意工坊');
     expect(sb).toContain('敬请期待');
   });
 
-  it('Builder hub 展开 = 业务+基础数据+工具 全部功能合集', () => {
+  it('基础功能列表展开 = 业务+基础数据+工具 全部功能合集', () => {
     aoi.workbench.enter();
     aoi.workbench.toggleBuilder();
     const items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
@@ -271,7 +272,7 @@ describe('工作台', () => {
     expect(doc.getElementById('wbBuilderItems').classList.contains('hidden')).toBe(true);
   });
 
-  it('自定义排序：新建分类、归属调整渲染到 Builder hub 对应分组', () => {
+  it('自定义排序：新建分类、归属调整渲染到基础功能列表对应分组', () => {
     aoi.workbench.enter();
     expect(aoi.workbench.addCollection('常用')).toBe(true);
     expect(aoi.workbench.addCollection('常用')).toBe(false); // 重名拒绝
@@ -284,7 +285,7 @@ describe('工作台', () => {
     expect(common.textContent).toBe('常用');
   });
 
-  it('隐藏功能从 Builder hub 移除但注册表与数据不受影响；恢复勾选即回归', () => {
+  it('隐藏功能从基础功能列表移除但注册表与数据不受影响；恢复勾选即回归', () => {
     aoi.workbench.enter();
     aoi.workbench.toggleHidden('view-orders');
     expect(aoi.workbench.isHidden('view-orders')).toBe(true);

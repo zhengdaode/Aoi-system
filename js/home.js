@@ -2,7 +2,8 @@
 // ① 启动动画：黑屏白字「你好」停留 1.5s → 缩放为黑色呼吸透明边框启动按钮、背景渐白，
 //   再 1.5s 后主页 UI 先中间后四周显现；点击任意处跳过。每次启动（页面加载）只播一次。
 // ② 中心信息区：待办任务 + 临近出荷；正中「你好」按钮（悬浮渐变为「开始工作」）进工作台。
-// ③ 自定义功能快捷跳转：14 格环绕，未编辑为浅色边框空格 + 悬浮加号；右下角齿轮进入编辑。
+// ③ 自定义功能快捷跳转：14 格环绕，功能标题居中放大、底色取所在自定义分类的颜色（v3.31.0）；
+//   未编辑为浅色边框空格 + 悬浮加号；右下角齿轮进入编辑。
 // ④ 功能面板（view-launcher，图2 临时界面）：左上返回、按类型彩色分组的全部功能，
 //   既可作空格选功能的选择器，也可独立跳转。
 window.Aoi = window.Aoi || {};
@@ -34,9 +35,6 @@ Aoi.home = (function () {
   function saveShortcuts(arr) { localStorage.setItem(LS_SHORTCUTS, JSON.stringify(arr)); }
 
   function featById(id) { return Aoi.workbench ? Aoi.workbench.featById(id) : null; }
-  function groupColor(g) {
-    return { '业务': '#5fd3d3', '基础数据': '#8ec46a', '工具': '#d4a017' }[g] || '#8e8b82';
-  }
   // 14 格位置：r1 四格；r2–r4 两侧各一格（中央面板跨 2–4 行 × 2–3 列）；r5 四格
   function tilePos(i) {
     if (i < 4) return { col: i + 1, row: 1 };
@@ -170,8 +168,10 @@ Aoi.home = (function () {
       var vid = shorts[i];
       var f = vid ? featById(vid) : null;
       if (f) {
-        html += '<button data-hslot="' + i + '" class="hq home-tile home-tile-filled" style="' + style + '" title="' + Aoi.escapeHtml(f.label) + '">'
-          + '<span class="home-tile-dot" style="background:' + groupColor(f.group) + '"></span>'
+        // v3.31.0：功能标题居中放大；底色 = 所在自定义分类的颜色（无分类回落默认奶油底）
+        var col = (Aoi.workbench && Aoi.workbench.collectionColorOf) ? (Aoi.workbench.collectionColorOf(vid) || '') : '';
+        var colBg = (col && Aoi.workbench.tint) ? ';background:' + Aoi.workbench.tint(col, '3d') : '';
+        html += '<button data-hslot="' + i + '" class="hq home-tile home-tile-filled" style="' + style + colBg + '" title="' + Aoi.escapeHtml(f.label) + '">'
           + '<span class="home-tile-label">' + Aoi.escapeHtml(f.label) + '</span>'
           + (editMode ? '<span class="home-tile-x" data-hclear="' + i + '" title="清除此快捷跳转">×</span>' : '')
           + '</button>';

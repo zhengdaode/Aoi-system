@@ -543,9 +543,11 @@ textarea:hover:not(:focus) {
 .home-tile {
   position: relative;
   border-radius: 0.6rem;
-  padding: 0.9rem;
-  text-align: left;
-  font-size: 0.9rem;
+  padding: 0.9rem 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease,
     opacity 0.55s ease var(--rd, 0ms);
 }
@@ -560,15 +562,16 @@ textarea:hover:not(:focus) {
   justify-content: center;
 }
 .home-tile-empty:hover { border-color: var(--primary); color: var(--primary); }
-.home-tile-dot {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  margin-right: 0.45rem;
-  vertical-align: middle;
+.home-tile-label {
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.3;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.home-tile-label { vertical-align: middle; }
 .home-tile-plus { font-size: 1.4rem; opacity: 0; transition: opacity 0.2s ease; }
 .home-tile-empty:hover .home-tile-plus { opacity: 1; }
 .home-tile-x {

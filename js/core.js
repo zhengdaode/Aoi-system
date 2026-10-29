@@ -139,8 +139,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.30.3',
-  buildDate: '2026-10-29',
+  version: 'v3.31.0',
+  buildDate: '2026-10-30',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.31.0（2026-10-30）：工作台分组行为重构 + 分类颜色——①「设置自定义排序」的分类/顺序/展示成果改挂侧栏「自定义排序」分组展示，「基础功能列表」回归静态全量目录（业务→基础数据→工具，不受自定义影响）；②分类支持颜色（新建选色+左列随时改色+分类内上移/下移），分类色作该分类功能的 UI 底色（侧栏行+主页快捷格）；③主页快捷格功能标题居中放大、底色取分类色',
     'v3.30.3（2026-10-29）：工作台侧栏分组改名——「Builder hub」→「基础功能列表」、「数据看板」→「自定义排序」（元素 id/注册表/布局数据不变，纯显示层）',
     'v3.30.2（2026-10-29）：修复「↻ 刷新」在订单/国际计算/审批/发货等页点击无效与跨页数据不同步——分视图渲染注册表 VIEW_RENDERERS 统一全部 24 视图（导航/刷新/撤销三处同源），进页即重渲染（批次下拉带选中保持、工单页撤销不触发网络），navRefresh 仅确有重渲染时提示成功',
     'v3.30.1（2026-10-26）：主页「开始工作」悬浮文字居中修复；「尽情期待」改「敬请期待」',

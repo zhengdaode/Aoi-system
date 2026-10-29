@@ -1,5 +1,28 @@
 # Changelog
 
+## v3.31.1 (2026-10-30)
+
+> **手机端适配补齐（v3.30.0 起新改版的缺口）**：工作台侧栏手机抽屉化 + 主页 14 格窄屏 2 列网格。
+> 纯显示层/交互层改动，零数据 schema 变更。
+
+### 工作台侧栏手机抽屉（此前手机上为永远展开、无法关闭的固定覆盖层）
+- `wbSidebar` 复刻经典侧栏的抽屉模式：`-translate-x-full`（手机端默认收起）+
+  `transition-transform duration-200` + `md:translate-x-0`（桌面 ≥768px 覆盖位移、维持常驻布局）；
+- 头部汉堡按钮改为 `Aoi.toggleNavDrawer()` **按外壳分发**：workbench 外壳开合工作台侧栏
+  （`Aoi.toggleWorkbenchSidebar`），其余外壳开合经典侧栏（`Aoi.toggleSidebar`，行为不变）；
+- 遮罩复用 `sidebarBackdrop`，点击改为 `Aoi.closeDrawers()`（同时收起两个抽屉）；
+- `Aoi.nav` 切视图自动收起全部抽屉；`setShell` 离开 workbench 外壳时把抽屉复位到收起位。
+
+### 主页 14 格窄屏 2 列网格
+- ≤900px 由「中央面板 + 14 个全宽格子纵向长列表」改为 **2 列紧凑网格**（内联 grid 定位用
+  `!important` 归位自动流、行高 ≥84px 保证触达），中央面板置顶跨双列（`order:-1`）。
+
+### 其他
+- 设置页「关于」选项卡版本更新至 v3.31.1；**AGENTS.md 注意事项新增第 5 条规范**：
+  每次发版必须同步更新 `js/core.js` 的 `Aoi.ABOUT`（version / buildDate / log）。
+- 新增 `tests/v3311-mobile-drawer.test.js` 5 例（抽屉类机制 / 开合联动遮罩 / 汉堡按外壳分发 /
+  nav 收起与外壳复位 / closeDrawers 双收起）；全套 vitest 745 → **750 全绿**。
+
 ## v3.31.0 (2026-10-30)
 
 > **工作台分组行为重构 + 分类颜色 + 主页快捷格改版（用户三项需求）**：纯前端与 localStorage

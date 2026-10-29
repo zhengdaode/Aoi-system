@@ -63,7 +63,11 @@ Aoi.home = (function () {
       sb.classList.toggle('hidden', home || wbm);
       if (home || wbm) sb.classList.add('-translate-x-full');
     }
-    if (wb) wb.classList.toggle('hidden', !wbm);
+    if (wb) {
+      wb.classList.toggle('hidden', !wbm);
+      // 离开工作台外壳时把手机抽屉复位到收起位（桌面端 md:translate-x-0 覆盖，不影响常驻布局）
+      if (!wbm) wb.classList.add('-translate-x-full');
+    }
     if (header) header.classList.toggle('hidden', home);
     if (main) main.classList.toggle('p-0', home);
     if (backdrop && (home || wbm)) backdrop.classList.add('hidden');

@@ -215,9 +215,9 @@
         </div>
       </nav>
     </aside>
-    <div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-black bg-opacity-40 hidden md:hidden" onclick="Aoi.toggleSidebar(false)"></div>
+    <div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-black bg-opacity-40 hidden md:hidden" onclick="Aoi.closeDrawers()"></div>
     <!-- 工作台侧栏（v3.30.0）：小红书创作平台式外壳，进入工作台时取代默认侧栏 -->
-    <aside id="wbSidebar" class="hidden w-60 bg-white border-r border-gray-200 p-5 shrink-0 fixed inset-y-0 left-0 z-50 overflow-y-auto md:static">
+    <aside id="wbSidebar" class="hidden w-60 bg-white border-r border-gray-200 p-5 shrink-0 fixed inset-y-0 left-0 z-50 overflow-y-auto -translate-x-full transition-transform duration-200 md:static md:translate-x-0">
       <div class="mb-5 px-2">
         <button onclick="Aoi.nav('view-home')" title="返回主页面" class="font-serif text-xl font-bold flex items-center gap-2 hover:opacity-80">
           <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
@@ -253,7 +253,7 @@
     <main class="flex-1 p-6">
       <header class="flex items-center justify-between mb-8">
         <div class="flex items-center gap-3">
-          <button onclick="Aoi.toggleSidebar()" class="md:hidden text-gray-600 hover:text-gray-900" aria-label="菜单">
+          <button onclick="Aoi.toggleNavDrawer()" class="md:hidden text-gray-600 hover:text-gray-900" aria-label="菜单">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
           </button>
           <div>

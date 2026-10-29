@@ -69,7 +69,7 @@ Aoi.nav = function (viewId, opts) {
   document.querySelectorAll('[data-nav]').forEach(function (el) {
     el.classList.toggle('nav-active', el.getAttribute('data-nav') === viewId);
   });
-  Aoi.toggleSidebar(false); // 移动端切视图后收起抽屉
+  Aoi.closeDrawers(); // 移动端切视图后收起全部抽屉（经典侧栏 / 工作台侧栏）
   // v3.30.0：外壳模式挂钩（回主页强制 home 全屏外壳；其余视图沿用当前外壳）
   if (Aoi.applyShellForView) Aoi.applyShellForView(viewId);
   Aoi.renderView(viewId);
@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.31.0',
+  version: 'v3.31.1',
   buildDate: '2026-10-30',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.31.1（2026-10-30）：手机端适配补齐——工作台侧栏改抽屉（手机端默认收起、头部汉堡按外壳分发开合、复用遮罩、切视图/换外壳自动收起复位），主页 14 格窄屏改 2 列紧凑网格（中央面板置顶跨双列，替代 14 行纵向长列表）',
     'v3.31.0（2026-10-30）：工作台分组行为重构 + 分类颜色——①「设置自定义排序」的分类/顺序/展示成果改挂侧栏「自定义排序」分组展示，「基础功能列表」回归静态全量目录（业务→基础数据→工具，不受自定义影响）；②分类支持颜色（新建选色+左列随时改色+分类内上移/下移），分类色作该分类功能的 UI 底色（侧栏行+主页快捷格）；③主页快捷格功能标题居中放大、底色取分类色',
     'v3.30.3（2026-10-29）：工作台侧栏分组改名——「Builder hub」→「基础功能列表」、「数据看板」→「自定义排序」（元素 id/注册表/布局数据不变，纯显示层）',
     'v3.30.2（2026-10-29）：修复「↻ 刷新」在订单/国际计算/审批/发货等页点击无效与跨页数据不同步——分视图渲染注册表 VIEW_RENDERERS 统一全部 24 视图（导航/刷新/撤销三处同源），进页即重渲染（批次下拉带选中保持、工单页撤销不触发网络），navRefresh 仅确有重渲染时提示成功',
@@ -209,6 +210,29 @@ Aoi.toggleSidebar = function (open) {
   if (open === undefined) open = sb.classList.contains('-translate-x-full');
   sb.classList.toggle('-translate-x-full', !open);
   if (bd) bd.classList.toggle('hidden', !open);
+};
+
+// 工作台侧栏抽屉（v3.31.1）：手机端 wbSidebar 为 fixed 覆盖层，开合与经典侧栏同款
+//（translate 滑入滑出 + 复用遮罩）；桌面端 md:translate-x-0 覆盖位移保持常驻布局。
+Aoi.toggleWorkbenchSidebar = function (open) {
+  var wb = document.getElementById('wbSidebar');
+  if (!wb) return;
+  if (open === undefined) open = wb.classList.contains('-translate-x-full');
+  wb.classList.toggle('-translate-x-full', !open);
+  var bd = document.getElementById('sidebarBackdrop');
+  if (bd) bd.classList.toggle('hidden', !open);
+};
+
+// 头部汉堡按钮（v3.31.1）：按当前外壳分发——workbench 外壳开合工作台侧栏，其余开合经典侧栏
+Aoi.toggleNavDrawer = function () {
+  if (Aoi.shell === 'workbench') Aoi.toggleWorkbenchSidebar();
+  else Aoi.toggleSidebar();
+};
+
+// 一次性收起全部抽屉（nav 切视图 / 遮罩点击共用）
+Aoi.closeDrawers = function () {
+  Aoi.toggleSidebar(false);
+  Aoi.toggleWorkbenchSidebar(false);
 };
 
 // XSS 防护：转义后再插入 DOM。引号也转义——value="…"/href="…"/title="…" 等

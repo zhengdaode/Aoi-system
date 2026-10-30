@@ -65,8 +65,9 @@ Aoi.poster.wrapText = function (ctx, text, maxWidth, maxLines) {
   return lines.slice(0, maxLines);
 };
 
-// contain 式完整绘制（v3.32.3，用户要求：比例不合适用黑边填充而非裁剪）——
-// 整图等比缩放放入目标框居中，短边方向留黑边；fitBox 为纯函数可单测
+// contain 式完整绘制（v3.32.3，用户要求：比例不合适用填充而非裁剪）——
+// 整图等比缩放放入目标框居中，短边方向留边；v3.32.4 边色改海报背景同色（#faf7f2，原黑边）；
+// fitBox 为纯函数可单测
 Aoi.poster.fitBox = function (iw, ih, w, h) {
   if (!iw || !ih) return null;
   var scale = Math.min(w / iw, h / ih);
@@ -78,7 +79,7 @@ Aoi.poster.fitBox = function (iw, ih, w, h) {
 Aoi.poster.drawContain = function (ctx, img, x, y, w, h) {
   var iw = img.width || img.naturalWidth;
   var ih = img.height || img.naturalHeight;
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = '#faf7f2'; // 海报背景同色（v3.32.4 用户要求，替代黑边）
   ctx.fillRect(x, y, w, h);
   var fit = Aoi.poster.fitBox(iw, ih, w, h);
   if (!fit) return;

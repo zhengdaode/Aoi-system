@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.32.3',
+  version: 'v3.32.4',
   buildDate: '2026-10-31',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.32.4（2026-10-31）：宣传图 contain 留边颜色改海报背景同色（#faf7f2），替代黑边',
     'v3.32.3（2026-10-31）：宣传图图片绘制改 contain 式——比例不合适的图片整图等比放入框内居中、短边方向留黑边（fitBox 纯函数 + drawContain），替代原 cover 式居中裁剪；商品图与头部封面同规则',
     'v3.32.2（2026-10-31）：宣传图图片失败诊断——导出后 toast 直接列出未能加载的图片域名（stage=fetch=代理/直连通道全败多为非白名单主机 / decode=取回但解码失败），控制台 warn 完整失败清单；fetchImg 返回结构化 {ok,url,stage,img}',
     'v3.32.1（2026-10-31）：两处实测修复——①桌面端汉堡改流内折叠：点击在原位展开/收起侧栏，内容自适应让位（md:hidden 显隐），不再以全屏遮罩盖住右侧内容，nav 切视图不强制收起；手机端抽屉行为不变；②修复导出宣传图商品图全部缺失：fetchImageBase64 返回 {dataUrl,ext} 对象被误整体传给 img.src，改为取 .dataUrl（webp 已重编码 jpeg）',

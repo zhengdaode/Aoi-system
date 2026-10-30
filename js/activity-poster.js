@@ -113,10 +113,13 @@ Aoi.poster.fetchImg = function (url) {
     .catch(function () { return { ok: false, url: url, stage: 'fetch', img: null }; });
 };
 
-// 占位框
+// 占位框（与商品图同款描边）
 Aoi.poster.drawPlaceholder = function (ctx, x, y, w, h) {
   ctx.fillStyle = '#f3f4f6';
   ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
   ctx.fillStyle = '#d1d5db';
   ctx.font = '20px sans-serif';
   ctx.textAlign = 'center';
@@ -126,6 +129,14 @@ Aoi.poster.drawPlaceholder = function (ctx, x, y, w, h) {
   ctx.textBaseline = 'alphabetic';
 };
 
+// 商品图边框（v3.32.5，用户要求：商品图与背景同色后完全融入，加边框区隔）——
+// 暖灰 #e5e7eb（设计系统 border-gray-200 同款），细线不抢商品主体
+Aoi.poster.drawImgBorder = function (ctx, x, y, w, h) {
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+};
+
 // 商品行高：图高 + 文字区（名称两行 + 价格 + 已排行 + 边距）
 Aoi.poster.CELL = { w: 344, imgH: 240, textH: 118, gap: 16 };
 
@@ -133,8 +144,12 @@ Aoi.poster.drawProduct = function (ctx, p, x, y, img) {
   var C = Aoi.poster.CELL;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, C.w, C.imgH + C.textH);
-  if (img) Aoi.poster.drawContain(ctx, img, x, y, C.w, C.imgH);
-  else Aoi.poster.drawPlaceholder(ctx, x, y, C.w, C.imgH);
+  if (img) {
+    Aoi.poster.drawContain(ctx, img, x, y, C.w, C.imgH);
+    Aoi.poster.drawImgBorder(ctx, x, y, C.w, C.imgH);
+  } else {
+    Aoi.poster.drawPlaceholder(ctx, x, y, C.w, C.imgH);
+  }
   var ty = y + C.imgH + 34;
   ctx.fillStyle = '#111827';
   ctx.font = 'bold 20px sans-serif';

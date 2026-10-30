@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.32.4',
+  version: 'v3.32.5',
   buildDate: '2026-10-31',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.32.5（2026-10-31）：宣传图商品图加边框——暖灰 #e5e7eb 细线（设计系统 border-gray-200 同款）区隔商品图与背景，占位框同款描边；头部封面保持通栏不加框',
     'v3.32.4（2026-10-31）：宣传图 contain 留边颜色改海报背景同色（#faf7f2），替代黑边',
     'v3.32.3（2026-10-31）：宣传图图片绘制改 contain 式——比例不合适的图片整图等比放入框内居中、短边方向留黑边（fitBox 纯函数 + drawContain），替代原 cover 式居中裁剪；商品图与头部封面同规则',
     'v3.32.2（2026-10-31）：宣传图图片失败诊断——导出后 toast 直接列出未能加载的图片域名（stage=fetch=代理/直连通道全败多为非白名单主机 / decode=取回但解码失败），控制台 warn 完整失败清单；fetchImg 返回结构化 {ok,url,stage,img}',

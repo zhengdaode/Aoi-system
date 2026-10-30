@@ -167,6 +167,24 @@ describe('宣传图图片拉取（v3.32.1 修复 + v3.32.2 结构化诊断）', 
   });
 });
 
+describe('海报图片 contain 绘制（v3.32.3 黑边填充替代裁剪）', () => {
+  it('fitBox 等比完整放入目标框：短边方向留黑边、居中，不裁剪', () => {
+    // 方图放入横向框：左右留黑边（dx>0，dy=0）
+    expect(aoi.poster.fitBox(100, 100, 200, 100)).toEqual({ dx: 50, dy: 0, dw: 100, dh: 100 });
+    // 横图放入方框：上下留黑边
+    expect(aoi.poster.fitBox(200, 100, 100, 100)).toEqual({ dx: 0, dy: 25, dw: 100, dh: 50 });
+    // 竖图放入横向框：左右留黑边、整高绘制
+    const fit = aoi.poster.fitBox(100, 400, 344, 240);
+    expect(fit.dh).toBe(240);
+    expect(fit.dw).toBe(60);
+    expect(fit.dx).toBeCloseTo((344 - 60) / 2, 6);
+    expect(fit.dy).toBe(0);
+    // 宽高为 0 的图返回 null（不绘制）
+    expect(aoi.poster.fitBox(0, 100, 100, 100)).toBeNull();
+    expect(aoi.poster.fitBox(100, 0, 100, 100)).toBeNull();
+  });
+});
+
 describe('宣传图入口（orders 委托）', () => {
   it('展开区操作行带 data-act-poster 按钮且点击路由到 Aoi.poster.exportFor', async () => {
     aoi.poster.exportFor = vi.fn().mockResolvedValue(undefined);

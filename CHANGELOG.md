@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.32.3 (2026-10-31)
+
+> **宣传图图片绘制改 contain 式（用户要求）**：比例不合适的图片用黑边填充，不再裁剪。
+> 零数据 schema 变更。
+
+- `Aoi.poster.drawCover`（cover 式铺满裁剪）替换为 `Aoi.poster.drawContain`——整图等比缩放
+  放入目标框居中，短边方向留黑边（先整框填黑再绘整图）；新增纯函数 `Aoi.poster.fitBox`
+  （返回 dx/dy/dw/dh）供单测；**商品图与头部封面同规则**；
+- tests/v3320-poster-intl-export 新增 fitBox 用例（方图入横框/横图入方框/竖图整高/零尺寸
+  返回 null）；全套 vitest 778 全绿。
+
 ## v3.32.2 (2026-10-31)
 
 > **宣传图图片失败诊断**：v3.32.1 修复 `.dataUrl` 取值后实测仍有海报全图占位——图片拉取失败

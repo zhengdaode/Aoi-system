@@ -65,14 +65,24 @@ Aoi.poster.wrapText = function (ctx, text, maxWidth, maxLines) {
   return lines.slice(0, maxLines);
 };
 
-// cover 式裁剪绘制（源图按比例铺满目标框后居中裁剪）
-Aoi.poster.drawCover = function (ctx, img, x, y, w, h) {
+// contain 式完整绘制（v3.32.3，用户要求：比例不合适用黑边填充而非裁剪）——
+// 整图等比缩放放入目标框居中，短边方向留黑边；fitBox 为纯函数可单测
+Aoi.poster.fitBox = function (iw, ih, w, h) {
+  if (!iw || !ih) return null;
+  var scale = Math.min(w / iw, h / ih);
+  var dw = iw * scale;
+  var dh = ih * scale;
+  return { dx: (w - dw) / 2, dy: (h - dh) / 2, dw: dw, dh: dh };
+};
+
+Aoi.poster.drawContain = function (ctx, img, x, y, w, h) {
   var iw = img.width || img.naturalWidth;
   var ih = img.height || img.naturalHeight;
-  if (!iw || !ih) return;
-  var scale = Math.max(w / iw, h / ih);
-  var sw = w / scale, sh = h / scale;
-  ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(x, y, w, h);
+  var fit = Aoi.poster.fitBox(iw, ih, w, h);
+  if (!fit) return;
+  ctx.drawImage(img, x + fit.dx, y + fit.dy, fit.dw, fit.dh);
 };
 
 Aoi.poster.loadImage = function (dataUrl) {
@@ -122,7 +132,7 @@ Aoi.poster.drawProduct = function (ctx, p, x, y, img) {
   var C = Aoi.poster.CELL;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(x, y, C.w, C.imgH + C.textH);
-  if (img) Aoi.poster.drawCover(ctx, img, x, y, C.w, C.imgH);
+  if (img) Aoi.poster.drawContain(ctx, img, x, y, C.w, C.imgH);
   else Aoi.poster.drawPlaceholder(ctx, x, y, C.w, C.imgH);
   var ty = y + C.imgH + 34;
   ctx.fillStyle = '#111827';
@@ -181,7 +191,7 @@ Aoi.poster.compose = async function (data) {
   // 头部封面（有图 cover 裁剪铺满，无图珊瑚色渐变带 + 活动名直接作标题）
   var ty0 = 0;
   if (coverImg) {
-    Aoi.poster.drawCover(ctx, coverImg, 0, 0, W, headerH);
+    Aoi.poster.drawContain(ctx, coverImg, 0, 0, W, headerH);
     ty0 = headerH + 28;
   } else {
     var grad = ctx.createLinearGradient(0, 0, W, headerH);

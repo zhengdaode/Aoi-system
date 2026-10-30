@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.32.2',
+  version: 'v3.32.3',
   buildDate: '2026-10-31',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.32.3（2026-10-31）：宣传图图片绘制改 contain 式——比例不合适的图片整图等比放入框内居中、短边方向留黑边（fitBox 纯函数 + drawContain），替代原 cover 式居中裁剪；商品图与头部封面同规则',
     'v3.32.2（2026-10-31）：宣传图图片失败诊断——导出后 toast 直接列出未能加载的图片域名（stage=fetch=代理/直连通道全败多为非白名单主机 / decode=取回但解码失败），控制台 warn 完整失败清单；fetchImg 返回结构化 {ok,url,stage,img}',
     'v3.32.1（2026-10-31）：两处实测修复——①桌面端汉堡改流内折叠：点击在原位展开/收起侧栏，内容自适应让位（md:hidden 显隐），不再以全屏遮罩盖住右侧内容，nav 切视图不强制收起；手机端抽屉行为不变；②修复导出宣传图商品图全部缺失：fetchImageBase64 返回 {dataUrl,ext} 对象被误整体传给 img.src，改为取 .dataUrl（webp 已重编码 jpeg）',
     'v3.32.0（2026-10-31）：活动管理改版 + 侧栏汉堡化 + 宣传图导出 + 国际计算导出修复——①活动管理删常驻「新建活动」表单（改「+ 新增活动」弹窗）+ 订单管理同款过滤行（关键词/状态/排序：创建顺序·倒序·最近修改·名称拼音）+ 展示方式下拉（文段/中图标一行3/大图标一行2）；②左侧 IP 分区栏（修改IP栏顺序[本机] + 全部/各 IP 点击筛选）；③画报模式卡片（主视图图 + 标题 + 种类数/参与人数/截止日期/状态/价格范围/所属IP，封面回落第一张商品参考图，展开区可传主视图与截止日期）；④导出宣传图长海报（每商品图/名称/单价/已排·余量/总量）；⑤桌面端经典侧栏改汉堡抽屉（与手机端一致）；⑥修复导出图片/表格读不到 input 值（国内额外金额等列空白）',

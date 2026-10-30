@@ -85,16 +85,21 @@ Aoi.poster.loadImage = function (dataUrl) {
 };
 
 // 拉取一张商品图：fetchImageBase64（直连→代理候选链，webp 经 canvas 重编码 jpeg）→ Image；
-// 注意其返回值为 {dataUrl, ext} 对象——取 .dataUrl 喂 Image（v3.32.1 修复：误传整个对象致全图失败）
+// 注意其返回值为 {dataUrl, ext} 对象——取 .dataUrl 喂 Image（v3.32.1 修复：误传整个对象致全图失败）。
+// v3.32.2：返回结构化结果 {ok, url, stage, img}——stage=fetch(候选链全败，多为非白名单主机无
+// 代理通道)/decode(字节取回但解码失败)，供 compose 汇总诊断（Aoi.poster.lastFailures）
 Aoi.poster.fetchImg = function (url) {
-  if (!url) return Promise.resolve(null);
+  if (!url) return Promise.resolve({ ok: false, url: url, stage: 'empty', img: null });
   var fetchBase64 = (Aoi.exportSummary && Aoi.exportSummary.fetchImageBase64) || null;
   return Promise.resolve()
     .then(function () { return fetchBase64 ? fetchBase64(url) : null; })
     .then(function (r) {
-      return r && r.dataUrl ? Aoi.poster.loadImage(r.dataUrl) : null;
+      if (!r || !r.dataUrl) return { ok: false, url: url, stage: 'fetch', img: null };
+      return Aoi.poster.loadImage(r.dataUrl).then(function (img) {
+        return img ? { ok: true, url: url, stage: '', img: img } : { ok: false, url: url, stage: 'decode', img: null };
+      });
     })
-    .catch(function () { return null; });
+    .catch(function () { return { ok: false, url: url, stage: 'fetch', img: null }; });
 };
 
 // 占位框
@@ -137,11 +142,22 @@ Aoi.poster.drawProduct = function (ctx, p, x, y, img) {
 };
 
 // 长海报：头部封面 + 标题统计 → 商品两列网格 → 落款
+// 失败诊断：Aoi.poster.lastFailures = [{url, stage}]（不含空链接），exportFor 据此提示
+Aoi.poster.lastFailures = [];
+
 Aoi.poster.compose = async function (data) {
   var W = Aoi.poster.W;
   var pad = 24;
-  var imgs = await Promise.all(data.products.map(function (p) { return Aoi.poster.fetchImg(p.img); }));
-  var coverImg = data.cover ? await Aoi.poster.fetchImg(data.cover) : null;
+  var results = await Promise.all(data.products.map(function (p) { return Aoi.poster.fetchImg(p.img); }));
+  var imgs = results.map(function (r) { return r.ok ? r.img : null; });
+  Aoi.poster.lastFailures = results
+    .filter(function (r) { return !r.ok && r.stage !== 'empty'; })
+    .map(function (r) { return { url: r.url, stage: r.stage }; });
+  var coverImg = null;
+  if (data.cover) {
+    var coverRes = await Aoi.poster.fetchImg(data.cover);
+    if (coverRes.ok) coverImg = coverRes.img;
+  }
 
   // 预算高度：头部（封面 320 或 90）+ 标题块 110 + 每行商品高 + 落款 70
   var C = Aoi.poster.CELL;
@@ -229,7 +245,18 @@ Aoi.poster.exportFor = async function (activity) {
     a.href = canvas.toDataURL('image/png');
     a.download = activity.replace(/[\\/:*?"<>|]/g, '-') + '-宣传图.png';
     a.click();
-    Aoi.toast('已导出「' + activity + '」宣传图', 'success');
+    var fails = Aoi.poster.lastFailures || [];
+    if (fails.length) {
+      var hosts = {};
+      fails.forEach(function (f) {
+        var m = String(f.url).match(/^https?:\/\/([^\/?#]+)/);
+        hosts[m ? m[1] : '（其他）'] = 1;
+      });
+      console.warn('[宣传图] 有 ' + fails.length + ' 张图片未能加载（stage=fetch=代理/直连通道全败，decode=取回但解码失败）：', fails);
+      Aoi.toast('海报已导出，但有 ' + fails.length + ' 张商品图未能加载——失败图片域名：' + Object.keys(hosts).join('、') + '（详见控制台），对应位置为「图片缺失」占位', 'warning');
+    } else {
+      Aoi.toast('已导出「' + activity + '」宣传图', 'success');
+    }
   } catch (e) {
     Aoi.toast('导出宣传图失败：' + (e && e.message ? e.message : '未知错误'), 'error');
   } finally {

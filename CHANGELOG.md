@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.32.2 (2026-10-31)
+
+> **宣传图图片失败诊断**：v3.32.1 修复 `.dataUrl` 取值后实测仍有海报全图占位——图片拉取失败
+> 的具体原因（哪个域名、卡在哪一环）此前不可见，本轮加入结构化诊断以便定位。零数据 schema 变更。
+
+### 失败诊断
+- `Aoi.poster.fetchImg` 返回结构化结果 `{ ok, url, stage, img }`——`stage=fetch` 表示
+  fetchImageBase64 候选链全败（多为**非白名单主机**：`PROXY_HOSTS` 不含该域名 → 无代理通道，
+  直连 fetch 被源站 CORS 拦截；也可能是 Edge relay 白名单未覆盖）；`stage=decode` 表示字节取回
+  但浏览器解码失败；空链接为 `stage=empty`；
+- `Aoi.poster.compose` 汇总失败清单至 `Aoi.poster.lastFailures`（不含空链接）；
+- `Aoi.poster.exportFor` 导出后：有失败时 toast 直接列出**失败图片域名**（去重）+ 控制台
+  `console.warn` 完整失败清单（url + stage），海报照常下载（失败位置「图片缺失」占位）。
+
+### 其他
+- tests/v3320-poster-intl-export fetchImg 用例更新为结构化契约（成功/fetch 全败/decode 失败/
+  抛错兜底/空链接 5 态）；全套 vitest 777 全绿。
+
 ## v3.32.1 (2026-10-31)
 
 > **v3.32.0 两处实测修复**：桌面汉堡交互语义 + 宣传图商品图全缺失。零数据 schema 变更。

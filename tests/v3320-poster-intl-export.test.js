@@ -138,21 +138,28 @@ describe('Aoi.exportFlattenInputs（导出前展平表单控件）', () => {
   });
 });
 
-describe('宣传图图片拉取（v3.32.1 修复）', () => {
-  it('fetchImg 取 fetchImageBase64 返回对象的 .dataUrl（v3.32.0 误传整个对象致海报全图失败）', async () => {
+describe('宣传图图片拉取（v3.32.1 修复 + v3.32.2 结构化诊断）', () => {
+  it('fetchImg 取 fetchImageBase64 返回对象的 .dataUrl；成功/失败/空链接返回结构化结果', async () => {
     const origFetch = aoi.exportSummary.fetchImageBase64;
     const origLoad = aoi.poster.loadImage;
     try {
       const seen = [];
       aoi.exportSummary.fetchImageBase64 = (u) => { seen.push(u); return Promise.resolve({ dataUrl: 'data:image/jpeg;base64,QQ==', ext: 'jpeg' }); };
       aoi.poster.loadImage = (dataUrl) => Promise.resolve(dataUrl === 'data:image/jpeg;base64,QQ==' ? 'IMG' : null);
-      await expect(aoi.poster.fetchImg('https://img.example/1.webp')).resolves.toBe('IMG');
+      await expect(aoi.poster.fetchImg('https://img.example/1.webp')).resolves.toEqual({ ok: true, url: 'https://img.example/1.webp', stage: '', img: 'IMG' });
       expect(seen).toEqual(['https://img.example/1.webp']);
-      // 全通道失败（返回 null）→ 占位 null，不抛错
+      // 候选链全败（fetchImageBase64 null）→ stage=fetch（多为非白名单主机无代理通道）
       aoi.exportSummary.fetchImageBase64 = () => Promise.resolve(null);
-      await expect(aoi.poster.fetchImg('https://img.example/2.webp')).resolves.toBeNull();
+      await expect(aoi.poster.fetchImg('https://img.example/2.webp')).resolves.toEqual({ ok: false, url: 'https://img.example/2.webp', stage: 'fetch', img: null });
+      // 字节取回但解码失败 → stage=decode
+      aoi.exportSummary.fetchImageBase64 = () => Promise.resolve({ dataUrl: 'data:image/jpeg;base64,QQ==', ext: 'jpeg' });
+      aoi.poster.loadImage = () => Promise.resolve(null);
+      await expect(aoi.poster.fetchImg('https://img.example/3.webp')).resolves.toEqual({ ok: false, url: 'https://img.example/3.webp', stage: 'decode', img: null });
+      // fetchImageBase64 抛错 → 兜底 stage=fetch，不抛出
+      aoi.exportSummary.fetchImageBase64 = () => Promise.reject(new Error('network'));
+      await expect(aoi.poster.fetchImg('https://img.example/4.webp')).resolves.toEqual({ ok: false, url: 'https://img.example/4.webp', stage: 'fetch', img: null });
       // 空链接短路
-      await expect(aoi.poster.fetchImg('')).resolves.toBeNull();
+      await expect(aoi.poster.fetchImg('')).resolves.toEqual({ ok: false, url: '', stage: 'empty', img: null });
     } finally {
       aoi.exportSummary.fetchImageBase64 = origFetch;
       aoi.poster.loadImage = origLoad;

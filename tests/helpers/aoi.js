@@ -41,6 +41,7 @@ const MODULES = [
   'js/image-upload.js',
   'js/summary-export.js',
   'js/plan-export.js',
+  'js/activity-poster.js',
   'js/typesafe.js',
   'js/species-zh.js',
   'js/catalog-dict.js',

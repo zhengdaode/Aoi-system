@@ -139,8 +139,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.31.1',
-  buildDate: '2026-10-30',
+  version: 'v3.32.0',
+  buildDate: '2026-10-31',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.32.0（2026-10-31）：活动管理改版 + 侧栏汉堡化 + 宣传图导出 + 国际计算导出修复——①活动管理删常驻「新建活动」表单（改「+ 新增活动」弹窗）+ 订单管理同款过滤行（关键词/状态/排序：创建顺序·倒序·最近修改·名称拼音）+ 展示方式下拉（文段/中图标一行3/大图标一行2）；②左侧 IP 分区栏（修改IP栏顺序[本机] + 全部/各 IP 点击筛选）；③画报模式卡片（主视图图 + 标题 + 种类数/参与人数/截止日期/状态/价格范围/所属IP，封面回落第一张商品参考图，展开区可传主视图与截止日期）；④导出宣传图长海报（每商品图/名称/单价/已排·余量/总量）；⑤桌面端经典侧栏改汉堡抽屉（与手机端一致）；⑥修复导出图片/表格读不到 input 值（国内额外金额等列空白）',
     'v3.31.1（2026-10-30）：手机端适配补齐——工作台侧栏改抽屉（手机端默认收起、头部汉堡按外壳分发开合、复用遮罩、切视图/换外壳自动收起复位），主页 14 格窄屏改 2 列紧凑网格（中央面板置顶跨双列，替代 14 行纵向长列表）',
     'v3.31.0（2026-10-30）：工作台分组行为重构 + 分类颜色——①「设置自定义排序」的分类/顺序/展示成果改挂侧栏「自定义排序」分组展示，「基础功能列表」回归静态全量目录（业务→基础数据→工具，不受自定义影响）；②分类支持颜色（新建选色+左列随时改色+分类内上移/下移），分类色作该分类功能的 UI 底色（侧栏行+主页快捷格）；③主页快捷格功能标题居中放大、底色取分类色',
     'v3.30.3（2026-10-29）：工作台侧栏分组改名——「Builder hub」→「基础功能列表」、「数据看板」→「自定义排序」（元素 id/注册表/布局数据不变，纯显示层）',
@@ -374,6 +375,25 @@ Aoi.exportFilterRows = function (clone, ids) {
   return clone;
 };
 
+// 克隆表导出前展平表单控件（v3.32.0）：input/textarea 的值只存在于 .value，html2canvas
+// 不渲染、table_to_book/innerText 读不到——导出后列空白（国际计算「国内额外金额」实测）。
+// 将 input/textarea 替换为等宽 span（textContent = value），select 替换为所选 option 文本，
+// hidden input 直接删除；checkbox（勾选行）等非值控件原样保留
+Aoi.exportFlattenInputs = function (clone) {
+  clone.querySelectorAll('input, select, textarea').forEach(function (el) {
+    if (el.type === 'hidden') { el.remove(); return; }
+    if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) return;
+    var text = el.tagName === 'SELECT'
+      ? ((el.selectedOptions && el.selectedOptions[0] && el.selectedOptions[0].textContent) || '')
+      : (el.value || '');
+    var span = document.createElement('span');
+    span.textContent = text;
+    span.className = el.className;
+    el.replaceWith(span);
+  });
+  return clone;
+};
+
 // 导出文件基础名（v3.6.0 S5）：data-name = 表格类型；按钮可带 data-activity-from="<下拉id>"，
 // 该下拉当前选中活动非空时文件名变为「活动名-表格类型」（非法文件名字符替换为 -，空则维持原名）；
 // v3.17.0：另支持 data-batch-from="<批次下拉id>"——按批次 ID 取批次显示名（name 优先回落日期）
@@ -438,7 +458,7 @@ Aoi.exportImage = function (btn) {
   // 克隆到离屏白色容器再截图，避免受滚动/隐藏容器影响，并留出边距
   var holder = document.createElement('div');
   holder.style.cssText = 'position:absolute;left:-9999px;top:0;background:#fff;padding:16px;';
-  holder.appendChild(Aoi.exportFilterRows(table.cloneNode(true), onlySelected ? selected : []));
+  holder.appendChild(Aoi.exportFlattenInputs(Aoi.exportFilterRows(table.cloneNode(true), onlySelected ? selected : [])));
   document.body.appendChild(holder);
   var label = onlySelected ? name + '（选中 ' + selected.length + ' 行）' : name;
   Aoi.showLoading('正在生成「' + label + '」图片…');
@@ -469,16 +489,17 @@ Aoi.tableExport = function (btn) {
   var name = Aoi.exportBaseName(btn);
   var table = document.getElementById(id);
   if (!table) return;
+  var clone = Aoi.exportFlattenInputs(table.cloneNode(true));
   if (typeof XLSX === 'object' && XLSX.utils) {
     try {
-      var wb = XLSX.utils.table_to_book(table, { sheet: 'Sheet1' });
+      var wb = XLSX.utils.table_to_book(clone, { sheet: 'Sheet1' });
       XLSX.writeFile(wb, name + '.xlsx');
       Aoi.toast('已下载「' + name + '」.xlsx', 'success');
       return;
     } catch (e) { /* 回退 CSV */ }
   }
   var rows = [];
-  table.querySelectorAll('tr').forEach(function (tr) {
+  clone.querySelectorAll('tr').forEach(function (tr) {
     var cells = [];
     tr.querySelectorAll('th,td').forEach(function (c) {
       cells.push('"' + (c.innerText || '').replace(/"/g, '""') + '"');

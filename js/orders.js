@@ -1520,6 +1520,166 @@ Aoi.orders.shipFuzzySuggestions = function (now) {
   return out;
 };
 
+// —— v3.32.0 活动管理改版：过滤行（关键词/状态/排序/展示方式）+ 左侧 IP 分区栏 + 文段/画报双视图 ——
+
+Aoi.orders.actIpFilter = ''; // 当前 IP 分区栏选中（'' = 全部）
+Aoi.orders.actIpSortMode = false; // 「修改IP栏顺序」编辑模式
+Aoi.orders.ACT_IP_ORDER_KEY = 'aoi_act_ip_order'; // IP 栏顺序（本机显示偏好，不动团队数据）
+Aoi.orders.ACT_VIEW_KEY = 'aoi_activities_view'; // 展示方式记忆
+
+Aoi.orders.actView = function () {
+  try { return localStorage.getItem(Aoi.orders.ACT_VIEW_KEY) || 'text'; } catch (e) { return 'text'; }
+};
+Aoi.orders.setActView = function (v) {
+  try { localStorage.setItem(Aoi.orders.ACT_VIEW_KEY, v === 'mid' || v === 'large' ? v : 'text'); } catch (e) {}
+  Aoi.orders.renderActivities();
+};
+
+// IP 栏顺序：localStorage 记录优先，未收录 IP 按团队 IP + 各活动所属 IP 原序追加
+// （collectIps 不含仅出现在 activityMeta[].ip 的 IP——IP 分区栏按活动归属，需并入）
+Aoi.orders.actIpOrder = function (d) {
+  var order = [];
+  try { order = JSON.parse(localStorage.getItem(Aoi.orders.ACT_IP_ORDER_KEY) || '[]'); } catch (e) {}
+  if (!Array.isArray(order)) order = [];
+  var seen = {}, out = [];
+  var push = function (ip) {
+    if (ip && typeof ip === 'string' && !seen[ip]) { seen[ip] = 1; out.push(ip); }
+  };
+  order.forEach(push);
+  Aoi.orders.collectIps(d).forEach(push);
+  d.activities.forEach(function (n) { push((d.activityMeta[n] || {}).ip); });
+  return out;
+};
+Aoi.orders.moveIpOrder = function (ip, delta) {
+  var d = Aoi.orders.ensure();
+  var list = Aoi.orders.actIpOrder(d);
+  var i = list.indexOf(ip);
+  if (i < 0) return;
+  var j = Math.min(Math.max(i + delta, 0), list.length - 1);
+  if (j === i) return;
+  list.splice(j, 0, list.splice(i, 1)[0]);
+  try { localStorage.setItem(Aoi.orders.ACT_IP_ORDER_KEY, JSON.stringify(list)); } catch (e) {}
+  Aoi.orders.renderActivities();
+};
+Aoi.orders.setActIpFilter = function (ip) {
+  Aoi.orders.actIpFilter = ip || '';
+  Aoi.orders.actIpSortMode = false;
+  Aoi.orders.renderActivities();
+};
+Aoi.orders.toggleIpSortMode = function () {
+  Aoi.orders.actIpSortMode = !Aoi.orders.actIpSortMode;
+  Aoi.orders.renderActivities();
+};
+
+// 左侧 IP 分区栏：「修改IP栏顺序」+「全部」+ 各 IP（样式对齐工作台基础功能列表）
+Aoi.orders.renderIpRail = function (d) {
+  var rail = document.getElementById('actIpRail');
+  if (!rail) return;
+  var edit = Aoi.orders.actIpSortMode;
+  var row = function (label, ip, active) {
+    if (!edit) {
+      return '<button onclick="Aoi.orders.setActIpFilter(' + Aoi.escapeHtml(JSON.stringify(ip)) + ')" class="w-full text-left px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer truncate ' + (active ? 'nav-active' : 'text-gray-700 hover:bg-gray-100') + '">' + Aoi.escapeHtml(label) + '</button>';
+    }
+    return '<div class="flex items-center gap-1 px-2 py-1 rounded-md ' + (active ? 'nav-active' : 'hover:bg-gray-100') + '">'
+      + '<span class="flex-1 truncate text-sm font-medium">' + Aoi.escapeHtml(label) + '</span>'
+      + '<button onclick="Aoi.orders.moveIpOrder(' + Aoi.escapeHtml(JSON.stringify(ip)) + ',-1)" class="px-1 text-gray-400 hover:text-gray-700" title="上移">↑</button>'
+      + '<button onclick="Aoi.orders.moveIpOrder(' + Aoi.escapeHtml(JSON.stringify(ip)) + ',1)" class="px-1 text-gray-400 hover:text-gray-700" title="下移">↓</button>'
+      + '</div>';
+  };
+  var html = '<p class="text-[11px] font-mono uppercase tracking-widest text-gray-400 mb-1.5 px-2">IP 分区</p>'
+    + '<div class="space-y-0.5">'
+    + '<button onclick="Aoi.orders.toggleIpSortMode()" class="w-full text-left px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer ' + (edit ? 'nav-active' : 'text-gray-500 hover:bg-gray-100') + '" title="进入/退出 IP 顺序调整（仅存本机显示偏好）">修改IP栏顺序</button>';
+  html += row('全部', '', !Aoi.orders.actIpFilter);
+  Aoi.orders.actIpOrder(d).forEach(function (ip) {
+    html += row(ip, ip, Aoi.orders.actIpFilter === ip);
+  });
+  html += '</div>';
+  if (edit) html += '<p class="text-[11px] text-gray-400 mt-2 px-2">顺序仅保存在本机</p>';
+  rail.innerHTML = html;
+};
+
+// 过滤（关键词/状态/IP 栏）+ 排序：只作用渲染副本，不写回 d.activities
+Aoi.orders.filteredActivities = function (d) {
+  var kwEl = document.getElementById('actFKeyword');
+  var stEl = document.getElementById('actFStatus');
+  var sortEl = document.getElementById('actFSort');
+  var kw = kwEl ? kwEl.value.trim().toLowerCase() : '';
+  var st = stEl ? stEl.value : '';
+  var mode = sortEl ? (sortEl.value || 'created') : 'created';
+  var idx = {};
+  d.activities.forEach(function (n, i) { idx[n] = i; });
+  var list = d.activities.filter(function (n) {
+    var m = d.activityMeta[n] || {};
+    if (Aoi.orders.actIpFilter && (m.ip || '') !== Aoi.orders.actIpFilter) return false;
+    if (st && (m.status || '未开始') !== st) return false;
+    if (kw && (n + ' ' + (m.remark || '')).toLowerCase().indexOf(kw) < 0) return false;
+    return true;
+  });
+  var coll = new Intl.Collator('zh-Hans-CN', { numeric: true });
+  list.sort(function (a, b) {
+    if (mode === 'name') return coll.compare(a, b);
+    if (mode === 'created_desc') return idx[b] - idx[a];
+    if (mode === 'updated') {
+      var ma = d.activityMeta[a] || {}, mb = d.activityMeta[b] || {};
+      var ta = ma.updatedAt || ma.createdAt || '';
+      var tb = mb.updatedAt || mb.createdAt || '';
+      if (ta !== tb) return ta > tb ? -1 : 1; // 最近修改在前
+      return idx[a] - idx[b];
+    }
+    return idx[a] - idx[b]; // created（创建顺序 = d.activities 原序）
+  });
+  return list;
+};
+
+// 活动封面回落链：meta.cover → 第一张商品参考图 → ''（画报与宣传图共用）
+Aoi.orders.activityCover = function (d, name) {
+  var m = d.activityMeta[name] || {};
+  if (m.cover) return m.cover;
+  var ps = m.products || [];
+  for (var i = 0; i < ps.length; i++) {
+    if (ps[i] && ps[i].refImage) return ps[i].refImage;
+  }
+  return '';
+};
+
+Aoi.orders.CURRENCY_SYMBOLS = { CNY: '¥', JPY: 'JP¥', USD: '$', KRW: '₩' };
+Aoi.orders.currencySymbol = function (cur) {
+  return Aoi.orders.CURRENCY_SYMBOLS[cur] || (cur ? cur + ' ' : '¥');
+};
+
+// 价格范围：商品主档按币种分组取 min~max（单值只显示一个），多币种 " / " 连接
+Aoi.orders.priceRangeText = function (d, name) {
+  var ps = ((d.activityMeta[name] || {}).products || []).filter(function (p) {
+    return p && p.price != null && p.price !== '' && !isNaN(Number(p.price));
+  });
+  if (!ps.length) return '';
+  var byCur = {};
+  ps.forEach(function (p) {
+    var cur = p.currency || 'CNY';
+    if (!byCur[cur]) byCur[cur] = [];
+    byCur[cur].push(Number(p.price));
+  });
+  return Object.keys(byCur).map(function (cur) {
+    var arr = byCur[cur];
+    var mn = Math.min.apply(null, arr);
+    var mx = Math.max.apply(null, arr);
+    var sym = Aoi.orders.currencySymbol(cur);
+    return sym + (mn === mx ? mx : mn + '~' + mx);
+  }).join(' / ');
+};
+
+Aoi.orders.STATUS_BADGE = {
+  '未开始': 'bg-amber-100 text-amber-700',
+  '进行中': 'bg-green-100 text-green-700',
+  '已下单': 'bg-blue-100 text-blue-700',
+  '已出货': 'bg-cyan-100 text-cyan-700',
+  '已完成': 'bg-gray-200 text-gray-500'
+};
+Aoi.orders.activityStatusBadge = function (m) {
+  var s = (m && m.status) || '未开始';
+  return '<span class="px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ' + (Aoi.orders.STATUS_BADGE[s] || 'bg-gray-100 text-gray-600') + '">' + Aoi.escapeHtml(s) + '</span>';
+};
+
 Aoi.orders.renderActivities = function () {
   var d = Aoi.orders.ensure();
   var tbody = document.getElementById('activityTbody');
@@ -1528,7 +1688,38 @@ Aoi.orders.renderActivities = function () {
   if (fuzzyList) fuzzyList.innerHTML = Aoi.orders.shipFuzzySuggestions()
     .map(function (s) { return '<option value="' + Aoi.escapeHtml(s) + '">'; }).join('');
   Aoi.orders.refillActProductTypes();
-  tbody.innerHTML = d.activities.length ? d.activities.map(function (name, i) {
+  // 状态下拉只填一次（保留用户当前选中）；IP 分区栏每次重画（编辑模式/激活态）
+  var stSel = document.getElementById('actFStatus');
+  if (stSel && stSel.options.length <= 1) {
+    var cur = stSel.value;
+    stSel.innerHTML = '<option value="">全部状态</option>'
+      + Aoi.orders.ACTIVITY_STATUSES.map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('');
+    stSel.value = cur;
+  }
+  Aoi.orders.renderIpRail(d);
+  var list = Aoi.orders.filteredActivities(d);
+  var view = Aoi.orders.actView();
+  var viewSel = document.getElementById('actFView');
+  if (viewSel && viewSel.value !== view) viewSel.value = view;
+  var textWrap = document.getElementById('actTextWrap');
+  var cardsWrap = document.getElementById('actCardsWrap');
+  if (view === 'text') {
+    if (textWrap) textWrap.classList.remove('hidden');
+    if (cardsWrap) { cardsWrap.classList.add('hidden'); cardsWrap.innerHTML = ''; }
+    Aoi.orders.renderActivityRows(d, list);
+  } else {
+    if (textWrap) textWrap.classList.add('hidden');
+    if (cardsWrap) cardsWrap.classList.remove('hidden');
+    Aoi.orders.renderActivityCards(d, list, view);
+  }
+};
+
+// 文段模式（原表格，套过滤/排序/IP 筛选；v3.32.0 增「截止日期」列，11→12 列）
+Aoi.orders.renderActivityRows = function (d, list) {
+  var tbody = document.getElementById('activityTbody');
+  if (!tbody) return;
+  tbody.innerHTML = list.length ? list.map(function (name) {
+    var i = d.activities.indexOf(name);
     var m = d.activityMeta[name] || {};
     var buyers = m.buyers || [];
     var sum = Aoi.orders.activityProductSummary(name);
@@ -1539,6 +1730,7 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="ip" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.ipOptions(m.ip) + '</select></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.buyDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="buyDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.shipDate || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDate" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
+      + '<td data-lowpri class="px-3 py-2"><input type="date" value="' + Aoi.escapeHtml(m.deadline || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="deadline" class="border border-gray-300 rounded px-2 py-1 text-sm"></td>'
       + '<td data-lowpri class="px-3 py-2"><input type="text" list="shipFuzzyOptions" value="' + Aoi.escapeHtml(m.shipDateFuzzy || '') + '" placeholder="如 9月中旬" data-activity="' + Aoi.escapeHtml(name) + '" data-field="shipDateFuzzy" class="border border-gray-300 rounded px-2 py-1 text-sm w-28"></td>'
       + '<td class="px-3 py-2"><select data-activity="' + Aoi.escapeHtml(name) + '" data-field="status" class="border border-gray-300 rounded px-2 py-1 text-sm">' + Aoi.orders.activityStatusOptions(m.status) + '</select></td>'
       + '<td class="px-3 py-2"><button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-2 py-1 border rounded text-xs ' + (buyers.length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (buyers.length ? buyers.length + ' 人' : '填写') + '</button></td>'
@@ -1547,24 +1739,90 @@ Aoi.orders.renderActivities = function () {
       + '<td class="px-3 py-2"><button data-remove="' + Aoi.escapeHtml(name) + '" class="text-red-500 hover:underline">删</button></td>'
       + '</tr>';
     if (expanded) {
-      row += '<tr class="border-b border-gray-100"><td colspan="11" class="px-3 py-3 bg-gray-50/60 border-l-2 border-l-blue-200">' + Aoi.orders.actExpandHtml(name, i) + '</td></tr>';
+      row += '<tr class="border-b border-gray-100"><td colspan="12" class="px-3 py-3 bg-gray-50/60 border-l-2 border-l-blue-200">' + Aoi.orders.actExpandHtml(name, i) + '</td></tr>';
     }
     return row;
-  }).join('') : '<tr><td colspan="11" class="px-3 py-2 text-gray-400">暂无活动，录入订单或手动新增</td></tr>';
+  }).join('') : '<tr><td colspan="12" class="px-3 py-2 text-gray-400">' + (d.activities.length ? '没有符合筛选条件的活动' : '暂无活动，录入订单或手动新增') + '</td></tr>';
 };
 
-Aoi.orders.addActivity = async function () {
-  var el = document.getElementById('newActivity');
-  var name = el.value.trim();
+// 画报模式（v3.32.0）：图 + 标题 + 种类数/参与人数/截止日期/状态/价格范围/所属IP
+Aoi.orders.renderActivityCards = function (d, list, view) {
+  var wrap = document.getElementById('actCardsWrap');
+  if (!wrap) return;
+  if (!list.length) { wrap.innerHTML = '<p class="text-sm text-gray-400 py-2">' + (d.activities.length ? '没有符合筛选条件的活动' : '暂无活动，录入订单或手动新增') + '</p>'; return; }
+  var gridCls = view === 'large' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3';
+  wrap.innerHTML = '<div class="grid gap-4 ' + gridCls + '">'
+    + list.map(function (name, i) {
+      return '<div class="flex flex-col gap-2">' + Aoi.orders.activityCardHtml(d, name, i) + '</div>';
+    }).join('')
+    + '</div>';
+};
+
+Aoi.orders.activityCardHtml = function (d, name, idx) {
+  var m = d.activityMeta[name] || {};
+  var sum = Aoi.orders.activityProductSummary(name);
+  var expanded = !!Aoi.orders.expandedActivities[name];
+  var cover = Aoi.orders.activityCover(d, name);
+  var price = Aoi.orders.priceRangeText(d, name);
+  var chips = ['周边 ' + ((m.products || []).length) + ' 种'];
+  if (sum.buyers) chips.push('参与 ' + sum.buyers + ' 人');
+  if (m.deadline) chips.push('预计 ' + Aoi.escapeHtml(m.deadline) + ' 截团');
+  var card = '<div class="rounded-xl border border-gray-200 overflow-hidden bg-white hover:shadow-lg transition-shadow">'
+    + '<div class="relative cursor-pointer" data-expand="' + Aoi.escapeHtml(name) + '" title="点击展开/收起商品明细">'
+    + (cover
+      ? '<img src="' + Aoi.escapeHtml(cover) + '" alt="' + Aoi.escapeHtml(name) + '" class="w-full h-44 object-cover" loading="lazy">'
+      : '<div class="w-full h-44 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">暂无主视图</div>')
+    + (m.ip ? '<span class="absolute top-2 left-2 px-2 py-0.5 bg-white/90 rounded-full text-xs font-bold text-gray-700">' + Aoi.escapeHtml(m.ip) + '</span>' : '')
+    + '<span class="absolute top-2 right-2 flex gap-1" onclick="event.stopPropagation()">'
+    + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-2 py-0.5 bg-white/90 rounded text-xs text-gray-600 hover:bg-white" title="跳转订单管理查看该活动订单">订单</button>'
+    + '<button data-expand="' + Aoi.escapeHtml(name) + '" class="px-2 py-0.5 bg-white/90 rounded text-xs text-gray-600 hover:bg-white" title="展开/收起商品明细">⋯</button>'
+    + '</span>'
+    + '</div>'
+    + '<div class="p-4">'
+    + '<div class="flex items-start justify-between gap-2">'
+    + '<button data-expand="' + Aoi.escapeHtml(name) + '" class="font-bold text-base text-left leading-snug hover:underline">' + Aoi.escapeHtml(name) + '</button>'
+    + Aoi.orders.activityStatusBadge(m)
+    + '</div>'
+    + '<p class="text-xs text-gray-500 mt-2">' + chips.join('<span class="mx-1 text-gray-300">·</span>') + '</p>'
+    + (price ? '<p class="text-red-500 font-bold mt-2 text-sm">' + Aoi.escapeHtml(price) + '</p>' : '')
+    + '</div>'
+    + '</div>';
+  if (expanded) {
+    card += '<div class="p-4 bg-gray-50/60 border border-gray-200 rounded-xl">' + Aoi.orders.actExpandHtml(name, idx) + '</div>';
+  }
+  return card;
+};
+
+// 新增活动弹窗（v3.32.0：常驻表单删除后改为弹窗入口）
+Aoi.orders.openActNew = function () {
+  var modal = document.getElementById('actNewModal');
+  if (modal) modal.classList.remove('hidden');
+  var nameEl = document.getElementById('actNewName');
+  if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+  var ipEl = document.getElementById('actNewIp');
+  if (ipEl) ipEl.value = '';
+};
+Aoi.orders.closeActNew = function () {
+  var modal = document.getElementById('actNewModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+Aoi.orders.addActivity = async function (nameArg, ipArg) {
+  var name, ip;
+  if (nameArg != null) { name = String(nameArg).trim(); ip = ipArg != null ? String(ipArg).trim() : ''; }
+  else {
+    var el = document.getElementById('actNewName');
+    name = el ? el.value.trim() : '';
+    var ipEl = document.getElementById('actNewIp');
+    ip = ipEl ? ipEl.value.trim() : '';
+  }
   if (!name) { Aoi.toast('请输入活动名称', 'warning'); return; }
-  var ipEl = document.getElementById('newActivityIp');
-  var ip = ipEl ? ipEl.value.trim() : '';
   var d = Aoi.orders.ensure();
   if (d.activities.indexOf(name) >= 0) { Aoi.toast('该活动已存在', 'warning'); return; }
   d.activities.push(name);
-  d.activityMeta[name] = { buyDate: '', shipDate: '', shipDateFuzzy: '', link: '', status: '未开始', ip: ip, remark: '', buyers: [], trackings: [] };
+  d.activityMeta[name] = { buyDate: '', shipDate: '', shipDateFuzzy: '', link: '', status: '未开始', ip: ip, remark: '', buyers: [], trackings: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   await Aoi.saveTeamData(d);
-  el.value = '';
+  Aoi.orders.closeActNew();
   Aoi.orders.renderActivities();
   Aoi.orders.refillDatalists();
   Aoi.orders.refillActivities();
@@ -1779,7 +2037,9 @@ Aoi.orders.setActivityField = async function (name, field, value) {
   var d = Aoi.orders.ensure();
   if (!d.activityMeta[name]) d.activityMeta[name] = {};
   if (field === 'link') value = Aoi.safeUrl(value); // v3.10.0：平台链接仅接受 http/https
+  if (field === 'cover') value = Aoi.safeUrl(value); // v3.32.0：主视图同 safeUrl 白名单
   d.activityMeta[name][field] = value;
+  d.activityMeta[name].updatedAt = new Date().toISOString(); // v3.32.0：最近修改排序依据
   await Aoi.saveTeamData(d);
 };
 
@@ -1828,8 +2088,61 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
   if (ep) { Aoi.orders.exportProductList(ep.getAttribute('data-act-exportproducts')); return; }
   var mx = e.target.closest('button[data-act-miniexport]');
   if (mx) { Aoi.orders.exportMiniProgram(mx.getAttribute('data-act-miniexport')); return; }
+  var po = e.target.closest('button[data-act-poster]');
+  if (po && window.Aoi.poster) { Aoi.poster.exportFor(po.getAttribute('data-act-poster')); return; }
   var t = e.target.closest('button[data-act-track]');
   if (t) Aoi.orders.openActTrack(t.getAttribute('data-act-track'));
+});
+
+// 画报模式（v3.32.0）展开区与 #activityTbody 同构：字段即时保存 + 操作按钮委托同表
+document.getElementById('actCardsWrap').addEventListener('change', function (e) {
+  var el = e.target;
+  if (!el.hasAttribute || !el.hasAttribute('data-activity')) return;
+  Aoi.orders.setActivityField(el.getAttribute('data-activity'), el.getAttribute('data-field'), el.value);
+});
+document.getElementById('actCardsWrap').addEventListener('click', function (e) {
+  var btn = e.target.closest('button[data-remove]');
+  if (btn) { Aoi.orders.removeActivity(btn.getAttribute('data-remove')); return; }
+  var ex = e.target.closest('button[data-expand]');
+  if (ex) { Aoi.orders.toggleActivityExpand(ex.getAttribute('data-expand')); return; }
+  var jump = e.target.closest('button[data-jump]');
+  if (jump) { Aoi.orders.jumpToActivity(jump.getAttribute('data-jump')); return; }
+  var pg = e.target.closest('button[data-act-paigu]');
+  if (pg && window.Aoi.paigu) { Aoi.paigu.openActivity(pg.getAttribute('data-act-paigu')); Aoi.nav('view-paigu'); return; }
+  var b = e.target.closest('button[data-act-buyers]');
+  if (b) { Aoi.orders.openActBuyers(b.getAttribute('data-act-buyers')); return; }
+  var syn = e.target.closest('button[data-act-sync]');
+  if (syn) { Aoi.orders.syncProductsFromOrders(syn.getAttribute('data-act-sync')); return; }
+  var pr = e.target.closest('button[data-act-prune]');
+  if (pr) { Aoi.orders.pruneNoOrderProducts(pr.getAttribute('data-act-prune')); return; }
+  var es = e.target.closest('button[data-act-exportsummary]');
+  if (es) { Aoi.exportSummary(es.getAttribute('data-act-exportsummary')); return; }
+  var ap = e.target.closest('button[data-act-addproduct]');
+  if (ap) { Aoi.orders.addActProduct(ap); return; }
+  var ps = e.target.closest('button[data-psave]');
+  if (ps) { Aoi.orders.saveActProduct(ps.getAttribute('data-psave')); return; }
+  var pd = e.target.closest('button[data-pdel]');
+  if (pd) { Aoi.orders.removeActProduct(pd.getAttribute('data-pdel')); return; }
+  var pj = e.target.closest('button[data-pjump]');
+  if (pj) {
+    var loc = Aoi.orders.findProductById(Aoi.orders.ensure(), pj.getAttribute('data-pjump'));
+    if (loc) Aoi.orders.jumpToProduct(loc.activity, loc.product.type, loc.product.model);
+    return;
+  }
+  var pl = e.target.closest('button[data-act-plan]');
+  if (pl) { Aoi.limits.openActPlan(pl.getAttribute('data-act-plan')); return; }
+  var pe = e.target.closest('button[data-act-planexport]');
+  if (pe && window.Aoi.planExport) { Aoi.planExport.exportAll(pe.getAttribute('data-act-planexport')); return; }
+  var gp = e.target.closest('button[data-act-genprice]');
+  if (gp) { Aoi.orders.showActGenRmb(gp.getAttribute('data-act-genprice')); return; }
+  var ep = e.target.closest('button[data-act-exportproducts]');
+  if (ep) { Aoi.orders.exportProductList(ep.getAttribute('data-act-exportproducts')); return; }
+  var mx = e.target.closest('button[data-act-miniexport]');
+  if (mx) { Aoi.orders.exportMiniProgram(mx.getAttribute('data-act-miniexport')); return; }
+  var po = e.target.closest('button[data-act-poster]');
+  if (po && window.Aoi.poster) { Aoi.poster.exportFor(po.getAttribute('data-act-poster')); return; }
+  var t2 = e.target.closest('button[data-act-track]');
+  if (t2) Aoi.orders.openActTrack(t2.getAttribute('data-act-track'));
 });
 
 // —— 活动购买人信息 / 快递单号弹窗（v1.9.0）——
@@ -2340,6 +2653,10 @@ Aoi.orders.actExpandHtml = function (name, idx) {
     + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded hover:bg-gray-900 whitespace-nowrap">查订单</button>'
     + '<button data-act-paigu="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs border-gray-300 text-gray-500 hover:bg-gray-100 whitespace-nowrap" title="打开该活动的排谷表（商品按类型分表排队，v3.27.0）">排谷表</button>'
     + '<input type="text" value="' + Aoi.escapeHtml(m.link || '') + '" placeholder="平台链接" data-activity="' + Aoi.escapeHtml(name) + '" data-field="link" class="w-48 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input type="date" value="' + Aoi.escapeHtml(m.deadline || '') + '" placeholder="截止日期" data-activity="' + Aoi.escapeHtml(name) + '" data-field="deadline" title="截止日期（画报展示「预计X截团」）" class="border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<input id="actCover' + sfx + '" type="text" value="' + Aoi.escapeHtml(m.cover || '') + '" placeholder="主视图 URL（可上传/粘贴）" data-activity="' + Aoi.escapeHtml(name) + '" data-field="cover" data-img-paste title="活动主视图：画报封面与宣传图头图（空则回落第一张商品参考图）" class="w-52 border border-gray-300 rounded px-2 py-1.5 text-sm">'
+    + '<button type="button" onclick="Aoi.img.openPicker(\'actCover' + sfx + '\')" class="px-2 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded hover:bg-gray-300 whitespace-nowrap" title="上传或粘贴主视图图片">主视图…</button>'
+    + '<button data-act-poster="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="生成长海报宣传图：活动标题 + 每商品（图/名称/单价/已排·余量/总量）">导出宣传图</button>'
     + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (trackings.length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (trackings.length ? '单号 ' + trackings.length + ' 个' : '快递单号') + '</button>'
     + '<button data-act-plan="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 border rounded text-xs ' + (plan ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + ' whitespace-nowrap">' + (plan ? '计划·' + plan.items.length + '账号' : '购买计划') + '</button>'
     + '<button data-act-planexport="' + Aoi.escapeHtml(name) + '" class="px-2 py-1.5 btn-outline rounded text-xs whitespace-nowrap" title="按已存购买计划导出 xlsx：每个账号一个 Sheet（参考图内嵌 + 外文原名/外币价/件数/外币总价）">导出购买清单表</button>'

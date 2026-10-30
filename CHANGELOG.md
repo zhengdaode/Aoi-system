@@ -1,5 +1,56 @@
 # Changelog
 
+## v3.32.0 (2026-10-31)
+
+> **活动管理改版 + 侧栏汉堡化 + 宣传图导出 + 国际计算导出修复（用户四组需求）**。
+> 零数据 schema 变更——`activityMeta` 新增可选 `createdAt` / `updatedAt` / `deadline` / `cover`
+> 字段（旧数据缺省兼容），IP 栏顺序与展示方式仅存本机 localStorage。
+
+### ① 活动管理改版
+- **删常驻「新建活动」表单**：改为头部「＋ 新增活动」按钮 → `actNewModal` 弹窗（活动名 + IP），
+  `Aoi.orders.addActivity(name, ip)` 改可传参（兼容无参走弹窗取值），写入 `createdAt`；
+- **过滤行**（订单管理同款）：`actFKeyword`（活动名/备注关键词）/ `actFStatus`（全部状态+5 状态）/
+  `actFSort`（创建顺序 / 创建倒序 / 最近修改 / 名称拼音）——过滤与排序只作用渲染副本，
+  不写回 `d.activities`；`setActivityField` 保存时附带写 `updatedAt`（最近修改排序依据）；
+- **左侧 IP 分区栏**（`actIpRail`，样式对齐工作台基础功能列表）：「修改IP栏顺序」编辑模式（行内
+  ↑↓，`Aoi.orders.moveIpOrder`，顺序存 localStorage `aoi_act_ip_order` 仅本机显示偏好）+
+  「全部」/各 IP 行点击筛选（`Aoi.orders.setActIpFilter`）；IP 全集 = collectIps ∪ 各活动所属 IP
+  （collectIps 本不含仅出现在 `activityMeta[].ip` 的 IP，已并入）；
+- **画报模式**：展示方式下拉 `actFView`（文段模式 / 中图标一行3 / 大图标一行2，localStorage
+  `aoi_activities_view`）——卡片 = 主视图图 + 标题 + 周边种类数 / 参与人数（订单去重买家）/
+  截止日期（`预计X截团`）/ 状态色标 / 价格范围（按币种分组 min~max）/ 所属IP 徽标，
+  点卡片/封面/标题展开编辑（与文段模式同一展开区，卡片容器有独立事件委托同 tbody 全量操作）；
+  封面回落链 `meta.cover` → 第一张商品参考图 → 「暂无主视图」占位；展开区操作行新增
+  「主视图…」（`Aoi.img.openPicker` 上传/粘贴，活动字段即时派发 change 保存）与「截止日期」输入；
+  文段模式表格增「截止日期」列（11 → 12 列，`data-lowpri`）。
+
+### ② 桌面侧栏汉堡化
+- 经典侧栏 `#sidebar` 去掉 `md:static md:translate-x-0`（全尺寸为 fixed 抽屉），头部汉堡按钮与
+  `#sidebarBackdrop` 去掉 `md:hidden`——桌面端与手机端行为一致（默认隐藏、汉堡展开、遮罩关闭），
+  主内容区自然占满全宽；工作台外壳 `wbSidebar` 维持桌面常驻（v3.30.0 设计）。
+
+### ③ 导出宣传图（新模块 `js/activity-poster.js`）
+- 入口 = 活动展开区「导出宣传图」（`data-act-poster` 双容器委托）；`Aoi.poster.buildData` 纯函数
+  （已排 = 排谷表该商品键排位数；总量 = 库存 stock 优先回落购买计划 limits；余量 = 总量-已排；
+  合计已排；封面同回落链）+ `Aoi.poster.compose` canvas 长海报（宽 760：头部封面 cover 裁剪 +
+  标题统计行 → 商品两列网格（图 cover 裁剪 / 名称两行截断 / 珊瑚单价 / 「已排X · 余量Y/总量Z」，
+  图片经 `imageCandidates` 候选链取 base64 防画布污染，全失败「图片缺失」占位）→ 落款），
+  `Aoi.promiseTimeout` 60s 兜底；文件名 `活动名-宣传图.png`。
+
+### ④ 国际计算导出修复（通用）
+- 根因：国内额外金额 / 单位重量 / 加权单价等列是 `<input>`（值只在 `.value`），html2canvas 1.4.1
+  不渲染 input 值、`table_to_book`/innerText 读不到——导出 PNG/xlsx 该列全空白；
+- 修复：新增 `Aoi.exportFlattenInputs(clone)`（input/textarea → 等宽 span 携值、select → 所选
+  option 文本、hidden 删除、checkbox 保留），`Aoi.exportImage` / `Aoi.tableExport`（xlsx + CSV
+  两路）导出前对克隆表统一展平——全站表格通用生效。
+
+### 其他
+- 设置页「关于」选项卡版本更新至 v3.32.0；
+- 新增 `tests/v3320-activities-view.test.js` 19 例（过滤/排序/IP 栏/三视图/画报数据派生/cover
+  回落链/addActivity）与 `tests/v3320-poster-intl-export.test.js` 7 例（buildData 派生 /
+  exportFlattenInputs / exportImage·tableExport 端到端 stub / 宣传图委托入口）；
+  `tests/helpers/aoi.js` MODULES 加入 `js/activity-poster.js`；全套 vitest 750 → **776 全绿**。
+
 ## v3.31.1 (2026-10-30)
 
 > **手机端适配补齐（v3.30.0 起新改版的缺口）**：工作台侧栏手机抽屉化 + 主页 14 格窄屏 2 列网格。

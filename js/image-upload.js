@@ -183,15 +183,25 @@ Aoi.img.applyPickedUrl = function (url) {
   return ok;
 };
 
+// v3.32.0：目标输入框为活动字段（data-activity + data-field，如活动主视图 cover）时，
+// 写入后派发 change 即时保存（该类字段无独立保存按钮）；其余输入框（表单式，有保存按钮）仅回填
+Aoi.img.applyToTarget = function (target, url, toastText) {
+  if (!target) return;
+  target.value = url;
+  if (target.hasAttribute && target.hasAttribute('data-activity') && target.hasAttribute('data-field')) {
+    target.dispatchEvent(new Event('change'));
+    Aoi.toast(toastText || '图片链接已填入并保存', 'success');
+  } else {
+    Aoi.toast(toastText || '图片链接已填入，保存后生效', 'success');
+  }
+};
+
 Aoi.img.confirmPicker = function () {
   var url = ((document.getElementById('imgUrlInput') || {}).value || '').trim();
   if (!/^https?:\/\/\S+/.test(url)) { Aoi.toast('请先粘贴图片 / 上传图片，或填写 http(s) 图床链接', 'warning'); return; }
   var target = document.getElementById(Aoi.img.pickerTarget);
   Aoi.img.closePicker();
-  if (target) {
-    target.value = url;
-    Aoi.toast('图片链接已填入，保存后生效', 'success');
-  }
+  if (target) Aoi.img.applyToTarget(target, url);
 };
 
 // 弹窗内上传（文件选择 / 粘贴图片共用）
@@ -238,8 +248,7 @@ Aoi.img.bindPaste = function () {
     Aoi.showLoading('正在压缩并上传粘贴的图片...');
     Aoi.img.upload(file).then(function (url) {
       Aoi.hideLoading();
-      t.value = url;
-      Aoi.toast('粘贴的图片已上传，保存后生效', 'success');
+      Aoi.img.applyToTarget(t, url, '粘贴的图片已上传，保存后生效');
     }, function (err) {
       Aoi.hideLoading();
       Aoi.toast('粘贴上传失败：' + (err && err.message ? err.message : '未知错误'), 'error');

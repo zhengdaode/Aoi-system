@@ -138,6 +138,28 @@ describe('Aoi.exportFlattenInputs（导出前展平表单控件）', () => {
   });
 });
 
+describe('宣传图图片拉取（v3.32.1 修复）', () => {
+  it('fetchImg 取 fetchImageBase64 返回对象的 .dataUrl（v3.32.0 误传整个对象致海报全图失败）', async () => {
+    const origFetch = aoi.exportSummary.fetchImageBase64;
+    const origLoad = aoi.poster.loadImage;
+    try {
+      const seen = [];
+      aoi.exportSummary.fetchImageBase64 = (u) => { seen.push(u); return Promise.resolve({ dataUrl: 'data:image/jpeg;base64,QQ==', ext: 'jpeg' }); };
+      aoi.poster.loadImage = (dataUrl) => Promise.resolve(dataUrl === 'data:image/jpeg;base64,QQ==' ? 'IMG' : null);
+      await expect(aoi.poster.fetchImg('https://img.example/1.webp')).resolves.toBe('IMG');
+      expect(seen).toEqual(['https://img.example/1.webp']);
+      // 全通道失败（返回 null）→ 占位 null，不抛错
+      aoi.exportSummary.fetchImageBase64 = () => Promise.resolve(null);
+      await expect(aoi.poster.fetchImg('https://img.example/2.webp')).resolves.toBeNull();
+      // 空链接短路
+      await expect(aoi.poster.fetchImg('')).resolves.toBeNull();
+    } finally {
+      aoi.exportSummary.fetchImageBase64 = origFetch;
+      aoi.poster.loadImage = origLoad;
+    }
+  });
+});
+
 describe('宣传图入口（orders 委托）', () => {
   it('展开区操作行带 data-act-poster 按钮且点击路由到 Aoi.poster.exportFor', async () => {
     aoi.poster.exportFor = vi.fn().mockResolvedValue(undefined);

@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.32.1 (2026-10-31)
+
+> **v3.32.0 两处实测修复**：桌面汉堡交互语义 + 宣传图商品图全缺失。零数据 schema 变更。
+
+### ① 桌面端汉堡改流内折叠（用户澄清：点击折叠/收起左侧 tab，而非右侧内容被盖）
+- `#sidebar` 恢复 `md:static md:translate-x-0`（桌面在文档流内）并新增 `md:hidden`（默认收起）；
+  `Aoi.toggleSidebar` 按视口分支——**桌面端切 `md:hidden` 流内显隐**（展开时内容自适应让位，
+  不再全屏遮罩盖住右侧内容），**手机端维持抽屉滑入 + 遮罩**（v3.31.1 行为不变）；
+- `Aoi.closeDrawers` 仅手机端收经典侧栏——桌面端是流内折叠面板，nav 切视图保持用户开合状态，
+  不再每次导航强制收起；侧栏内 × 关闭按钮两端均可用。
+
+### ② 修复导出宣传图商品图全部缺失
+- 根因：`Aoi.exportSummary.fetchImageBase64` 返回 `{ dataUrl, ext }` **对象**，
+  `Aoi.poster.fetchImg` 误把整个对象赋给 `img.src`（解析为 `"[object Object]"`）→ 全部 onerror
+  → 海报内所有商品图/封面均为「图片缺失」占位；
+- 修复：取 `r.dataUrl` 再喂 `Image`（webp 图床图已由 fetchImageBase64 经 canvas 重编码为 jpeg，
+  无需额外处理）；新增 fetchImg 映射回归用例。
+
+### 其他
+- 新增 tests/v3320-poster-intl-export.test.js fetchImg 用例 1 例；
+  tests/v3311-mobile-drawer.test.js 两个用例同步 v3.32.0 桌面折叠新契约（closeDrawers 桌面端
+  不收经典侧栏 + matchMedia stub 模拟手机端分支）+ beforeEach 复位侧栏初始态；
+  全套 vitest 776 → **777 全绿**。
+
 ## v3.32.0 (2026-10-31)
 
 > **活动管理改版 + 侧栏汉堡化 + 宣传图导出 + 国际计算导出修复（用户四组需求）**。

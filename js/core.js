@@ -139,7 +139,7 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.32.0',
+  version: 'v3.32.1',
   buildDate: '2026-10-31',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
@@ -148,6 +148,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.32.1（2026-10-31）：两处实测修复——①桌面端汉堡改流内折叠：点击在原位展开/收起侧栏，内容自适应让位（md:hidden 显隐），不再以全屏遮罩盖住右侧内容，nav 切视图不强制收起；手机端抽屉行为不变；②修复导出宣传图商品图全部缺失：fetchImageBase64 返回 {dataUrl,ext} 对象被误整体传给 img.src，改为取 .dataUrl（webp 已重编码 jpeg）',
     'v3.32.0（2026-10-31）：活动管理改版 + 侧栏汉堡化 + 宣传图导出 + 国际计算导出修复——①活动管理删常驻「新建活动」表单（改「+ 新增活动」弹窗）+ 订单管理同款过滤行（关键词/状态/排序：创建顺序·倒序·最近修改·名称拼音）+ 展示方式下拉（文段/中图标一行3/大图标一行2）；②左侧 IP 分区栏（修改IP栏顺序[本机] + 全部/各 IP 点击筛选）；③画报模式卡片（主视图图 + 标题 + 种类数/参与人数/截止日期/状态/价格范围/所属IP，封面回落第一张商品参考图，展开区可传主视图与截止日期）；④导出宣传图长海报（每商品图/名称/单价/已排·余量/总量）；⑤桌面端经典侧栏改汉堡抽屉（与手机端一致）；⑥修复导出图片/表格读不到 input 值（国内额外金额等列空白）',
     'v3.31.1（2026-10-30）：手机端适配补齐——工作台侧栏改抽屉（手机端默认收起、头部汉堡按外壳分发开合、复用遮罩、切视图/换外壳自动收起复位），主页 14 格窄屏改 2 列紧凑网格（中央面板置顶跨双列，替代 14 行纵向长列表）',
     'v3.31.0（2026-10-30）：工作台分组行为重构 + 分类颜色——①「设置自定义排序」的分类/顺序/展示成果改挂侧栏「自定义排序」分组展示，「基础功能列表」回归静态全量目录（业务→基础数据→工具，不受自定义影响）；②分类支持颜色（新建选色+左列随时改色+分类内上移/下移），分类色作该分类功能的 UI 底色（侧栏行+主页快捷格）；③主页快捷格功能标题居中放大、底色取分类色',
@@ -203,14 +204,24 @@ Aoi.about = {
   }
 };
 
-// 移动端侧边栏抽屉：无参切换，true 展开 / false 收起
+// 侧边栏开关（v3.32.0 按视口分支）：
+// 手机端 = 抽屉滑入 + 遮罩（translate 位移，v3.31.1 行为不变）；
+// 桌面端 = 流内折叠——点击汉堡在原位展开/收起（md:hidden 显隐），内容自适应让位，
+// 不再以全屏遮罩盖住右侧内容。无参切换，true 展开 / false 收起
 Aoi.toggleSidebar = function (open) {
   var sb = document.getElementById('sidebar');
   var bd = document.getElementById('sidebarBackdrop');
   if (!sb) return;
-  if (open === undefined) open = sb.classList.contains('-translate-x-full');
-  sb.classList.toggle('-translate-x-full', !open);
-  if (bd) bd.classList.toggle('hidden', !open);
+  var mobile = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+  if (mobile) {
+    if (open === undefined) open = sb.classList.contains('-translate-x-full');
+    sb.classList.toggle('-translate-x-full', !open);
+    if (bd) bd.classList.toggle('hidden', !open);
+    return;
+  }
+  if (open === undefined) open = sb.classList.contains('md:hidden');
+  sb.classList.toggle('md:hidden', !open);
+  if (bd) bd.classList.add('hidden');
 };
 
 // 工作台侧栏抽屉（v3.31.1）：手机端 wbSidebar 为 fixed 覆盖层，开合与经典侧栏同款
@@ -230,9 +241,11 @@ Aoi.toggleNavDrawer = function () {
   else Aoi.toggleSidebar();
 };
 
-// 一次性收起全部抽屉（nav 切视图 / 遮罩点击共用）
+// 一次性收起全部抽屉（nav 切视图 / 遮罩点击共用）：
+// 经典侧栏仅手机端收（桌面端是流内折叠面板，nav 切视图保持用户开合状态不强制收起）
 Aoi.closeDrawers = function () {
-  Aoi.toggleSidebar(false);
+  var mobile = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+  if (mobile) Aoi.toggleSidebar(false);
   Aoi.toggleWorkbenchSidebar(false);
 };
 

@@ -84,13 +84,16 @@ Aoi.poster.loadImage = function (dataUrl) {
   });
 };
 
-// 拉取一张商品图：fetchImageBase64（直连→代理候选链）→ Image；全失败 null
+// 拉取一张商品图：fetchImageBase64（直连→代理候选链，webp 经 canvas 重编码 jpeg）→ Image；
+// 注意其返回值为 {dataUrl, ext} 对象——取 .dataUrl 喂 Image（v3.32.1 修复：误传整个对象致全图失败）
 Aoi.poster.fetchImg = function (url) {
   if (!url) return Promise.resolve(null);
   var fetchBase64 = (Aoi.exportSummary && Aoi.exportSummary.fetchImageBase64) || null;
   return Promise.resolve()
     .then(function () { return fetchBase64 ? fetchBase64(url) : null; })
-    .then(function (dataUrl) { return dataUrl ? Aoi.poster.loadImage(dataUrl) : null; })
+    .then(function (r) {
+      return r && r.dataUrl ? Aoi.poster.loadImage(r.dataUrl) : null;
+    })
     .catch(function () { return null; });
 };
 

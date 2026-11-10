@@ -820,3 +820,11 @@ textarea:hover:not(:focus) {
     transition-delay: 0ms !important;
   }
 }
+
+/* v3.34.1 关闭反向动画：详情卡内容先淡出（面板缩小与主视图飞回由 JS 同帧驱动），遮罩淡出 */
+#actDetail.act-detail-closing .dt-head,
+#actDetail.act-detail-closing #actDetailBody {
+  opacity: 0 !important;
+  transition: opacity 150ms ease !important;
+}
+#actDetailBackdrop { transition: opacity 240ms ease; }

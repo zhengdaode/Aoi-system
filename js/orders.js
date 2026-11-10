@@ -2234,17 +2234,18 @@ Aoi.orders.renderActDetailBody = function (name) {
     + '<div id="actDetailPaneInfo" style="display:none">' + info + '</div>';
 };
 
-// 主视图共享元素：克隆卡片封面 → 从卡位放大移动到 hero 位（480ms 减速）
-Aoi.orders._actDetailFly = function (cardEl) {
+// 主视图共享元素：克隆卡片封面建立飞行起点（自 hero 终点位 hr 飞回卡位；hr 必须在面板
+// 尚处全尺寸居中态时读取——demo 同款顺序。此函数只设起点态，过渡启动由 openActDetail
+// 在统一回流后与面板 FLIP 同帧进行，两条动画才能严丝合缝）
+Aoi.orders._actDetailFly = function (cardEl, hr) {
   var st = Aoi.orders.actDetail;
   var hero = document.getElementById('actDetailHero');
-  if (!hero || !hero.firstChild) return;
+  if (!hero || !hero.firstChild || !hr || !hr.width) return;
   var coverEl = cardEl ? cardEl.querySelector('.relative img, .relative .w-full.h-44') : null;
   if (!coverEl) return;
-  var hr = hero.getBoundingClientRect();
   var fr = coverEl.getBoundingClientRect();
-  if (!hr.width || !fr.width) return;
-  hero.firstChild.style.visibility = 'hidden';
+  if (!fr.width) return;
+  hero.firstChild.style.visibility = 'hidden'; // 飞行期间隐藏面板内真身，防重叠
   var isImg = coverEl.tagName === 'IMG';
   var fly = isImg ? coverEl.cloneNode(false) : document.createElement('div');
   fly.style.cssText = 'position:fixed;z-index:96;pointer-events:none;left:' + hr.left + 'px;top:' + hr.top + 'px;width:' + hr.width + 'px;height:' + hr.height + 'px;'
@@ -2258,10 +2259,6 @@ Aoi.orders._actDetailFly = function (cardEl) {
   fly.style.transition = 'none';
   document.body.appendChild(fly);
   st.fly = fly;
-  void fly.offsetWidth;
-  fly.style.transition = 'transform 480ms cubic-bezier(0.22,1,0.36,1), border-radius 480ms ease';
-  fly.style.transform = 'none';
-  fly.style.borderRadius = '0px';
 };
 
 Aoi.orders._actDetailFinishFly = function () {
@@ -2292,21 +2289,35 @@ Aoi.orders.openActDetail = function (name, cardEl) {
   panel.classList.remove('hidden', 'act-detail-ready');
   panel.style.display = 'flex';
   backdrop.classList.remove('hidden');
+  backdrop.style.opacity = ''; // 复位上一次关闭时设的淡出
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 终点几何必须先读：此刻面板无 FLIP 起点变换，处于「全尺寸居中」态——
+  // hero 矩形即共享元素的真实落点（v3.34.1 修复：此前在设起点变换后读取，
+  // 读到的是缩小态 hero，共享元素几何全错 → 用户看到的「先缩小下移、再跳变成 banner」）
   var to = panel.getBoundingClientRect();
   var from = cardEl ? cardEl.getBoundingClientRect() : null;
-  if (!reduced && from && from.width && to.width) {
+  var heroEl = document.getElementById('actDetailHero');
+  var hr = heroEl ? heroEl.getBoundingClientRect() : null;
+  if (!reduced && from && from.width && to.width && hr && hr.width) {
     var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
     var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
     var sx = from.width / to.width, sy = from.height / to.height;
+    // ① 面板起点（缩放对齐卡片）+ 共享元素起点（自 hero 终点飞回卡位）
     panel.style.transition = 'none';
     panel.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
     panel.style.opacity = '0';
+    Aoi.orders._actDetailFly(cardEl, hr);
+    // ② 统一回流后同帧启动双过渡：面板长大上移，主视图同步飞向 banner 位
     void panel.offsetWidth;
     panel.style.transition = 'transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease';
     panel.style.transform = 'translate(-50%,-50%)';
     panel.style.opacity = '1';
-    Aoi.orders._actDetailFly(cardEl);
+    var fly = st.fly;
+    if (fly) {
+      fly.style.transition = 'transform 480ms cubic-bezier(0.22,1,0.36,1), border-radius 480ms ease';
+      fly.style.transform = 'none';
+      fly.style.borderRadius = '0px';
+    }
     st.openTimer = setTimeout(function () {
       panel.classList.add('act-detail-ready');
       Aoi.orders._actDetailFinishFly();
@@ -2332,11 +2343,15 @@ Aoi.orders.closeActDetail = function (instant) {
   var finalize = function () {
     if (st.name !== closing) return; // 已被新的展开接管
     st.name = null;
+    if (st.fly && st.fly.parentNode) st.fly.parentNode.removeChild(st.fly);
+    st.fly = null;
+    var hero = document.getElementById('actDetailHero');
+    if (hero && hero.firstChild) hero.firstChild.style.visibility = '';
     if (!panel) return;
     panel.classList.add('hidden');
-    panel.classList.remove('act-detail-ready');
+    panel.classList.remove('act-detail-ready', 'act-detail-closing');
     panel.style.display = ''; panel.style.transition = ''; panel.style.transform = ''; panel.style.opacity = '';
-    if (backdrop) backdrop.classList.add('hidden');
+    if (backdrop) { backdrop.classList.add('hidden'); backdrop.style.opacity = ''; }
   };
   if (instant || !panel) { finalize(); return; }
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2351,11 +2366,35 @@ Aoi.orders.closeActDetail = function (instant) {
   var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
   var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
   var sx = from.width / to.width, sy = from.height / to.height;
+  // 反向对称动画（v3.34.1）：内容先淡出，主视图自 banner 位飞回卡片图位（与面板缩小同步），
+  // 遮罩淡出——几何读取同样遵守「先读终点、再设起点变换」的顺序（hr 此刻面板全尺寸）
+  panel.classList.add('act-detail-closing');
+  var heroEl = document.getElementById('actDetailHero');
+  var heroImg = heroEl ? heroEl.querySelector('img') : null;
+  var coverEl = cardEl.querySelector('.relative img, .relative .w-full.h-44');
+  var hr = heroEl ? heroEl.getBoundingClientRect() : null;
+  var fr = coverEl ? coverEl.getBoundingClientRect() : null;
   panel.style.transition = 'transform 360ms cubic-bezier(0.4,0,1,1), opacity 240ms ease';
   panel.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
   panel.style.opacity = '0';
-  if (backdrop) backdrop.classList.remove('hidden');
-  st.closeTimer = setTimeout(finalize, 380);
+  if (backdrop) backdrop.style.opacity = '0';
+  if (!reduced && heroImg && coverEl && hr && hr.width && fr && fr.width) {
+    heroImg.style.visibility = 'hidden'; // 飞回期间隐藏面板内真身，防重叠
+    var fly = heroImg.cloneNode(false);
+    fly.style.cssText = 'position:fixed;z-index:96;pointer-events:none;left:' + hr.left + 'px;top:' + hr.top + 'px;width:' + hr.width + 'px;height:' + hr.height + 'px;object-fit:cover;border-radius:0;transition:none;';
+    fly.style.transform = 'none';
+    document.body.appendChild(fly);
+    st.fly = fly;
+  }
+  void panel.offsetWidth; // 统一回流后面板与共享元素同帧启动
+  if (st.fly) {
+    var fdx = (fr.left + fr.width / 2) - (hr.left + hr.width / 2);
+    var fdy = (fr.top + fr.height / 2) - (hr.top + hr.height / 2);
+    var fsx = fr.width / hr.width, fsy = fr.height / hr.height;
+    st.fly.style.transition = 'transform 360ms cubic-bezier(0.4,0,1,1)';
+    st.fly.style.transform = 'translate(' + fdx + 'px,' + fdy + 'px) scale(' + fsx + ',' + fsy + ')';
+  }
+  st.closeTimer = setTimeout(finalize, 400);
 };
 
 // 详情卡绑定（× / 遮罩 / tab 切换 / Esc——菜单优先）

@@ -1,6 +1,13 @@
 // Aoi-system — 数据层：团队业务数据读写（Supabase RPC + 调试 localStorage）
 // v3：管理端读写全部携带 admin token，经 admin_get/save_team_data（乐观锁内建）
+// v3.35.0（方案 C P3，docs/PLAN-C-SCHEMA-SPLIT.md）：新增 DATA_MODE='tables' 通道——
+//   读 = aoi_get_all（服务端把 aoi_* 表组装成与旧 blob 同构的 JSON，业务模块零改动）；
+//   写 = saveTeamData 内部经 Aoi.blobDiff 与基线深比较 → 变更集 → aoi_sync 行级应用
+//   （同字段并发 = 后写覆盖，无整包乐观锁）。'blob' 为旧整包通道（回退用，默认）。
+//   切换默认值 = P4 真迁移时的唯一发布动作；两通道严禁并存双写。
 window.Aoi = window.Aoi || {};
+
+Aoi.DATA_MODE = Aoi.DATA_MODE || 'blob';
 
 // 调试模式：团队存 localStorage（aoi_debug_ 前缀）
 Aoi.debugTeam = function () {
@@ -48,6 +55,7 @@ Aoi.saveTeamData = async function (data) {
     Aoi.bumpDataVersion(); // v3.15.0 S8：记忆化失效信号（调试通道同样生效）
     return;
   }
+  if (Aoi.DATA_MODE === 'tables') return Aoi.saveTeamDataTables(data);
   var s = Aoi.adminLoadSession();
   if (!s) throw new Error('登录会话已失效，请重新登录');
   // v3.11.0 B6：blob 体积预警（>2MB 提示一次；整包上传会越来越慢）
@@ -75,6 +83,52 @@ Aoi.saveTeamData = async function (data) {
   }
   Aoi.adminUpdatedAt = r.data; // 记录新版本，供下次写入
   Aoi.bumpDataVersion(); // v3.15.0 S8：记忆化失效信号
+  return r.data;
+};
+
+// —— 方案 C tables 通道（v3.35.0 P3）——
+// 基线 = 上次 aoi_get_all / 同步成功时的 blob 形状快照；saveTeamData 对其 diff 出最小变更集。
+Aoi._baseline = null;
+
+Aoi.saveTeamDataTables = async function (data) {
+  var s = Aoi.adminLoadSession();
+  if (!s) throw new Error('登录会话已失效，请重新登录');
+  var changes = Aoi.blobDiff(Aoi._baseline, data);
+  if (!changes) { Aoi.bumpDataVersion(); return null; } // 无变化（防御：幂等保存）
+  var bytes = 0;
+  try { bytes = JSON.stringify(changes).length; } catch (e) { /* 不可序列化按 0 */ }
+  if (bytes > 2 * 1024 * 1024 && !Aoi._blobWarned) {
+    Aoi._blobWarned = true;
+    Aoi.toast('警告：本次变更集异常庞大（' + Math.round(bytes / 1024) + 'KB），保存可能较慢', 'warning');
+  }
+  var r;
+  try {
+    r = await Aoi.db.rpc('aoi_sync', { p_token: s.token, p_changes: changes });
+  } catch (e) {
+    Aoi.toast('数据保存失败：网络异常或服务不可用，本次改动未上传——请检查网络后重试', 'error');
+    throw e;
+  }
+  if (r.error) {
+    var hint = Aoi.explainRpcError(r.error.message, '数据保存');
+    if (/会话已过期/.test(hint || '')) Aoi.adminClearSession();
+    var msg = hint || ('保存失败：' + r.error.message);
+    Aoi.toast('数据保存失败：' + msg, 'error');
+    throw new Error(msg);
+  }
+  Aoi._baseline = JSON.parse(JSON.stringify(data)); // 同步成功 → 新基线
+  Aoi.bumpDataVersion();
+  return r.data;
+};
+
+// tables 模式登录拉取：aoi_get_all 返回 {name, memberKey, data, updatedAt}（与 admin_get_team_data 同形）
+Aoi.getAllTables = async function (token) {
+  var r = await Aoi.db.rpc('aoi_get_all', { p_token: token });
+  if (r.error) {
+    var hint = Aoi.explainRpcError(r.error.message, '数据读取');
+    throw new Error(hint || ('读取团队数据失败：' + r.error.message));
+  }
+  if (!r.data) return null;
+  Aoi._baseline = JSON.parse(JSON.stringify(r.data.data || {}));
   return r.data;
 };
 

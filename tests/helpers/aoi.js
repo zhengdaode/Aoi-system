@@ -23,6 +23,7 @@ const w = dom.window;
 const MODULES = [
   'js/core.js',
   'js/data.js',
+  'js/blob-diff.js',
   'js/auth.js',
   'js/team.js',
   'js/import.js',

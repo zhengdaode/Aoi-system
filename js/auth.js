@@ -114,7 +114,19 @@ Aoi.enterApp = async function () {
     var s = Aoi.adminLoadSession();
     if (!s) { Aoi.showScreen('screen-auth'); return; }
     Aoi.showLoading('加载中...');
-    var r = await Aoi.db.rpc('admin_get_team_data', { p_token: s.token });
+    // v3.35.0（方案 C P3）：DATA_MODE='tables' 走 aoi_get_all（aoi_* 表组装成 blob 同构 JSON，
+    // 返回形状与 admin_get_team_data 一致，下游零改动）；'blob' 走旧整包通道（回退用）
+    var r;
+    try {
+      r = Aoi.DATA_MODE === 'tables'
+        ? { data: await Aoi.getAllTables(s.token) }
+        : await Aoi.db.rpc('admin_get_team_data', { p_token: s.token });
+    } catch (e) {
+      Aoi.hideLoading();
+      Aoi.toast(e.message || '加载失败', 'error');
+      Aoi.showScreen('screen-auth');
+      return;
+    }
     Aoi.hideLoading();
     if (r.error || !r.data) {
       var msg = (r.error && r.error.message) || '加载失败';

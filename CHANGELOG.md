@@ -1,5 +1,35 @@
 # Changelog
 
+## v3.35.0 (2026-11-11)
+
+> **方案 C 多人并发改造 P3（数据层引擎，用户拍板跳过 B 直接 C）**。零数据 schema 变更
+> （新表全部独立，旧 blob 通道完整保留为回退路径）。设计与进度：docs/PLAN-C-SCHEMA-SPLIT.md。
+
+- **真库迁移 002–008（全部幂等，已应用）**：24 张 `aoi_*` 规范表（002，业务 id 保留原形态、
+  活动以名称引用、复合低频结构 jsonb）；003 文本保真列（createdAt/updatedAt 改 text）+ 全集合
+  sort 列 + 子表 FK 级联；005/006 可空修正（可选日期/布尔 false≡缺省）；007 `aoi_paigu_meta`
+  （排谷表 updatedAt 审计字段，摸底补遗）；008 保真修正（`_aiAligned` 实为字符串、pco
+  `unmatched` 实为字符串数组——列改 jsonb 原样保真）；
+- **组装/同步 RPC（004）**：`aoi_get_all` 把全部表**组装成与旧 blob 完全同构的 JSON**（业务模块
+  零改动）；`aoi_sync` 应用前端 diff 变更集（每集合 upsert/delete/replace，行级覆盖、
+  同字段并发后写赢、无整包乐观锁）；鉴权复刻 admin_verify_session + assert_single_team；
+- **diff 引擎 `js/blob-diff.js`（新增）**：语义归一化（null≡undefined≡''、false≡undefined、
+  数组序=渲染序、无 id 子行整体替换、未映射顶层键自动落 settings KV 前向兼容）；
+  已注册 harness MODULES；
+- **data.js DATA_MODE 通道**：`'tables'`（新）= 登录走 `aoi_get_all` + 保存走
+  blobDiff→`aoi_sync`→基线更新；`'blob'`（默认，回退用）= 现状整包通道。**默认仍 blob，
+  P4 真迁移时的唯一发布动作 = 默认值切 tables**；debug 通道不受影响；
+- **真库实证（对拍工具入库）**：`migrate-blob-to-tables.js --reset --apply` 把线上全部业务数据
+  灌入真表（**1243 行/23 顶层键**：orders 309/products 319/activities 34/notifications 89/
+  payments 47/reservoirs 3 池 101 条/paigu 93 排位 131 日志/typeMeta 44/…），批量分批执行带
+  429 限流重试与批内降级；`probe-assemble.js`（1 小时临时探针会话）+ `verify-assemble.js`
+  **形状对拍全绿：组装输出与备份 blob 语义等价**；`sync-smoke.js` 写路径烟测通过
+  （改状态→组装回读一致→恢复归位）。对拍发现并修复：limit 空串→Number('')=0、
+  `_aiAligned`/`unmatched` 真实型别、paigu updatedAt 漏迁移、buyers/trackings null≡[]；
+- 测试：新增 `tests/v3350-tables-mode.test.js` 23 例（diff 引擎 17 + tables 通道 6）；
+  vitest 798→821 全绿。**需求 3 上线计划**：P4（低峰重灌+对拍+切 DATA_MODE）→ P5（团员端
+  aoi_member_get/sync + shop RPC）→ P6（Realtime 可选）。
+
 ## v3.34.1 (2026-11-11)
 
 > **活动详情卡动画两连修（用户实测反馈）**。零数据 schema 变更。

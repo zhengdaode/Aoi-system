@@ -123,7 +123,16 @@ Aoi.renderView = function (viewId) {
 };
 
 // v3.28.0：返回上一步视图（历史栈空则提示；回退本身不入栈）
+// v3.33.0：视图内子层级返回钩子——排谷表「活动列表 → 活动排位矩阵」这类视图内下钻
+// 不产生导航历史，此前靠页内自己的「‹ 返回」按钮回列表，与头部返回形成两个不同目标的
+// 返回按钮。现统一：VIEW_BACK 按当前视图登记回退函数（返回 true = 已在视图内回退一级，
+// 不消费导航历史），全站只保留头部右上角这一个返回入口。
+Aoi.VIEW_BACK = {};
 Aoi.navBack = function () {
+  var cur = document.querySelector('[data-view]:not(.hidden)');
+  var curId = cur ? cur.getAttribute('id') : null;
+  var hook = curId && Aoi.VIEW_BACK[curId];
+  if (hook && hook() === true) return;
   var prev = Aoi.navHistory.pop();
   if (!prev) { Aoi.toast('没有更早的页面了', 'info'); return; }
   Aoi.nav(prev, { back: true });
@@ -139,8 +148,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.32.5',
-  buildDate: '2026-10-31',
+  version: 'v3.33.0',
+  buildDate: '2026-11-10',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -148,6 +157,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.33.0（2026-11-10）：统一返回 + 主视图回显 + 工作台列表合并——①全站只保留头部右上角「‹ 返回」：排谷表页内返回按钮移除，新增 Aoi.VIEW_BACK 视图内回退钩子（活动排位矩阵时头部返回先回活动列表、不消费导航历史；功能面板左上返回保留——home 外壳下头部隐藏，它是唯一可见返回）；②活动展开区「主视图 URL」回显封面回落链（未单独设置时显示首商品参考图，此前恒为空）；③工作台「自定义排序」合并进「基础功能列表」：自建分类直接排在列表最前（分类色底色、按设置顺序）、未分类按 业务→基础数据→工具 静态分组、末尾常驻 ⚙ 设置入口，顶部新增模糊搜索（汉字子串/按序简写 + 拼音首字母，如「订管」「dd」均命中「订单管理」；注册表增 py 字段），独立「自定义排序」分组移除',
     'v3.32.5（2026-10-31）：宣传图商品图加边框——暖灰 #e5e7eb 细线（设计系统 border-gray-200 同款）区隔商品图与背景，占位框同款描边；头部封面保持通栏不加框',
     'v3.32.4（2026-10-31）：宣传图 contain 留边颜色改海报背景同色（#faf7f2），替代黑边',
     'v3.32.3（2026-10-31）：宣传图图片绘制改 contain 式——比例不合适的图片整图等比放入框内居中、短边方向留黑边（fitBox 纯函数 + drawContain），替代原 cover 式居中裁剪；商品图与头部封面同规则',

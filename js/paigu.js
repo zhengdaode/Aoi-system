@@ -499,6 +499,15 @@ Aoi.paigu.purgeOver = async function (activity) {
 
 var pqView = { activity: null, type: null, legendOpen: false, page: 1 };
 
+// v3.33.0：视图内返回统一走头部「‹ 返回」（core.js VIEW_BACK 钩子）——
+// 活动排位矩阵时头部返回先回活动列表，列表态不拦（交还导航历史）
+Aoi.VIEW_BACK = Aoi.VIEW_BACK || {};
+Aoi.VIEW_BACK['view-paigu'] = function () {
+  if (!pqView.activity) return false;
+  Aoi.paigu.backToList();
+  return true;
+};
+
 Aoi.paigu.openActivity = function (activity) {
   pqView.activity = activity; pqView.type = null; pqView.page = 1;
   Aoi.paigu.renderAll();
@@ -589,7 +598,6 @@ function pqDetailHtml(d, activity) {
   var st = Aoi.paigu.activityStats(d, activity);
   var html = '<div class="bg-white rounded-lg border border-gray-200 p-4">'
     + '<div class="flex flex-wrap items-center gap-2">'
-    + '<button class="px-2.5 py-1.5 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-100" data-pact="back">‹ 返回</button>'
     + '<h3 class="font-bold">' + Aoi.escapeHtml(activity) + '</h3>'
     + (st.over ? '<span class="px-2 py-0.5 rounded-full text-[11px] bg-red-50 text-red-600 border border-red-200">超排 ' + st.over + '</span>' : '')
     + '<span class="flex-1"></span>'
@@ -977,7 +985,6 @@ document.addEventListener('click', function (e) {
   var slotId = el.getAttribute('data-slot');
   if (act === 'modal-close') { pqCloseModal(); }
   else if (act === 'open') { Aoi.paigu.openActivity(activity); }
-  else if (act === 'back') { Aoi.paigu.backToList(); }
   else if (act === 'switch-type') { Aoi.paigu.setType(el.getAttribute('data-type')); }
   else if (act === 'legend-toggle') { pqView.legendOpen = !pqView.legendOpen; Aoi.paigu.renderAll(); }
   else if (act === 'slot') { Aoi.paigu.modalSlotMenu(activity, slotId); }

@@ -235,15 +235,8 @@
           <button id="wbBuilderToggle" onclick="Aoi.workbench.toggleBuilder()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
             <span>🧰 基础功能列表</span><span id="wbBuilderChevron" class="text-gray-400 text-xs">▾</span>
           </button>
+          <!-- v3.33.0 合并版：模糊搜索 + 自定义排序成果直接展示（分类在前/分类色/展示勾选隐藏），由 buildNav 渲染 -->
           <div id="wbBuilderItems" class="hidden pl-2 space-y-0.5"></div>
-        </div>
-        <div>
-          <button id="wbDataToggle" onclick="Aoi.workbench.toggleData()" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">
-            <span>📊 自定义排序</span><span id="wbDataChevron" class="text-gray-400 text-xs">▾</span>
-          </button>
-          <div id="wbDataItems" class="hidden pl-2 space-y-0.5">
-            <a data-nav="view-wbsort" onclick="Aoi.nav('view-wbsort')" class="block px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">设置自定义排序</a>
-          </div>
         </div>
         <a data-nav="view-fun" onclick="Aoi.nav('view-fun')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">🎪 娱乐活动工具</a>
         <a data-nav="view-idea" onclick="Aoi.nav('view-idea')" class="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100">💡 创意工坊</a>

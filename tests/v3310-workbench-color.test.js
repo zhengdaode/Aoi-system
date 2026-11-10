@@ -1,9 +1,8 @@
-// v3.31.0 工作台分组行为与分类颜色测试
-// ①「设置自定义排序」的成果（分类/顺序/展示）改挂侧栏「自定义排序」分组展示，
-//   基础功能列表回归静态全量目录（业务→基础数据→工具，不受自定义影响）
-// ②分类颜色：新建时选色 + 随时改色（左列色块展开调色板），分类色作为该分类功能的 UI 底色
-//  （侧栏「自定义排序」行底色 + 主页快捷格底色）
-// ③主页快捷格（自定义展示）：功能标题居中放大（去分组圆点）、底色取分类色，无分类回落默认奶油底
+// v3.31.0 工作台分组行为与分类颜色测试（v3.33.0 起断言同步合并语义）
+// ①分类颜色：新建时选色 + 随时改色（左列色块展开调色板），分类色作为该分类功能的 UI 底色
+//  （侧栏「基础功能列表」分类行底色 + 主页快捷格底色）
+// ②主页快捷格（自定义展示）：功能标题居中放大（去分组圆点）、底色取分类色，无分类回落默认奶油底
+// ③v3.33.0：「自定义排序」成果（分类/顺序/展示）直接合并进基础功能列表展示（设置页照旧管理）
 import { describe, it, expect, beforeEach } from 'vitest';
 import { aoi, doc, win } from './helpers/aoi.js';
 
@@ -15,9 +14,7 @@ beforeEach(() => {
   doc.querySelectorAll('[data-view]').forEach((el) => el.classList.add('hidden'));
   // 侧栏分组展开态在共享 DOM 中跨用例残留，逐项复位
   doc.getElementById('wbBuilderItems').classList.add('hidden');
-  doc.getElementById('wbDataItems').classList.add('hidden');
   doc.getElementById('wbBuilderChevron').textContent = '▾';
-  doc.getElementById('wbDataChevron').textContent = '▾';
 });
 
 describe('分类颜色（数据层）', () => {
@@ -54,7 +51,7 @@ describe('设置自定义排序页（颜色 UI + 分类内排序）', () => {
     expect(doc.querySelector('[data-wbcolset]')).toBeNull();
   });
 
-  it('分类内上移/下移（moveInView）即「自定义排序」分组内的展示顺序', () => {
+  it('分类内上移/下移（moveInView）即「基础功能列表」中该分类的展示顺序（v3.33.0 合并语义）', () => {
     aoi.workbench.addCollection('常用');
     aoi.workbench.assign('view-orders', '常用');
     aoi.workbench.assign('view-paigu', '常用');
@@ -62,29 +59,30 @@ describe('设置自定义排序页（颜色 UI + 分类内排序）', () => {
     expect(aoi.workbench.loadLayout().collections[0].views).toEqual(['view-paigu', 'view-orders']);
     aoi.workbench.moveInView('view-orders', -1);
     expect(aoi.workbench.loadLayout().collections[0].views).toEqual(['view-orders', 'view-paigu']);
-    aoi.workbench.renderCustomNav();
-    const ids = Array.from(doc.querySelectorAll('#wbDataItems [data-nav]'))
-      .map(a => a.getAttribute('data-nav')).filter(id => id !== 'view-wbsort');
+    aoi.workbench.buildNav();
+    const sec = doc.querySelector('#wbBuilderItems [data-wbsection="常用"]');
+    const ids = Array.from(sec.querySelectorAll('[data-nav]'))
+      .map(a => a.getAttribute('data-nav'));
     expect(ids).toEqual(['view-orders', 'view-paigu']);
   });
 });
 
-describe('侧栏「自定义排序」分组底色', () => {
+describe('侧栏「基础功能列表」分类底色（v3.33.0 合并语义）', () => {
   it('分类色作功能行底色（淡 tint）；无色分类行无内联背景；未自定义时给引导文案 + 设置入口常驻', () => {
     aoi.workbench.addCollection('珊瑚组', '#f97362');
     aoi.workbench.assign('view-orders', '珊瑚组');
     aoi.workbench.addCollection('无色组');
     aoi.workbench.assign('view-calc', '无色组');
-    aoi.workbench.renderCustomNav();
-    const colored = doc.querySelector('#wbDataItems [data-nav="view-orders"]');
+    aoi.workbench.buildNav();
+    const colored = doc.querySelector('#wbBuilderItems [data-wbsection="珊瑚组"] [data-nav="view-orders"]');
     expect(colored.getAttribute('style')).toContain('#f97362');
-    const plain = doc.querySelector('#wbDataItems [data-nav="view-calc"]');
+    const plain = doc.querySelector('#wbBuilderItems [data-wbsection="无色组"] [data-nav="view-calc"]');
     expect(plain.getAttribute('style')).toBeNull();
     // 未自定义（清空布局）：引导文案 + 设置入口
     win.localStorage.removeItem('aoi_wb_layout');
-    aoi.workbench.renderCustomNav();
-    const box = doc.getElementById('wbDataItems').innerHTML;
-    expect(box).toContain('尚未自定义');
+    aoi.workbench.buildNav();
+    const box = doc.getElementById('wbBuilderItems').innerHTML;
+    expect(box).toContain('尚未自定义分类');
     expect(box).toContain('设置自定义排序');
   });
 });

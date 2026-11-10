@@ -84,10 +84,10 @@ describe('模块与页面接线（静默待命 / 导航 / 活动列表）', () =
     expect(doc.getElementById('paiguBody').textContent).toContain('还没有活动');
   });
 
-  it('openActivity 详情渲染：返回/图例/类型 tab/排位格与状态底色，位次最少 10 行', () => {
+  it('openActivity 详情渲染：图例/类型 tab/排位格与状态底色，位次最少 10 行（v3.33.0 起页内返回按钮移除，返回统一走头部）', () => {
     P().openActivity(ACT);
     const body = doc.getElementById('paiguBody');
-    expect(body.querySelector('[data-pact="back"]')).not.toBeNull();
+    expect(body.querySelector('[data-pact="back"]')).toBeNull();
     expect(body.querySelector('[data-pact="switch-type"][data-type="毛绒"]')).not.toBeNull();
     expect(body.querySelector('[data-pact="switch-type"][data-type="发卡"]')).not.toBeNull();
     expect(body.textContent).toContain('未分类');
@@ -394,13 +394,21 @@ describe('弹层交互（统一委托 [data-pact] / 右键 / Esc / 遮罩）', (
     expect(doc.getElementById('paiguModal').classList.contains('hidden')).toBe(true);
   });
 
-  it('返回列表 / 切类型 tab', () => {
+  it('返回列表 / 切类型 tab（v3.33.0：详情回列表经头部返回 VIEW_BACK 钩子，不消费导航历史）', () => {
     P().openActivity(ACT);
     doc.querySelector('[data-pact="switch-type"][data-type="发卡"]').click();
     expect(doc.getElementById('paiguBody').querySelector('[data-pact="slot"][data-slot="s3"]')).not.toBeNull();
     expect(doc.getElementById('paiguBody').querySelector('[data-pact="slot"][data-slot="s1"]')).toBeNull();
-    doc.querySelector('[data-pact="back"]').click();
+    aoi.navBack();
     expect(doc.getElementById('paiguBody').textContent).toContain('打开排谷表');
+    // 视图内回退不动导航历史：再次头部返回应回退到进入前的视图
+    aoi.nav('view-orders');
+    aoi.nav('view-paigu');
+    P().openActivity(ACT);
+    aoi.navBack(); // 视图内：详情 → 列表
+    expect(doc.getElementById('paiguBody').textContent).toContain('打开排谷表');
+    aoi.navBack(); // 导航历史：view-paigu → view-orders
+    expect(doc.querySelector('[data-view]:not(.hidden)').getAttribute('id')).toBe('view-orders');
   });
 });
 

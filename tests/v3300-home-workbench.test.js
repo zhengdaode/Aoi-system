@@ -22,9 +22,7 @@ beforeEach(() => {
   doc.getElementById('view-home').classList.remove('pre-reveal');
   // 侧栏分组展开态在共享 DOM 中跨用例残留，逐项复位
   doc.getElementById('wbBuilderItems').classList.add('hidden');
-  doc.getElementById('wbDataItems').classList.add('hidden');
   doc.getElementById('wbBuilderChevron').textContent = '▾';
-  doc.getElementById('wbDataChevron').textContent = '▾';
 });
 
 describe('外壳模式 setShell / applyShellForView', () => {
@@ -239,26 +237,30 @@ describe('工作台', () => {
     expect(doc.getElementById('wbSidebar').classList.contains('hidden')).toBe(false);
   });
 
-  it('侧栏含创建拼团 / 账号与设置 / 自定义排序 / 娱乐活动工具 / 创意工坊 / 敬请期待', () => {
+  it('侧栏含创建拼团 / 账号与设置 / 基础功能列表 / 娱乐活动工具 / 创意工坊 / 敬请期待（v3.33.0：独立「自定义排序」分组移除，设置入口并入基础功能列表）', () => {
     const sb = doc.getElementById('wbSidebar').innerHTML;
     expect(sb).toContain('创建拼团');
     expect(sb).toContain('账号与设置');
     expect(sb).toContain('基础功能列表');
-    expect(sb).toContain('自定义排序');
-    expect(sb).toContain('设置自定义排序');
+    expect(doc.getElementById('wbDataItems')).toBeNull();       // 独立分组已删
+    expect(sb).not.toContain('📊');                              // 自定义排序分组图标不再出现
     expect(sb).toContain('娱乐活动工具');
     expect(sb).toContain('创意工坊');
     expect(sb).toContain('敬请期待');
+    // 设置自定义排序入口 = 展开基础功能列表后的常驻末行
+    aoi.workbench.toggleBuilder();
+    expect(doc.getElementById('wbBuilderItems').textContent).toContain('设置自定义排序');
   });
 
-  it('基础功能列表展开 = 业务+基础数据+工具 全部功能合集', () => {
+  it('基础功能列表展开 = 全部功能 + ⚙ 设置入口（未自定义时按 业务→基础数据→工具 静态分组）', () => {
     aoi.workbench.enter();
     aoi.workbench.toggleBuilder();
     const items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
-    expect(items.length).toBe(aoi.workbench.FEATURES.length);
+    expect(items.length).toBe(aoi.workbench.FEATURES.length + 1); // 全部功能 + 设置入口
     expect(items).toContain('view-orders');
     expect(items).toContain('view-activities');
     expect(items).toContain('view-calc');
+    expect(items).toContain('view-wbsort');
     expect(items).not.toContain('view-overview');   // 首页独立入口
     expect(items).not.toContain('view-settings');   // 账号与设置独立入口
   });
@@ -272,45 +274,41 @@ describe('工作台', () => {
     expect(doc.getElementById('wbBuilderItems').classList.contains('hidden')).toBe(true);
   });
 
-  it('自定义排序：归属调整渲染到侧栏「自定义排序」分组，不改动基础功能列表（v3.31.0）', () => {
+  it('自定义排序合并（v3.33.0）：自建分类直接渲染在基础功能列表最前，未分类功能留在静态分组', () => {
     aoi.workbench.enter();
     expect(aoi.workbench.addCollection('常用')).toBe(true);
     expect(aoi.workbench.addCollection('常用')).toBe(false); // 重名拒绝
     aoi.workbench.assign('view-orders', '常用');
     aoi.workbench.assign('view-paigu', '常用');
-    aoi.workbench.toggleData();
-    const custom = doc.getElementById('wbDataItems').innerHTML;
-    expect(custom).toContain('常用');
-    const ids = Array.from(doc.querySelectorAll('#wbDataItems [data-nav]')).map(a => a.getAttribute('data-nav'));
-    expect(ids).toContain('view-orders');
-    expect(ids).toContain('view-paigu');
-    expect(ids).toContain('view-wbsort'); // 设置入口常驻
     aoi.workbench.toggleBuilder();
-    const builder = doc.getElementById('wbBuilderItems').innerHTML;
-    expect(builder).not.toContain('常用');   // 自定义分类不再进基础功能列表
-    expect(builder).toContain('业务');       // 仍是静态三分组全量目录
-    expect(builder).toContain('基础数据');
-    expect(builder).toContain('工具');
+    const custom = doc.getElementById('wbBuilderItems').innerHTML;
+    expect(custom).toContain('常用');
+    const sec = doc.querySelector('#wbBuilderItems [data-wbsection="常用"]');
+    expect(sec).not.toBeNull();
+    const secIds = Array.from(sec.querySelectorAll('[data-nav]')).map(a => a.getAttribute('data-nav'));
+    expect(secIds).toEqual(['view-orders', 'view-paigu']); // 分类内按设置顺序
+    // 未分类功能仍在静态分组；全部功能 + 设置入口仍齐全
+    const items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
+    expect(items).toContain('view-calc');
+    expect(items).toContain('view-wbsort'); // 设置入口常驻
+    expect(items.length).toBe(aoi.workbench.FEATURES.length + 1);
   });
 
-  it('展示勾选只作用于「自定义排序」分组；基础功能列表恒为全量（v3.31.0）', () => {
+  it('展示勾选隐藏该功能（导航中不出现，功能与数据不受影响）；恢复勾选即回归列表（v3.33.0 合并语义）', () => {
     aoi.workbench.enter();
     aoi.workbench.addCollection('常用');
     aoi.workbench.assign('view-orders', '常用');
     aoi.workbench.toggleHidden('view-orders');
     expect(aoi.workbench.isHidden('view-orders')).toBe(true);
-    aoi.workbench.toggleData();
-    const ids = Array.from(doc.querySelectorAll('#wbDataItems [data-nav]')).map(a => a.getAttribute('data-nav'));
-    expect(ids).not.toContain('view-orders');   // 自定义分组不再展示
     aoi.workbench.toggleBuilder();
-    const items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
-    expect(items).toContain('view-orders');     // 基础功能列表仍全量
-    expect(items.length).toBe(aoi.workbench.FEATURES.length);
-    // 恢复勾选即回归自定义分组
+    let items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
+    expect(items).not.toContain('view-orders');          // 隐藏后导航中不出现
+    expect(items.length).toBe(aoi.workbench.FEATURES.length); // 其余功能 + 设置入口
+    // 恢复勾选即回归列表（分类位置与底色一并恢复）
     aoi.workbench.toggleHidden('view-orders');
-    aoi.workbench.renderCustomNav();
-    const ids2 = Array.from(doc.querySelectorAll('#wbDataItems [data-nav]')).map(a => a.getAttribute('data-nav'));
-    expect(ids2).toContain('view-orders');
+    items = Array.from(doc.querySelectorAll('#wbBuilderItems [data-nav]')).map(a => a.getAttribute('data-nav'));
+    expect(items).toContain('view-orders');
+    expect(items.length).toBe(aoi.workbench.FEATURES.length + 1);
   });
 
   it('删除分类后其功能回落未分类', () => {

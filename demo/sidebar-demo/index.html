@@ -150,7 +150,7 @@
 <body>
   <div class="explain">
     <span><b>需求 1 演示</b>：桌面侧栏平时收起；<b>点「☰」弹出</b>（保持打开）或 <b>鼠标贴到屏幕最左缘</b> 悬停弹出（移出 350ms 自动收起）。Esc / 点空白 / 点导航项 也会收起。</span>
-    <label><input type="checkbox" id="scrimToggle"> 弹出时显示半透明遮罩（对比用，默认关 = 悬浮不遮挡内容）</label>
+    <label><input type="checkbox" id="scrimToggle" checked> 弹出时显示半透明遮罩（默认开，可取消对比无遮罩的悬浮观感）</label>
     <button id="narrowToggle">预览手机端抽屉模式（窄窗）</button>
   </div>
 
@@ -176,7 +176,7 @@
         <div class="acard"><div class="cover cov5"></div><div class="body"><div class="t">明日方舟联动</div><div class="s">周边 0 种 · 未开始</div></div></div>
         <div class="acard"><div class="cover cov6"></div><div class="body"><div class="t">谷谷汇总团</div><div class="s">周边 12 种 · 进行中</div></div></div>
       </div>
-      <p class="hint">💡 侧栏弹出时<b>内容区不移动</b>（悬浮层）；勾选顶部「显示遮罩」可对比有遮罩的观感。悬停模式只在侧栏收起时启用；点击 ☰ 打开后不会因移出鼠标而收起。</p>
+      <p class="hint">💡 侧栏弹出时<b>内容区不移动</b>（悬浮层）；遮罩默认开启，可取消勾选对比无遮罩的观感。悬停模式只在侧栏收起时启用；点击 ☰ 打开后不会因移出鼠标而收起。</p>
     </div>
   </div>
 
@@ -184,8 +184,8 @@
   <div class="scrim" id="scrim"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sb-head">
-      <div class="sb-brand" onclick="closeSidebar(true)">Aoi System<small>谷圈团购管理</small></div>
-      <button class="sb-x" onclick="closeSidebar(true)" aria-label="关闭菜单">×</button>
+      <div class="sb-brand" data-sbclose>Aoi System<small>谷圈团购管理</small></div>
+      <button class="sb-x" data-sbclose aria-label="关闭菜单">×</button>
     </div>
     <nav class="sb-nav">
       <p>业务</p>
@@ -255,7 +255,10 @@
   });
   sb.addEventListener('mouseenter', function () { clearTimeout(hoverTimer); });
 
-  // ④ 收起路径：× / 品牌位、Esc、点击内容空白、点击导航项（跳转后收起）
+  // ④ 收起路径：× / 品牌位（data-sbclose）、Esc、点击内容空白、点击导航项（跳转后收起）
+  document.querySelectorAll('[data-sbclose]').forEach(function (x) {
+    x.addEventListener('click', function () { close(true); });
+  });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen()) close(); });
   document.getElementById('app').addEventListener('click', function (e) {
     if (!isOpen()) return;

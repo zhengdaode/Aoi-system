@@ -136,6 +136,7 @@
     transition: opacity var(--dur-close) var(--ease-close), transform var(--dur-close) var(--ease-close);
   }
   .b2.show {
+    visibility: visible;
     opacity: 1; transform: none;
     transition: opacity var(--dur-open) var(--ease-open), transform var(--dur-open) var(--ease-open);
   }
@@ -150,6 +151,7 @@
                 filter var(--dur-close) var(--ease-close), box-shadow var(--dur-close) var(--ease-close);
   }
   .b3.show {
+    visibility: visible;
     opacity: 1; transform: none; filter: blur(0);
     box-shadow: 0 10px 28px rgba(47, 46, 43, 0.14);
     transition: opacity var(--dur-open) var(--ease-open), transform var(--dur-open) var(--ease-open),
@@ -352,7 +354,8 @@
   <h2>三、落地建议（合并时的取舍）</h2>
   <div class="card" style="max-width: 100%;">
     <p class="note" style="font-size: 13px;">
-      ① <b>手风琴（侧栏分组、活动管理展开区、设置页折叠卡）→ 方案 A4</b>（grid 0fr→1fr + 内容微动），纯 CSS 全浏览器可用；
+      <b style="color:#15803d">✅ 已拍板（2026-11-10）：手风琴 = A3（grid 0fr→1fr），下拉弹层 = B2（B3 备选）</b>——合并进主应用时按此口径实现；<br>
+      ① <b>手风琴（侧栏分组、活动管理展开区、设置页折叠卡）→ 方案 A3/A4</b>（grid 0fr→1fr，可选叠内容微动），纯 CSS 全浏览器可用；
       ② <b>弹层（批次下拉、右键菜单、操作菜单、弹窗面板）→ 方案 B2</b> 统一 pop（scale0.95+fade，origin 锚定触发点）；重要弹窗可局部用 B3；
       ③ <b>interpolate-size 作为渐进增强</b>包 @supports 叠加（Chromium 用户获得 height:auto 直通的更简渲染，其他浏览器不受影响）；
       ④ <b>时长/曲线全部收敛为 4 个 CSS 变量</b>（--dur-open/--dur-close/--ease-open/--ease-close），一处可调全站生效；

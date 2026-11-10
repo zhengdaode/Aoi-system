@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面侧栏交互方案 — Aoi-system 需求 1 演示</title>
+<!--
+  Aoi-system · 需求 1 demo：桌面端侧栏「平时收起 + 汉堡点击弹出 + 鼠标移到左缘悬停弹出」。
+  纯静态零依赖，双击本文件即可离线打开。请在电脑端（宽 ≥ 900px 窗口）体验。
+
+  交互规则（demo 即提案，确认后照此合并进主应用）：
+  · 桌面端侧栏默认收起（内容区占满整行，不再流内常驻）；
+  · 点击头部「☰」弹出（点击模式）——保持打开，直到 ☰ 再点 / 侧栏内 × / 点击内容区空白 /
+    Esc / 点击任意导航项完成跳转后自动收起；
+  · 鼠标移到屏幕左缘热区（宽 14px，透明）弹出（悬停模式）——移出侧栏 350ms 后自动收起；
+    悬停模式中途点 ☰ 或点导航项，即转为点击模式语义（保持打开/正常跳转收起）；
+  · 弹出 = 悬浮层（flyout）：不挤压内容区，侧栏带柔影浮在内容之上；可选开启半透明遮罩
+    （右下角开关，默认关）；
+  · 手机端（≤767px）维持 v3.31.1 抽屉 + 遮罩不变，demo 内提供窄窗预览按钮。
+-->
+<style>
+  :root {
+    --cream: #faf7f2;
+    --ink: #2f2e2b;
+    --line: #e5e7eb;
+    --muted: #8a8578;
+    --coral: #f97362;
+    --dur: 240ms;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--cream); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  button { font-family: inherit; }
+
+  /* ── 顶部说明条 ── */
+  .explain {
+    background: #fff; border-bottom: 1px solid var(--line);
+    padding: 10px 18px; font-size: 12.5px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  }
+  .explain b { color: var(--ink); }
+  .explain label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; color: var(--ink); }
+  .explain button {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 4px 12px; font-size: 12.5px; cursor: pointer; color: var(--ink);
+  }
+  .explain button:hover { border-color: #d6d3cb; }
+
+  /* ── 应用外壳 mock ── */
+  .app { min-height: calc(100vh - 41px); position: relative; }
+  header.topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 22px; background: var(--cream);
+    border-bottom: 1px solid var(--line);
+  }
+  .burger {
+    border: 0; background: transparent; cursor: pointer; color: var(--ink);
+    width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center;
+    transition: background 150ms ease;
+  }
+  .burger:hover { background: #efece5; }
+  .brand { font-family: Georgia, "Noto Serif SC", serif; font-size: 22px; font-weight: 700; }
+  .brand small { display: block; font-family: inherit; font-size: 12px; color: var(--muted); font-weight: 400; }
+  .spacer { flex: 1; }
+  .topbtn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 5px 12px; font-size: 12.5px; color: var(--muted); cursor: default;
+  }
+
+  /* ── 内容区 mock（活动卡片）── */
+  .content { padding: 26px; }
+  .content h2 { font-family: Georgia, serif; font-size: 20px; margin: 0 0 16px; }
+  .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .acard {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    transition: transform 200ms ease, box-shadow 200ms ease; cursor: default;
+  }
+  .acard:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(47, 46, 43, 0.08); }
+  .acard .cover { height: 130px; }
+  .acard .body { padding: 12px 14px; }
+  .acard .t { font-weight: 700; font-size: 14px; }
+  .acard .s { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .cov1 { background: linear-gradient(135deg, #fca5a5, #fdba74, #fcd34d); }
+  .cov2 { background: linear-gradient(135deg, #a5b4fc, #c4b5fd, #f0abfc); }
+  .cov3 { background: linear-gradient(135deg, #6ee7b7, #93c5fd); }
+  .cov4 { background: linear-gradient(135deg, #fda4af, #d8b4fe); }
+  .cov5 { background: linear-gradient(135deg, #fcd34d, #86efac); }
+  .cov6 { background: linear-gradient(135deg, #93c5fd, #67e8f9); }
+
+  /* ── 左缘悬停热区：侧栏收起时才启用 ── */
+  .edgezone {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 14px; z-index: 40;
+    cursor: default; background: transparent; border: 0; padding: 0;
+  }
+  .edgezone.off { display: none; }
+
+  /* ── 侧栏：悬浮层（flyout）——不挤压内容 ── */
+  .scrim {
+    position: fixed; inset: 0; z-index: 45; background: rgba(15, 14, 12, 0.36);
+    opacity: 0; pointer-events: none; transition: opacity var(--dur) ease;
+  }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 240px; z-index: 50;
+    background: #fff; border-right: 1px solid var(--line);
+    box-shadow: 0 0 34px rgba(47, 46, 43, 0.16);
+    transform: translateX(-105%);
+    transition: transform var(--dur) var(--ease);
+    display: flex; flex-direction: column; padding: 16px 14px;
+  }
+  .sidebar.open { transform: none; }
+  .sb-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 2px 6px 14px; }
+  .sb-brand { font-family: Georgia, "Noto Serif SC", serif; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .sb-brand small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .sb-x { border: 0; background: transparent; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 7px; }
+  .sb-x:hover { color: var(--ink); background: #f3f1ea; }
+  .sb-nav { overflow-y: auto; }
+  .sb-nav p {
+    font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #b3aea1; margin: 14px 6px 5px; font-family: Consolas, monospace;
+  }
+  .sb-nav a {
+    display: block; padding: 7px 12px; border-radius: 8px; font-size: 13.5px;
+    color: #4b4a46; text-decoration: none; font-weight: 500; cursor: pointer;
+  }
+  .sb-nav a:hover { background: #f3f1ea; }
+  .sb-nav a.active { background: #fff3ef; color: #c2410c; font-weight: 700; }
+
+  /* 状态徽标：说明当前打开模式（演示辅助） */
+  .modebadge {
+    position: fixed; left: 250px; bottom: 18px; z-index: 60;
+    font-size: 12px; color: var(--muted); background: #fff;
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
+    opacity: 0; transition: opacity 200ms ease; pointer-events: none;
+  }
+  .modebadge.show { opacity: 1; }
+
+  /* 窄窗预览（手机抽屉模式示意） */
+  .app.narrow { max-width: 420px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-height: calc(100vh - 41px); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 26px 26px 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar, .scrim, .modebadge { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="explain">
+    <span><b>需求 1 演示</b>：桌面侧栏平时收起；<b>点「☰」弹出</b>（保持打开）或 <b>鼠标贴到屏幕最左缘</b> 悬停弹出（移出 350ms 自动收起）。Esc / 点空白 / 点导航项 也会收起。</span>
+    <label><input type="checkbox" id="scrimToggle"> 弹出时显示半透明遮罩（对比用，默认关 = 悬浮不遮挡内容）</label>
+    <button id="narrowToggle">预览手机端抽屉模式（窄窗）</button>
+  </div>
+
+  <div class="app" id="app">
+    <header class="topbar">
+      <button class="burger" id="burger" aria-label="菜单" title="打开 / 关闭菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <div class="brand">Aoi System<small>超级管理员</small></div>
+      <div class="spacer"></div>
+      <button class="topbtn">‹ 返回</button>
+      <button class="topbtn">↻ 刷新</button>
+      <button class="topbtn">退出登录</button>
+    </header>
+
+    <div class="content">
+      <h2>活动管理（内容 mock）</h2>
+      <div class="cards">
+        <div class="acard"><div class="cover cov1"></div><div class="body"><div class="t">宝可梦万圣节</div><div class="s">周边 41 种 · 未开始</div></div></div>
+        <div class="acard"><div class="cover cov2"></div><div class="body"><div class="t">8.23 涩谷</div><div class="s">周边 44 种 · 参与 2 人</div></div></div>
+        <div class="acard"><div class="cover cov3"></div><div class="body"><div class="t">10.1 韩国快闪</div><div class="s">周边 11 种 · 参与 4 人</div></div></div>
+        <div class="acard"><div class="cover cov4"></div><div class="body"><div class="t">AHS 娃再贩</div><div class="s">周边 7 种 · 已出货</div></div></div>
+        <div class="acard"><div class="cover cov5"></div><div class="body"><div class="t">明日方舟联动</div><div class="s">周边 0 种 · 未开始</div></div></div>
+        <div class="acard"><div class="cover cov6"></div><div class="body"><div class="t">谷谷汇总团</div><div class="s">周边 12 种 · 进行中</div></div></div>
+      </div>
+      <p class="hint">💡 侧栏弹出时<b>内容区不移动</b>（悬浮层）；勾选顶部「显示遮罩」可对比有遮罩的观感。悬停模式只在侧栏收起时启用；点击 ☰ 打开后不会因移出鼠标而收起。</p>
+    </div>
+  </div>
+
+  <button class="edgezone" id="edgezone" aria-label="悬停展开菜单热区"></button>
+  <div class="scrim" id="scrim"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-brand" onclick="closeSidebar(true)">Aoi System<small>谷圈团购管理</small></div>
+      <button class="sb-x" onclick="closeSidebar(true)" aria-label="关闭菜单">×</button>
+    </div>
+    <nav class="sb-nav">
+      <p>业务</p>
+      <a data-nav>总览</a><a data-nav>信息录入</a><a data-nav class="active">活动管理</a><a data-nav>排谷表</a><a data-nav>国际批次</a><a data-nav>国际计算</a><a data-nav>事务审批</a><a data-nav>发货管理</a>
+      <p>基础数据</p>
+      <a data-nav>买家管理</a><a data-nav>类型管理</a><a data-nav>囤货地管理</a>
+      <p>工具</p>
+      <a data-nav>计算器</a><a data-nav>限购计划</a><a data-nav>蓄水池</a><a data-nav>PCO 目录导入</a>
+      <p>账户</p>
+      <a data-nav>账号与设置</a>
+    </nav>
+  </aside>
+  <div class="modebadge" id="badge">侧栏已打开 · 悬停模式（移出自动收起）</div>
+
+<script>
+(function () {
+  var sb = document.getElementById('sidebar');
+  var edge = document.getElementById('edgezone');
+  var scrim = document.getElementById('scrim');
+  var burger = document.getElementById('burger');
+  var badge = document.getElementById('badge');
+  var openedBy = '';      // '' | 'click' | 'hover'
+  var hoverTimer = null;
+  var HOVER_GRACE = 350;  // 移出后宽限 ms（防手抖误收）
+
+  function isOpen() { return sb.classList.contains('open'); }
+  function showBadge(text) {
+    badge.textContent = text;
+    badge.classList.add('show');
+    clearTimeout(badge._t);
+    badge._t = setTimeout(function () { badge.classList.remove('show'); }, 1600);
+  }
+  function open(by) {
+    clearTimeout(hoverTimer);
+    if (isOpen() && openedBy === 'hover' && by === 'click') showBadge('已转为点击模式（保持打开）');
+    else if (!isOpen() && by === 'hover') showBadge('侧栏已打开 · 悬停模式（移出自动收起）');
+    else if (!isOpen() && by === 'click') showBadge('侧栏已打开 · 点击模式（保持打开）');
+    openedBy = by || openedBy || 'click';
+    sb.classList.add('open');
+    edge.classList.add('off');
+    if (document.getElementById('scrimToggle').checked) scrim.classList.add('on');
+  }
+  function close(silent) {
+    clearTimeout(hoverTimer);
+    sb.classList.remove('open');
+    scrim.classList.remove('on');
+    edge.classList.remove('off');
+    openedBy = '';
+    if (!silent) showBadge('侧栏已收起');
+  }
+
+  // ① 汉堡点击：开（点击模式）/ 关
+  burger.addEventListener('click', function () {
+    if (isOpen() && openedBy === 'click') close();
+    else open('click');
+  });
+
+  // ② 左缘悬停热区：仅收起时可用；打开 = 悬停模式
+  edge.addEventListener('mouseenter', function () { open('hover'); });
+
+  // ③ 悬停模式：移出侧栏 350ms 后自动收起（回到侧栏即取消）
+  sb.addEventListener('mouseleave', function () {
+    if (isOpen() && openedBy === 'hover') {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function () { close(); }, HOVER_GRACE);
+    }
+  });
+  sb.addEventListener('mouseenter', function () { clearTimeout(hoverTimer); });
+
+  // ④ 收起路径：× / 品牌位、Esc、点击内容空白、点击导航项（跳转后收起）
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen()) close(); });
+  document.getElementById('app').addEventListener('click', function (e) {
+    if (!isOpen()) return;
+    if (e.target.closest('.topbar') || e.target.closest('.explain')) return;
+    if (e.target.closest('#sidebar')) return;
+    close();
+  });
+  document.querySelectorAll('[data-nav]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      document.querySelectorAll('[data-nav]').forEach(function (x) { x.classList.remove('active'); });
+      a.classList.add('active');
+      close();
+    });
+  });
+
+  // ⑤ 遮罩点击 = 收起（开启遮罩时）
+  scrim.addEventListener('click', function () { close(); });
+
+  // ⑥ 窄窗预览：手机抽屉模式示意（遮罩强制开启）
+  document.getElementById('narrowToggle').addEventListener('click', function () {
+    var app = document.getElementById('app');
+    var narrow = app.classList.toggle('narrow');
+    this.textContent = narrow ? '退出窄窗预览' : '预览手机端抽屉模式（窄窗）';
+    document.getElementById('scrimToggle').checked = narrow;
+    if (!narrow) scrim.classList.remove('on');
+    if (isOpen()) close(true);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>展开动画方案对比 — Aoi-system 需求 2 演示</title>
+<!--
+  Aoi-system · 需求 2 demo：展开型弹层（侧栏分组手风琴 / 下拉选择弹层）的展开动画方案对比。
+  纯静态零依赖，双击本文件即可离线打开。结论与依据写在每个方案卡片内。
+  调研依据（2026-11 联网检索）：
+  · grid-template-rows 0fr→1fr：现代基线（高度自适应、时长精确）——CSS-Tricks / Tailwind#11186
+  · interpolate-size: allow-keywords：Chromium 129+ 前瞻增强（height:0↔auto 直接过渡）
+  · max-height 过渡：legacy，时长失真不推荐
+  · 弹层/菜单：150–250ms，opacity + scale(≥0.95)，transform-origin 锚定触发点，
+    进场减速曲线、出场加速且稍快（M3 / NN/g / Emil Kowalski）
+-->
+<style>
+  :root {
+    --cream: #faf7f2;
+    --ink: #2f2e2b;
+    --coral: #f97362;
+    --line: #e5e7eb;
+    --muted: #8a8578;
+    /* 可调参数（页面底部调参面板写入） */
+    --dur-open: 240ms;
+    --dur-close: 170ms;
+    --ease-open: cubic-bezier(0.22, 1, 0.36, 1);   /* ease-out-quint 系：进场减速 */
+    --ease-close: cubic-bezier(0.4, 0, 1, 1);      /* 加速：出场干脆 */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--cream); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-family: Georgia, "Noto Serif SC", serif; font-size: 30px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 40px; }
+  h2 { font-family: Georgia, "Noto Serif SC", serif; font-size: 21px; margin: 48px 0 4px; }
+  .secsub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+  .tag.bad   { background: #fee2e2; color: #b91c1c; }
+  .tag.good  { background: #dcfce7; color: #15803d; }
+  .tag.best  { background: #cffafe; color: #0e7490; }
+  .tag.base  { background: #f3f4f6; color: #6b7280; }
+  .tag.new   { background: #ede9fe; color: #6d28d9; }
+  .card h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .note { font-size: 12.5px; color: var(--muted); }
+  .note b { color: var(--ink); }
+
+  /* ── 手风琴组件公共样式（复刻侧栏「基础功能列表」分组）────────── */
+  .acc { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .acc-head {
+    width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+    padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--ink);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .acc-head:hover { background: #f7f4ef; }
+  .chev { color: var(--muted); font-size: 12px; transition: transform var(--dur-open) var(--ease-open); }
+  .acc.open .chev { transform: rotate(180deg); }
+  .acc-items { padding: 2px 8px 8px; }
+  .acc-items a {
+    display: block; padding: 6px 10px; border-radius: 7px; font-size: 13.5px;
+    color: #4b4a46; text-decoration: none;
+  }
+  .acc-items a:hover { background: #f7f4ef; }
+  .acc-items a.hit { background: #fff3ef; color: #c2410c; font-weight: 600; }
+
+  /* 方案 A1：现状——hidden 直接显隐（无动画，作对照） */
+  .a1-body.hidden { display: none; }
+
+  /* 方案 A2：max-height 过渡（legacy）——时长失真：max-height 必须写「足够大」的值 */
+  .a2-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height var(--dur-open) var(--ease-open);
+  }
+  .a2.open .a2-body { max-height: 400px; }  /* 魔法数字：内容超过就截断、短内容则前段空转 */
+  .a2:not(.open) .a2-body { transition-timing-function: var(--ease-close); transition-duration: var(--dur-close); }
+
+  /* 方案 A3：grid-template-rows 0fr→1fr（推荐基线）——高度自适应，无魔法数字 */
+  .a3-body {
+    display: grid; grid-template-rows: 0fr;
+    transition: grid-template-rows var(--dur-open) var(--ease-open);
+  }
+  .a3.open .a3-body { grid-template-rows: 1fr; }
+  .a3:not(.open) .a3-body { transition-timing-function: var(--ease-close); transition-duration: var(--dur-close); }
+  .a3-clip { overflow: hidden; min-height: 0; }
+
+  /* 方案 A4：grid + 内容微动（最精致）——容器高度动画 + 内容淡入下落 4px + chevron 旋转 */
+  .a4-inner { opacity: 0; transform: translateY(-5px); }
+  .a4.open .a4-inner {
+    opacity: 1; transform: none;
+    transition: opacity 200ms ease 60ms, transform var(--dur-open) var(--ease-open) 40ms;
+  }
+  .a4:not(.open) .a4-inner { transition: opacity 120ms ease, transform 120ms ease; }
+
+  /* 方案 A5：interpolate-size height:0↔auto（Chromium 129+ 前瞻增强；不支持时优雅退化为直接显隐） */
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+    .a5-body {
+      height: 0; overflow: hidden;
+      transition: height var(--dur-open) var(--ease-open);
+    }
+    .a5.open .a5-body { height: auto; }
+    .a5:not(.open) .a5-body { transition-timing-function: var(--ease-close); transition-duration: var(--dur-close); }
+  }
+
+  /* ── 下拉弹层（复刻「选择批次」场景）──────────────────────── */
+  .dd-scene { position: relative; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .dd-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer;
+    padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: var(--ink);
+    display: inline-flex; gap: 8px; align-items: center;
+  }
+  .dd-btn:hover { border-color: #d6d3cb; }
+  .dd {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 5;
+    min-width: 210px; background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(47, 46, 43, 0.12); padding: 6px; visibility: hidden;
+  }
+  .dd a { display: block; padding: 7px 12px; border-radius: 7px; font-size: 13.5px; color: #4b4a46; text-decoration: none; }
+  .dd a:hover { background: #f7f4ef; }
+
+  /* B1：直接显隐（现状对照） */
+  .b1.show { visibility: visible; }
+
+  /* B2：opacity + scale(0.95)，origin 顶部（与触发点同侧）——推荐 */
+  .b2 {
+    transform-origin: top left;
+    opacity: 0; transform: scale(0.95) translateY(-4px);
+    transition: opacity var(--dur-close) var(--ease-close), transform var(--dur-close) var(--ease-close);
+  }
+  .b2.show {
+    opacity: 1; transform: none;
+    transition: opacity var(--dur-open) var(--ease-open), transform var(--dur-open) var(--ease-open);
+  }
+
+  /* B3：B2 + 阴影/模糊渐入（进阶观感：弹层「浮现」感）+ 菜单项逐条 stagger */
+  .b3 {
+    transform-origin: top left;
+    opacity: 0; transform: scale(0.94) translateY(-6px);
+    filter: blur(3px);
+    box-shadow: 0 0 0 rgba(47, 46, 43, 0);
+    transition: opacity var(--dur-close) var(--ease-close), transform var(--dur-close) var(--ease-close),
+                filter var(--dur-close) var(--ease-close), box-shadow var(--dur-close) var(--ease-close);
+  }
+  .b3.show {
+    opacity: 1; transform: none; filter: blur(0);
+    box-shadow: 0 10px 28px rgba(47, 46, 43, 0.14);
+    transition: opacity var(--dur-open) var(--ease-open), transform var(--dur-open) var(--ease-open),
+                filter var(--dur-open) var(--ease-open), box-shadow var(--dur-open) var(--ease-open);
+  }
+  .b3 a { opacity: 0; transform: translateY(-3px); }
+  .b3.show a {
+    opacity: 1; transform: none;
+    transition: opacity 180ms ease, transform 180ms var(--ease-open);
+  }
+  .b3.show a:nth-child(1) { transition-delay: 30ms; }
+  .b3.show a:nth-child(2) { transition-delay: 55ms; }
+  .b3.show a:nth-child(3) { transition-delay: 80ms; }
+  .b3.show a:nth-child(4) { transition-delay: 105ms; }
+  .b3.show a:nth-child(5) { transition-delay: 130ms; }
+
+  /* ── 调参面板 ─────────────────────────────────────────── */
+  .tuner {
+    margin-top: 56px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  }
+  .tuner h3 { margin: 0 0 4px; font-size: 15px; }
+  .tuner .row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; margin-top: 12px; font-size: 13px; }
+  .tuner label { display: inline-flex; gap: 8px; align-items: center; }
+  .tuner input[type="range"] { width: 160px; accent-color: var(--coral); }
+  .tuner select { font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 7px; }
+  .code {
+    margin-top: 14px; background: #2f2e2b; color: #f5f1e8; border-radius: 10px;
+    padding: 14px 16px; font-family: Consolas, "Courier New", monospace; font-size: 12px;
+    white-space: pre; overflow-x: auto;
+  }
+  .foot { margin-top: 40px; font-size: 12px; color: var(--muted); }
+  .foot a { color: #b45309; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; transition-delay: 0ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>展开动画方案对比</h1>
+  <p class="sub">Aoi-system 需求 2 演示 · 侧栏分组手风琴（如「基础功能列表」）与下拉弹层（如「选择批次」）的展开动画备选方案 · 纯静态离线可开</p>
+
+  <h2>一、侧栏分组手风琴（展开/收起）</h2>
+  <p class="secsub">五个方案同一组件并列，点表头体验；进场用减速曲线（cubic-bezier(0.22,1,0.36,1)）、出场稍快（170ms 加速）。</p>
+  <div class="grid">
+    <div class="card">
+      <h3>A1 · 直接显隐（现状对照）<span class="tag base">无动画</span></h3>
+      <div class="acc" id="a1">
+        <button class="acc-head">🧰 基础功能列表 <span class="chev">▾</span></button>
+        <div class="a1-body hidden">
+          <div class="acc-items">
+            <a class="hit" href="javascript:void 0">订单管理</a>
+            <a href="javascript:void 0">排谷表</a>
+            <a href="javascript:void 0">国际计算</a>
+            <a href="javascript:void 0">活动管理</a>
+          </div>
+        </div>
+      </div>
+      <p class="note">现状 = class 切换瞬间出现/消失。作为对比基线保留。实际观感「生硬」，且用户缺少「内容从哪来」的空间线索。</p>
+    </div>
+
+    <div class="card">
+      <h3>A2 · max-height 过渡<span class="tag bad">不推荐 · legacy</span></h3>
+      <div class="acc a2" id="a2">
+        <button class="acc-head">🧰 基础功能列表 <span class="chev">▾</span></button>
+        <div class="a2-body">
+          <div class="acc-items">
+            <a class="hit" href="javascript:void 0">订单管理</a>
+            <a href="javascript:void 0">排谷表</a>
+            <a href="javascript:void 0">国际计算</a>
+            <a href="javascript:void 0">活动管理</a>
+          </div>
+        </div>
+      </div>
+      <p class="note">经典写法。缺陷：<b>max-height 必须预设「足够大」的魔法数字</b>——内容比它短时，展开前段在「空转」（视觉延迟感）；内容比它长时会被截断。时长与真实高度不匹配，收起同样失真。仅在需要兼容极旧浏览器时作兜底。</p>
+    </div>
+
+    <div class="card">
+      <h3>A3 · grid 0fr→1fr<span class="tag good">推荐基线</span></h3>
+      <div class="acc a3" id="a3">
+        <button class="acc-head">🧰 基础功能列表 <span class="chev">▾</span></button>
+        <div class="a3-body"><div class="a3-clip">
+          <div class="acc-items">
+            <a class="hit" href="javascript:void 0">订单管理</a>
+            <a href="javascript:void 0">排谷表</a>
+            <a href="javascript:void 0">国际计算</a>
+            <a href="javascript:void 0">活动管理</a>
+            <a href="javascript:void 0">多加几行也不怕——高度自适应</a>
+            <a href="javascript:void 0">任意内容长度都精确</a>
+          </div>
+        </div></div>
+      </div>
+      <p class="note">外层 <b>grid-template-rows: 0fr → 1fr</b>，内层 overflow:hidden。过渡的是「fr 轨道」，<b>高度自动等于内容真实高度</b>——无魔法数字、时长全程有效，Safari/Firefox/Chrome 全支持。这是 2024 起社区共识的基线做法（CSS-Tricks / Tailwind 均改用此法）。收起时自动换用更快的加速曲线。</p>
+    </div>
+
+    <div class="card">
+      <h3>A4 · grid + 内容微动<span class="tag best">最精致 · 建议采用</span></h3>
+      <div class="acc a3 a4" id="a4">
+        <button class="acc-head">🧰 基础功能列表 <span class="chev">▾</span></button>
+        <div class="a3-body"><div class="a3-clip"><div class="a4-inner">
+          <div class="acc-items">
+            <a class="hit" href="javascript:void 0">订单管理</a>
+            <a href="javascript:void 0">排谷表</a>
+            <a href="javascript:void 0">国际计算</a>
+            <a href="javascript:void 0">活动管理</a>
+          </div>
+        </div></div></div>
+      </div>
+      <p class="note">A3 之上叠加：<b>内容淡入 + 下落 5px 归位</b>（延迟 40–60ms 让容器先动），chevron 同曲线旋转。展开时「容器先开、内容随后浮入」，观感最自然；收起时内容先快退、容器再合上。实现仍纯 CSS，成本约 6 行。</p>
+    </div>
+
+    <div class="card">
+      <h3>A5 · interpolate-size height:auto<span class="tag new">Chromium 129+ 前瞻</span></h3>
+      <div class="acc a5" id="a5">
+        <button class="acc-head">🧰 基础功能列表 <span class="chev">▾</span></button>
+        <div class="a5-body">
+          <div class="acc-items">
+            <a class="hit" href="javascript:void 0">订单管理</a>
+            <a href="javascript:void 0">排谷表</a>
+            <a href="javascript:void 0">国际计算</a>
+            <a href="javascript:void 0">活动管理</a>
+          </div>
+        </div>
+      </div>
+      <p class="note"><b>interpolate-size: allow-keywords</b>（2024 新标准）让 height:0 ↔ height:auto 直接过渡——结构最简、语义最直白。目前仅 Chromium 支持，包在 @supports 里：<b>支持的浏览器有动画，不支持的优雅退化直接显隐</b>。适合作为渐进增强叠加在 A3/A4 之上，不适合作唯一依赖。</p>
+    </div>
+  </div>
+
+  <h2>二、下拉选择弹层（如「选择批次」下拉）</h2>
+  <p class="secsub">要点：150–250ms；opacity 搭配 scale ≥0.95（禁止 scale(0)）；transform-origin 锚定触发点同侧；进场减速、出场加速且稍快。</p>
+  <div class="grid">
+    <div class="card">
+      <h3>B1 · 直接显隐（现状对照）<span class="tag base">无动画</span></h3>
+      <div class="dd-scene">
+        <button class="dd-btn" data-dd="b1">选择批次 ▾</button>
+        <div class="dd b1" id="b1">
+          <a href="javascript:void 0">8.23 涩谷一批</a>
+          <a href="javascript:void 0">8.23 涩谷二批</a>
+          <a href="javascript:void 0">万圣节一批</a>
+          <a href="javascript:void 0">未分批</a>
+        </div>
+      </div>
+      <p class="note">现状。瞬间弹出/消失，无方向感、无层次感。</p>
+    </div>
+
+    <div class="card">
+      <h3>B2 · scale+fade 弹出<span class="tag good">推荐 · 标准 pop</span></h3>
+      <div class="dd-scene">
+        <button class="dd-btn" data-dd="b2">选择批次 ▾</button>
+        <div class="dd b2" id="b2">
+          <a href="javascript:void 0">8.23 涩谷一批</a>
+          <a href="javascript:void 0">8.23 涩谷二批</a>
+          <a href="javascript:void 0">万圣节一批</a>
+          <a href="javascript:void 0">未分批</a>
+        </div>
+      </div>
+      <p class="note"><b>opacity + scale(0.95) + translateY(-4px)</b>，transform-origin 顶部左侧（与触发按钮同侧，内容「从按钮处长出来」）。进场 240ms 减速、出场 170ms 加速（时长、曲线由下方调参面板统一控制）。成本极低，观感提升立竿见影——<b>建议全站弹层统一采用</b>。</p>
+    </div>
+
+    <div class="card">
+      <h3>B3 · 浮现感 + 逐条 stagger<span class="tag new">进阶可选</span></h3>
+      <div class="dd-scene">
+        <button class="dd-btn" data-dd="b3">选择批次 ▾</button>
+        <div class="dd b3" id="b3">
+          <a href="javascript:void 0">8.23 涩谷一批</a>
+          <a href="javascript:void 0">8.23 涩谷二批</a>
+          <a href="javascript:void 0">万圣节一批</a>
+          <a href="javascript:void 0">韩国快闪一批</a>
+          <a href="javascript:void 0">未分批</a>
+        </div>
+      </div>
+      <p class="note">B2 之上：弹层带轻微模糊→清晰 + 阴影渐入（「浮现」质感），菜单项逐条错峰入场（每条差 25ms）。列表长时错峰应封顶（如最多前 5 条参与）。观感华丽但动效噪音更多，适合重要弹窗/菜单，<b>不建议所有弹层都用</b>。</p>
+    </div>
+  </div>
+
+  <div class="tuner">
+    <h3>调参面板（实时应用到上面 A2–A5 / B2–B3）</h3>
+    <p class="note">依据：M3 标准 200ms；NN/g 弹层 150–250ms；进场减速曲线 cubic-bezier(0.22,1,0.36,1)（ease-out-quint 系），出场加速且略快（170ms）。选一个你观感最舒服的组合，告诉我数值即可照此合并。</p>
+    <div class="row">
+      <label>进场时长 <input type="range" id="tOpen" min="120" max="400" step="10" value="240"> <b id="tOpenV">240ms</b></label>
+      <label>出场时长 <input type="range" id="tClose" min="80" max="300" step="10" value="170"> <b id="tCloseV">170ms</b></label>
+      <label>进场曲线
+        <select id="tEase">
+          <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out-quint（减速·推荐）</option>
+          <option value="cubic-bezier(0.16, 1, 0.3, 1)">ease-out-expo（更「弹」）</option>
+          <option value="cubic-bezier(0.2, 0, 0, 1)">standard（M3 标准减速）</option>
+          <option value="ease">ease（系统默认）</option>
+        </select>
+      </label>
+      <button class="dd-btn" id="tReset" style="margin-left:auto">恢复推荐值</button>
+    </div>
+    <div class="code" id="tunerCode">:root {
+  --dur-open: 240ms;                          /* 进场：手风琴/弹层 */
+  --dur-close: 170ms;                         /* 出场：略快，干脆收束 */
+  --ease-open: cubic-bezier(0.22, 1, 0.36, 1); /* 减速曲线（进场） */
+  --ease-close: cubic-bezier(0.4, 0, 1, 1);    /* 加速曲线（出场） */
+}</div>
+  </div>
+
+  <h2>三、落地建议（合并时的取舍）</h2>
+  <div class="card" style="max-width: 100%;">
+    <p class="note" style="font-size: 13px;">
+      ① <b>手风琴（侧栏分组、活动管理展开区、设置页折叠卡）→ 方案 A4</b>（grid 0fr→1fr + 内容微动），纯 CSS 全浏览器可用；
+      ② <b>弹层（批次下拉、右键菜单、操作菜单、弹窗面板）→ 方案 B2</b> 统一 pop（scale0.95+fade，origin 锚定触发点）；重要弹窗可局部用 B3；
+      ③ <b>interpolate-size 作为渐进增强</b>包 @supports 叠加（Chromium 用户获得 height:auto 直通的更简渲染，其他浏览器不受影响）；
+      ④ <b>时长/曲线全部收敛为 4 个 CSS 变量</b>（--dur-open/--dur-close/--ease-open/--ease-close），一处可调全站生效；
+      ⑤ <b>prefers-reduced-motion: reduce</b> 时动画时长归零（本页已内置演示）——晕动症用户直接显隐；
+      ⑥ 长内容 stagger 封顶（B3 最多前 5 条），避免长列表逐条等待。
+    </p>
+  </div>
+
+  <p class="foot">
+    调研来源（2026-11-10 检索）：
+    <a href="https://css-tricks.com/css-grid-can-do-auto-height-transitions">CSS-Tricks · grid auto height transitions</a> ·
+    <a href="https://developer.chrome.com/docs/css-ui/animate-to-height-auto">Chrome Developers · animate to height:auto</a> ·
+    <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/interpolate-size">MDN · interpolate-size</a> ·
+    <a href="https://m3.material.io/styles/motion/easing-and-duration">Material 3 · easing &amp; duration</a> ·
+    <a href="https://www.nngroup.com/articles/animation-duration">NN/g · animation duration</a> ·
+    <a href="https://emilkowal.ski/ui/7-practical-animation-tips">Emil Kowalski · 7 practical animation tips</a> ·
+    <a href="https://developer.mozilla.org/en-US/docs/Web/API/Popover_API/Using">MDN · Popover API（@starting-style / allow-discrete）</a>
+  </p>
+</div>
+
+<script>
+(function () {
+  // —— 手风琴：点表头开合 ——
+  ['a1', 'a2', 'a3', 'a4', 'a5'].forEach(function (id) {
+    var acc = document.getElementById(id);
+    if (!acc) return;
+    acc.querySelector('.acc-head').addEventListener('click', function () {
+      acc.classList.toggle('open');
+      if (id === 'a1') acc.querySelector('.a1-body').classList.toggle('hidden');
+    });
+  });
+  // —— 下拉：点按钮开、点外部/Esc 关 ——
+  function closeAll(except) {
+    ['b1', 'b2', 'b3'].forEach(function (id) {
+      var dd = document.getElementById(id);
+      if (dd && dd !== except) dd.classList.remove('show');
+    });
+  }
+  document.querySelectorAll('[data-dd]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var dd = document.getElementById(btn.getAttribute('data-dd'));
+      var willShow = !dd.classList.contains('show');
+      closeAll();
+      dd.classList.toggle('show', willShow);
+    });
+  });
+  document.addEventListener('click', function () { closeAll(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+  // —— 调参面板 ——
+  var r = document.documentElement;
+  function sync() {
+    var o = document.getElementById('tOpen').value + 'ms';
+    var c = document.getElementById('tClose').value + 'ms';
+    var e = document.getElementById('tEase').value;
+    r.style.setProperty('--dur-open', o);
+    r.style.setProperty('--dur-close', c);
+    r.style.setProperty('--ease-open', e);
+    document.getElementById('tOpenV').textContent = o;
+    document.getElementById('tCloseV').textContent = c;
+    document.getElementById('tunerCode').textContent = ':root {\n'
+      + '  --dur-open: ' + o + '  /* 进场：手风琴/弹层 */\n'
+      + '  --dur-close: ' + c + ' /* 出场：略快，干脆收束 */\n'
+      + '  --ease-open: ' + e + ' /* 减速曲线（进场） */\n'
+      + '  --ease-close: cubic-bezier(0.4, 0, 1, 1); /* 加速曲线（出场） */\n'
+      + '}';
+  }
+  ['tOpen', 'tClose', 'tEase'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', sync);
+  });
+  document.getElementById('tReset').addEventListener('click', function () {
+    document.getElementById('tOpen').value = 240;
+    document.getElementById('tClose').value = 170;
+    document.getElementById('tEase').selectedIndex = 0;
+    sync();
+  });
+  sync();
+})();
+</script>
+</body>
+</html>

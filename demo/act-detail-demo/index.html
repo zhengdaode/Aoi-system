@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活动卡片全屏展开编辑 — Aoi-system 需求 4 演示</title>
+<!--
+  Aoi-system · 需求 4 demo：活动管理画报卡片的新交互。纯静态零依赖，双击离线可开。
+
+  本 demo 即提案，确认后照此合并进主应用（orders.js 活动管理）：
+  ① 卡片上的「订单」按钮移除（展开后的详情卡内已有完整操作，卡片保持干净）；
+  ② 「⋯」改为操作菜单（查订单 / 打开排谷表 / 导出宣传图 / 删除活动），带 pop 动画；
+  ③ 左上角 IP 名可点击 = 按该 IP 筛选卡片（与左侧 IP 分区栏同语义，再次点击取消）；
+  ④ 点击卡片任意位置（主视图图 / 标题 / 文字区）= 打开全屏详情卡：
+     · 约占屏幕 4/5（demo 用 86vw × 88vh），内容可滚轮上下滑动；
+     · 展开动画 = FLIP：卡片面板从原卡片位置缩放平移长大（420ms 减速曲线），
+       主视图图作为「共享元素」从卡片小图平滑放大移动到详情卡头部大图位；
+     · 详情内容头部（标题/状态/日期/IP）随后淡入，列表再错峰浮入；
+     · 关闭反向播放（Esc / 右上 × / 点遮罩空白）。
+  ⑤ 顶部右上不再有第二个返回类按钮；详情卡即「展开区」本体（商品编辑 + 活动信息合一，
+    对应现 actExpandHtml 的能力），标签页「商品」/「活动信息」切换。
+
+  说明：本页所有数据为 mock，输入可打字、按钮有 toast 反馈，不写任何真实存储。
+-->
+<style>
+  :root {
+    --cream: #faf7f2;
+    --ink: #2f2e2b;
+    --line: #e5e7eb;
+    --muted: #8a8578;
+    --coral: #f97362;
+    --dur: 420ms;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--cream); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; line-height: 1.6;
+  }
+  button, input, select, textarea { font-family: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 34px 24px 90px; }
+  h1 { font-family: Georgia, "Noto Serif SC", serif; font-size: 28px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 26px; }
+  .iprail { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .ipchip {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    padding: 4px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: #4b4a46;
+  }
+  .ipchip:hover { border-color: #d6d3cb; }
+  .ipchip.active { background: #2f2e2b; color: #fff; border-color: #2f2e2b; }
+
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(47, 46, 43, 0.1); }
+  .card .cover { position: relative; height: 160px; cursor: pointer; }
+  .card .cover img, .card .cover .nocov { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .nocov { background: #efece5; color: #c6c1b4; display: grid; place-items: center; font-size: 13px; }
+  .ip-tag {
+    position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92);
+    border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 700;
+    color: #4b4a46; cursor: pointer; border: 0; z-index: 2;
+  }
+  .ip-tag:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .more {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    background: rgba(255,255,255,.92); border: 0; border-radius: 8px;
+    width: 28px; height: 24px; font-weight: 700; color: #4b4a46; cursor: pointer; line-height: 1;
+  }
+  .more:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .card .body { padding: 14px 16px 16px; cursor: pointer; }
+  .row1 { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .row1 .t { font-weight: 700; font-size: 15.5px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+  .b-wks { background: #fef3c7; color: #a16207; }
+  .b-ing { background: #dcfce7; color: #15803d; }
+  .b-ord { background: #dbeafe; color: #1d4ed8; }
+  .b-shp { background: #cffafe; color: #0e7490; }
+  .chips { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .price { color: #e11d48; font-weight: 700; font-size: 13.5px; margin-top: 6px; }
+
+  /* ⋯ 操作菜单（pop 动画，origin 右上 = 触发点同侧） */
+  .menu {
+    position: fixed; z-index: 90; min-width: 168px; background: #fff;
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px rgba(47,46,43,.16);
+    padding: 6px; transform-origin: top right;
+    opacity: 0; transform: scale(0.95) translateY(-4px); visibility: hidden;
+    transition: opacity 150ms cubic-bezier(.4,0,1,1), transform 150ms cubic-bezier(.4,0,1,1);
+  }
+  .menu.show { opacity: 1; transform: none; visibility: visible; transition-duration: 220ms; transition-timing-function: cubic-bezier(.22,1,.36,1); }
+  .menu button {
+    display: block; width: 100%; text-align: left; border: 0; background: transparent;
+    padding: 7px 12px; border-radius: 7px; font-size: 13.5px; color: #4b4a46; cursor: pointer;
+  }
+  .menu button:hover { background: #f7f4ef; }
+  .menu button.danger { color: #dc2626; }
+  .menu button.danger:hover { background: #fef2f2; }
+
+  /* ── 全屏详情卡 ── */
+  .backdrop {
+    position: fixed; inset: 0; z-index: 100; background: rgba(15, 14, 12, 0.44);
+    opacity: 0; pointer-events: none; transition: opacity 300ms ease;
+  }
+  .backdrop.show { opacity: 1; pointer-events: auto; }
+  .detail {
+    position: fixed; z-index: 110; left: 50%; top: 50%;
+    width: min(86vw, 1280px); height: min(88vh, 940px);   /* ≈4/5 屏 */
+    transform: translate(-50%, -50%);
+    background: #fffdf9; border: 1px solid var(--line); border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(15, 14, 12, 0.35);
+    display: none; flex-direction: column; overflow: hidden;
+    will-change: transform;
+  }
+  .detail.open { display: flex; }
+  .dt-hero { position: relative; height: 30%; min-height: 190px; background: #efece5; flex-shrink: 0; }
+  .dt-hero img, .dt-hero .nocov { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dt-hero .nocov { color: #c6c1b4; display: grid; place-items: center; font-size: 14px; background: #efece5; }
+  .dt-close {
+    position: absolute; top: 12px; right: 12px; z-index: 5;
+    background: rgba(255,255,255,.92); border: 0; border-radius: 999px;
+    width: 32px; height: 32px; font-size: 16px; font-weight: 700; color: #4b4a46; cursor: pointer;
+  }
+  .dt-close:hover { box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  .dt-hero .ip-tag { position: absolute; top: 12px; left: 12px; cursor: default; }
+  .dt-head { padding: 14px 22px 0; flex-shrink: 0; }
+  .dt-head .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .dt-title { font-family: Georgia, "Noto Serif SC", serif; font-size: 22px; font-weight: 700; border: 1px solid transparent; border-radius: 9px; padding: 2px 8px; margin-left: -8px; background: transparent; min-width: 220px; }
+  .dt-title:hover { border-color: var(--line); }
+  .dt-title:focus { outline: none; border-color: var(--coral); }
+  .fld {
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+    font-size: 13px; background: #fff; color: var(--ink);
+  }
+  .fld:focus { outline: none; border-color: var(--coral); }
+  .dt-tabs { display: flex; gap: 4px; margin-top: 12px; border-bottom: 1px solid var(--line); }
+  .dt-tab {
+    border: 0; background: transparent; padding: 8px 16px; font-size: 13.5px; font-weight: 600;
+    color: var(--muted); cursor: pointer; border-radius: 9px 9px 0 0; border-bottom: 2px solid transparent;
+  }
+  .dt-tab:hover { color: var(--ink); }
+  .dt-tab.active { color: var(--ink); border-bottom-color: var(--coral); }
+  .dt-body { flex: 1; overflow-y: auto; padding: 16px 22px 26px; }  /* 滚轮上下滑 */
+  .dt-body::-webkit-scrollbar { width: 9px; }
+  .dt-body::-webkit-scrollbar-thumb { background: #ddd8cd; border-radius: 8px; }
+  .dt-foot {
+    flex-shrink: 0; display: flex; gap: 10px; padding: 12px 22px;
+    border-top: 1px solid var(--line); background: #fff;
+  }
+  .btn { border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; color: #4b4a46; }
+  .btn:hover { border-color: #d6d3cb; background: #faf8f4; }
+  .btn.primary { background: var(--coral); border-color: var(--coral); color: #fff; }
+  .btn.primary:hover { background: #e96555; border-color: #e96555; }
+
+  /* 商品编辑卡（mock 展开区） */
+  .pgrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .pcard { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .pcard .pimg { width: 100%; height: 110px; border-radius: 9px; object-fit: cover; border: 1px solid var(--line); }
+  .pcard .pm { font-weight: 700; font-size: 13.5px; }
+  .pcard .pi { font-size: 11.5px; color: var(--muted); }
+  .pcard .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pcard .inputs .fld { width: 100%; font-size: 12px; padding: 5px 8px; }
+  .pcard .inputs .full { grid-column: span 2; }
+  .infogrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .infogrid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+
+  /* 详情内容入场（头部淡入 / 内容浮入） */
+  .dt-anim-head, .dt-anim-body { opacity: 0; transform: translateY(8px); }
+  .detail.ready .dt-anim-head { opacity: 1; transform: none; transition: opacity 260ms ease 120ms, transform 300ms var(--ease) 120ms; }
+  .detail.ready .dt-anim-body { opacity: 1; transform: none; transition: opacity 260ms ease 210ms, transform 340ms var(--ease) 200ms; }
+
+  /* 主视图共享元素（FLIP 克隆层） */
+  .flyimg {
+    position: fixed; z-index: 120; object-fit: cover; pointer-events: none;
+    will-change: transform;
+  }
+  .flyimg.nocov { background: #efece5; color: #c6c1b4; display: grid; place-items: center; font-size: 13px; }
+
+  /* toast */
+  .toast {
+    position: fixed; top: 18px; left: 50%; transform: translate(-50%, -12px); z-index: 200;
+    background: #2f2e2b; color: #fff; font-size: 13px; padding: 9px 18px; border-radius: 10px;
+    opacity: 0; pointer-events: none; transition: opacity 250ms ease, transform 250ms ease;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 18px 2px 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .detail, .flyimg, .backdrop, .card, .menu, .dt-anim-head, .dt-anim-body { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>活动卡片 → 全屏详情编辑</h1>
+  <p class="sub">需求 4 demo · 点卡片任意位置（图/文字）展开约 4/5 屏编辑卡，主视图平滑放大移动；「订单」按钮已移除；「⋯」= 操作菜单；左上 IP 名 = 点击筛选。数据为 mock，可随意操作。</p>
+  <div class="iprail" id="iprail"></div>
+  <div class="grid" id="grid"></div>
+  <p class="hint">💡 试一下：① 点「宝可梦万圣节」卡片的图片 → 主视图从卡片放大移动到头部大图位；② 点卡片文字 → 同样展开；③ 点卡片左上 IP 名 → 筛选同 IP；④ 点右上「⋯」→ 操作菜单；⑤ Esc / 右上 × / 点遮罩空白 → 反向收回。展开后内容区可滚轮上下滑动。</p>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="detail" id="detail">
+  <div class="dt-hero" id="dtHero">
+    <button class="ip-tag" id="dtIp">宝可梦</button>
+    <button class="dt-close" id="dtClose" title="关闭（Esc）">×</button>
+  </div>
+  <div class="dt-head dt-anim-head">
+    <div class="row">
+      <input class="dt-title" id="dtTitle" value="宝可梦万圣节">
+      <select class="fld" id="dtStatus">
+        <option>未开始</option><option>进行中</option><option>已下单</option><option>已出货</option><option>已完成</option>
+      </select>
+      <input class="fld" type="date" id="dtDeadline" value="2026-10-31" title="截止日期">
+      <select class="fld" id="dtIpSel"><option>宝可梦</option><option>术力口</option><option>明日方舟</option><option>终末</option></select>
+    </div>
+    <div class="dt-tabs">
+      <button class="dt-tab active" data-tab="products">商品（41 种）</button>
+      <button class="dt-tab" data-tab="info">活动信息</button>
+    </div>
+  </div>
+  <div class="dt-body dt-anim-body" id="dtBody"></div>
+  <div class="dt-foot">
+    <button class="btn primary" onclick="toast('已保存（mock）')">保存</button>
+    <button class="btn" onclick="toast('已复制平台链接（mock）')">复制平台链接</button>
+    <button class="btn" onclick="toast('导出宣传图（mock）')">导出宣传图</button>
+    <button class="btn" onclick="toast('导出汇总表（mock）')">导出汇总表</button>
+    <span style="flex:1"></span>
+    <button class="btn" onclick="toast('删除活动需二次确认（mock）', true)" style="color:#dc2626">删除活动</button>
+  </div>
+</div>
+<div class="menu" id="menu"></div>
+<div class="toast" id="toastEl"></div>
+
+<script>
+(function () {
+  // —— mock 数据 ——
+  var ACTS = [
+    { name: '宝可梦万圣节', ip: '宝可梦', status: '未开始', cls: 'cov-w', chips: '周边 41 种 · 参与 12 人 · 预计 2026-10-31 截团', price: 'JP¥ 14.5~408 / ¥24',
+      cover: 'https://picsum.photos/seed/aoi-w/640/360', products: [
+        { m: 'A4 クリアファイル Pokémon Magic Hour', o: 'A4 万圣节 vicious 文件夹', p: '¥20.5' },
+        { m: 'ピアス ソロア&ソロアーク 116', o: 'Pokémon accessory 116 耳饰', p: '¥86' },
+        { m: 'アクリルスタンド 万圣节全镇', o: '万圣节全镇 亚克力立牌', p: '¥45' }
+      ] },
+    { name: '8.23 涩谷', ip: '终末', status: '未开始', cls: 'cov-s', chips: '周边 44 种 · 参与 2 人', price: '¥35',
+      cover: 'https://picsum.photos/seed/aoi-s/640/360', products: [
+        { m: '缶バッジ 终末组合', o: '终末组合 徽章', p: '¥12' },
+        { m: 'アクスタ 终末', o: '终末 亚克力立牌', p: '¥38' }
+      ] },
+    { name: '10.1 韩国快闪', ip: '术力口', status: '未开始', cls: 'cov-k', chips: '周边 11 种 · 参与 4 人', price: '₩ 15~375',
+      cover: 'https://picsum.photos/seed/aoi-k/640/360', products: [
+        { m: '포토카드 세트', o: '小卡套装', p: '¥30' },
+        { m: '미니머그컵', o: '迷你马克杯', p: '¥52' }
+      ] },
+    { name: 'AHS 娃再贩', ip: '术力口', status: '已出货', cls: 'cov-a', chips: '周边 7 种 · 参与 9 人', price: '¥ 295',
+      cover: 'https://picsum.photos/seed/aoi-a/640/360', products: [
+        { m: '樱乃 再贩', o: 'AHS 娃 樱乃', p: '¥295' },
+        { m: '小春 再贩', o: 'AHS 娃 小春', p: '¥310' }
+      ] },
+    { name: '明日方舟联动', ip: '明日方舟', status: '进行中', cls: 'cov-m', chips: '周边 0 种 · 未登记商品', price: '', cover: '', products: [] },
+    { name: '谷谷汇总团', ip: '终末', status: '已下单', cls: 'cov-g', chips: '周边 12 种 · 参与 6 人', price: '¥ 88~420',
+      cover: 'https://picsum.photos/seed/aoi-g/640/360', products: [
+        { m: '经常见到的谷子 1', o: '汇总 谷子 1', p: '¥88' }
+      ] }
+  ];
+  var COVCSS = {
+    'cov-w': 'linear-gradient(135deg,#fda4af,#fdba74,#fde047,#a78bfa)',
+    'cov-s': 'linear-gradient(135deg,#a5b4fc,#c4b5fd,#f0abfc)',
+    'cov-k': 'linear-gradient(135deg,#6ee7b7,#93c5fd)',
+    'cov-a': 'linear-gradient(135deg,#fda4af,#d8b4fe)',
+    'cov-m': 'linear-gradient(135deg,#fcd34d,#f9a8d4)',
+    'cov-g': 'linear-gradient(135deg,#93c5fd,#67e8f9)'
+  };
+  var STATUS_CLS = { '未开始': 'b-wks', '进行中': 'b-ing', '已下单': 'b-ord', '已出货': 'b-shp' };
+  var ipFilter = '';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var grid = document.getElementById('grid');
+  var iprail = document.getElementById('iprail');
+  var backdrop = document.getElementById('backdrop');
+  var detail = document.getElementById('detail');
+  var dtHero = document.getElementById('dtHero');
+  var dtBody = document.getElementById('dtBody');
+  var menu = document.getElementById('menu');
+  var toastEl = document.getElementById('toastEl');
+  var cur = null;       // 当前展开的活动
+  var flyEl = null;     // 主视图共享元素克隆
+  var openTimer = null; // 展开内容入场定时
+  var closeTimer = null; // 收起动画定时（快速关→开时必须取消，防误关新详情）
+
+  function toast(msg, warn) {
+    toastEl.textContent = msg;
+    toastEl.style.background = warn ? '#b45309' : '#2f2e2b';
+    toastEl.classList.add('show');
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(function () { toastEl.classList.remove('show'); }, 1800);
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // —— IP 分区栏 ——
+  function renderRail() {
+    var ips = ['全部'].concat(ACTS.map(function (a) { return a.ip; }).filter(function (v, i, arr) { return arr.indexOf(v) === i; }));
+    iprail.innerHTML = ips.map(function (ip) {
+      var act = ip !== '全部' && ipFilter === ip;
+      return '<button class="ipchip' + (act ? ' active' : '') + '" data-ip="' + esc(ip) + '">' + esc(ip) + '</button>';
+    }).join('');
+  }
+  iprail.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ip]');
+    if (!b) return;
+    var ip = b.getAttribute('data-ip');
+    ipFilter = (ip === '全部' || ipFilter === ip) ? '' : ip;
+    renderRail(); renderGrid();
+  });
+
+  // —— 卡片栅格（无「订单」按钮；⋯=菜单；IP=筛选；整卡点击=展开详情） ——
+  function coverHtml(a) {
+    return a.cover
+      ? '<img src="' + esc(a.cover) + '" alt="' + esc(a.name) + '" loading="lazy">'
+      : '<div class="nocov">暂无主视图</div>';
+  }
+  function renderGrid() {
+    var list = ACTS.filter(function (a) { return !ipFilter || a.ip === ipFilter; });
+    grid.innerHTML = list.map(function (a, i) {
+      return '<div class="card" data-i="' + ACTS.indexOf(a) + '">'
+        + '<div class="cover" data-open>'
+        + '<button class="ip-tag" data-ip="' + esc(a.ip) + '" title="按该 IP 筛选">' + esc(a.ip) + '</button>'
+        + '<button class="more" data-more title="更多操作">⋯</button>'
+        + coverHtml(a)
+        + '</div>'
+        + '<div class="body" data-open>'
+        + '<div class="row1"><span class="t">' + esc(a.name) + '</span>'
+        + '<span class="badge ' + (STATUS_CLS[a.status] || '') + '">' + esc(a.status) + '</span></div>'
+        + '<div class="chips">' + esc(a.chips) + '</div>'
+        + (a.price ? '<div class="price">' + esc(a.price) + '</div>' : '')
+        + '</div></div>';
+    }).join('') || '<p class="sub">没有该 IP 的活动</p>';
+  }
+
+  // —— ⋯ 操作菜单（pop：scale0.95+fade，origin 右上） ——
+  function openMenu(btn, act) {
+    var r = btn.getBoundingClientRect();
+    menu.innerHTML = '<button data-m="orders">查订单</button>'
+      + '<button data-m="paigu">打开排谷表</button>'
+      + '<button data-m="poster">导出宣传图</button>'
+      + '<button data-m="plan">购买计划</button>'
+      + '<button class="danger" data-m="del">删除活动…</button>';
+    menu.classList.add('show');
+    var mw = 172, mh = 190;
+    var left = Math.min(r.right - mw, window.innerWidth - mw - 10);
+    var top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 10) top = r.top - mh - 6;
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    menu._act = act;
+  }
+  menu.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-m]');
+    if (!b) return;
+    var a = menu._act || {};
+    var m = b.getAttribute('data-m');
+    closeMenu();
+    if (m === 'orders') toast('跳转订单管理：' + a.name + '（mock）');
+    if (m === 'paigu') toast('打开排谷表：' + a.name + '（mock）');
+    if (m === 'poster') toast('导出宣传图：' + a.name + '（mock）');
+    if (m === 'plan') toast('打开购买计划：' + a.name + '（mock）');
+    if (m === 'del') toast('删除活动需二次确认（mock）', true);
+  });
+  function closeMenu() { menu.classList.remove('show'); }
+
+  // —— 详情内容（商品 tab / 活动信息 tab） ——
+  function renderDetail(a) {
+    document.getElementById('dtTitle').value = a.name;
+    document.getElementById('dtStatus').value = a.status;
+    document.getElementById('dtIpSel').value = a.ip;
+    document.getElementById('dtIp').textContent = a.ip;
+    var ps = a.products.length ? ('<div class="pgrid">' + a.products.map(function (p) {
+      return '<div class="pcard">'
+        + '<div class="pimg" style="background:' + (COVCSS[a.cls] || '#eee') + '"></div>'
+        + '<div class="pm">' + esc(p.m) + '</div>'
+        + '<div class="pi">原名：' + esc(p.o) + ' · 参考单价 ' + esc(p.p) + '</div>'
+        + '<div class="inputs">'
+        + '<input class="fld" value="' + esc(p.m) + '" placeholder="型号">'
+        + '<input class="fld" value="' + esc(p.p) + '" placeholder="单价¥">'
+        + '<input class="fld" placeholder="限购">'
+        + '<input class="fld" placeholder="库存">'
+        + '<input class="fld full" placeholder="参考图 URL">'
+        + '<input class="fld full" placeholder="跳转链接（空=平台链接）">'
+        + '</div>'
+        + '<div style="display:flex;gap:8px"><button class="btn primary" onclick="toast(\'已保存商品（mock）\')">保存</button>'
+        + '<button class="btn" onclick="toast(\'已删除商品（mock）\', true)" style="color:#dc2626">删</button></div>'
+        + '</div>';
+    }).join('') + '</div>')
+      : '<p class="sub" style="margin-top:8px">还没有登记商品——在上方表单添加，或「从订单同步商品」</p>'
+        + '<div class="pcard" style="max-width:560px"><div class="inputs">'
+        + '<input class="fld" placeholder="制品类型"><input class="fld" placeholder="型号">'
+        + '<input class="fld" placeholder="单价¥（选填）"><input class="fld" placeholder="限购（选填）">'
+        + '<input class="fld full" placeholder="参考图 URL（可上传/粘贴）">'
+        + '</div><div style="margin-top:8px"><button class="btn primary" onclick="toast(\'已添加商品（mock）\')">添加商品</button></div></div>';
+    var info = '<div class="infogrid">'
+      + '<label>活动名称<input class="fld" value="' + esc(a.name) + '"></label>'
+      + '<label>所属 IP<input class="fld" value="' + esc(a.ip) + '"></label>'
+      + '<label>状态<select class="fld">' + Object.keys(STATUS_CLS).map(function (s) {
+          return '<option' + (s === a.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></label>'
+      + '<label>购买日期<input class="fld" type="date"></label>'
+      + '<label>发货日期<input class="fld" type="date"></label>'
+      + '<label>截止日期<input class="fld" type="date"></label>'
+      + '<label>发货模糊（如 9 月中旬）<input class="fld" placeholder="如 9月中旬"></label>'
+      + '<label>平台链接<input class="fld" placeholder="https://"></label>'
+      + '<label>主视图 URL<input class="fld" value="' + esc(a.cover) + '" placeholder="可上传/粘贴"></label>'
+      + '<label>备注<input class="fld" placeholder="备注"></label>'
+      + '</div>'
+      + '<p class="sub" style="margin-top:14px">' + esc(a.chips) + '</p>'
+      + '<p class="sub" style="margin:4px 0">快捷操作（现展开区能力全部保留在这里）：查订单 · 排谷表 · 快递单号 · 购买计划 · 导出购买清单表 · 生成人民币价 · 导出商品列表 · 导出到小程序 · 从订单同步商品 · 清理无订单商品</p>';
+    dtBody.innerHTML = '<div data-pane="products">' + ps + '</div><div data-pane="info" style="display:none">' + info + '</div>';
+  }
+  document.querySelectorAll('.dt-tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.dt-tab').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      var tab = t.getAttribute('data-tab');
+      dtBody.querySelectorAll('[data-pane]').forEach(function (p) {
+        p.style.display = p.getAttribute('data-pane') === tab ? '' : 'none';
+      });
+    });
+  });
+
+  // —— FLIP：面板从卡片长大 + 主视图共享元素放大移动 ——
+  function openDetail(card) {
+    clearTimeout(closeTimer);
+    clearTimeout(openTimer);
+    var a = ACTS[parseInt(card.getAttribute('data-i'), 10)];
+    cur = a;
+    renderDetail(a);
+    closeMenu();
+    detail.classList.add('open');
+    detail.classList.remove('ready');
+    backdrop.classList.add('show');
+
+    var from = card.getBoundingClientRect();
+    var to = detail.getBoundingClientRect(); // translate(-50%,-50%) 后的实际位置
+    var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+    var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+    var sx = from.width / to.width, sy = from.height / to.height;
+
+    // 主视图共享元素：克隆卡片封面图 → 移动到 hero 位
+    if (flyEl && flyEl.parentNode) flyEl.parentNode.removeChild(flyEl); // 清理上一轮残留（防悬空克隆）
+    flyEl = null;
+    var coverEl = card.querySelector('.cover img') || card.querySelector('.cover .nocov');
+    var heroTarget = document.getElementById('dtHero');
+    var hr = heroTarget.getBoundingClientRect();
+    if (coverEl) {
+      var isImg = coverEl.tagName === 'IMG';
+      flyEl = isImg ? coverEl.cloneNode(false) : document.createElement('div');
+      flyEl.className = 'flyimg' + (isImg ? '' : ' nocov');
+      if (!isImg) flyEl.textContent = coverEl.textContent;
+      flyEl.style.left = hr.left + 'px';
+      flyEl.style.top = hr.top + 'px';
+      flyEl.style.width = hr.width + 'px';
+      flyEl.style.height = hr.height + 'px';
+      var fr = coverEl.getBoundingClientRect();
+      var fdx = (fr.left + fr.width / 2) - (hr.left + hr.width / 2);
+      var fdy = (fr.top + fr.height / 2) - (hr.top + hr.height / 2);
+      var fsx = fr.width / hr.width, fsy = fr.height / hr.height;
+      flyEl.style.transform = 'translate(' + fdx + 'px,' + fdy + 'px) scale(' + fsx + ',' + fsy + ')';
+      flyEl.style.transition = 'none';
+      flyEl.style.borderRadius = '8px';
+      document.body.appendChild(flyEl);
+      // 克隆期间 hero 位真身隐藏，避免穿透重叠
+      var real = heroTarget.querySelector('img, .nocov');
+      if (real) real.style.visibility = 'hidden';
+      heroTarget._real = real;
+    } else {
+      flyEl = null;
+    }
+
+    if (!reduced) {
+      detail.style.transition = 'none';
+      detail.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
+      detail.style.opacity = '0';
+      // 强制回流后再启动过渡
+      void detail.offsetWidth;
+      detail.style.transition = 'transform ' + 420 + 'ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease';
+      detail.style.transform = 'translate(-50%,-50%)';
+      detail.style.opacity = '1';
+      if (flyEl) {
+        void flyEl.offsetWidth;
+        flyEl.style.transition = 'transform 480ms cubic-bezier(0.22,1,0.36,1), border-radius 480ms ease';
+        flyEl.style.transform = 'none';
+        flyEl.style.borderRadius = '0px';
+      }
+      openTimer = setTimeout(function () {
+        detail.classList.add('ready');
+        finishFly();
+      }, 500);
+    } else {
+      detail.classList.add('ready');
+      finishFly();
+    }
+  }
+  function finishFly() {
+    if (!cur) return; // 已被关闭（快速关→开竞态下晚到的入场定时）
+    if (flyEl && flyEl.parentNode) flyEl.parentNode.removeChild(flyEl);
+    flyEl = null;
+    if (dtHero._real) dtHero._real.style.visibility = '';
+    // 把当前活动封面真正放进 hero
+    dtHero.innerHTML = '<button class="ip-tag" id="dtIp">' + esc(cur.ip) + '</button>'
+      + '<button class="dt-close" id="dtClose" title="关闭（Esc）">×</button>'
+      + (cur.cover
+        ? '<img src="' + esc(cur.cover) + '" alt="' + esc(cur.name) + '">'
+        : '<div class="nocov">暂无主视图</div>');
+    document.getElementById('dtClose').addEventListener('click', closeDetail);
+  }
+
+  function closeDetail() {
+    if (!cur) return;
+    var closing = cur; // 收起过程中若又打开了别的活动，定时不得动它
+    clearTimeout(openTimer);
+    // 入场定时被取消则 finishFly 不会再跑：克隆层与被遮真身在此就地清理
+    if (flyEl && flyEl.parentNode) flyEl.parentNode.removeChild(flyEl);
+    flyEl = null;
+    if (dtHero._real) { dtHero._real.style.visibility = ''; dtHero._real = null; }
+    var card = grid.querySelector('.card[data-i="' + ACTS.indexOf(cur) + '"]');
+    closeMenu();
+    if (card && !reduced) {
+      var from = card.getBoundingClientRect();
+      var to = detail.getBoundingClientRect();
+      var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+      var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+      var sx = from.width / to.width, sy = from.height / to.height;
+      detail.style.transition = 'transform 360ms cubic-bezier(0.4,0,1,1), opacity 240ms ease';
+      detail.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
+      detail.style.opacity = '0';
+      backdrop.classList.remove('show');
+      closeTimer = setTimeout(function () {
+        if (cur !== closing) return; // 已被新的展开接管
+        detail.classList.remove('open', 'ready');
+        detail.style.transition = ''; detail.style.transform = ''; detail.style.opacity = '';
+        cur = null;
+      }, 380);
+    } else {
+      detail.classList.remove('open', 'ready');
+      detail.style.transition = ''; detail.style.transform = ''; detail.style.opacity = '';
+      backdrop.classList.remove('show');
+      cur = null;
+    }
+  }
+
+  // —— 卡片事件委托 ——
+  grid.addEventListener('click', function (e) {
+    var more = e.target.closest('[data-more]');
+    if (more) {
+      e.stopPropagation();
+      var card = more.closest('.card');
+      if (menu.classList.contains('show') && menu._act === ACTS[parseInt(card.getAttribute('data-i'), 10)]) closeMenu();
+      else openMenu(more, ACTS[parseInt(card.getAttribute('data-i'), 10)]);
+      return;
+    }
+    var ipb = e.target.closest('.ip-tag');
+    if (ipb) {
+      e.stopPropagation();
+      var ip = ipb.getAttribute('data-ip');
+      ipFilter = (ipFilter === ip) ? '' : ip;
+      renderRail(); renderGrid();
+      toast(ipFilter ? '已筛选 IP：' + ipFilter : '已取消 IP 筛选');
+      return;
+    }
+    var open = e.target.closest('[data-open]');
+    if (open) openDetail(open.closest('.card'));
+  });
+  document.addEventListener('click', function (e) {
+    if (menu.classList.contains('show') && !e.target.closest('#menu') && !e.target.closest('[data-more]')) closeMenu();
+    if (backdrop.classList.contains('show') && !detail.contains(e.target) && !e.target.closest('.card')) closeDetail();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (menu.classList.contains('show')) { closeMenu(); return; }
+    if (cur) closeDetail();
+  });
+
+  window.toast = toast;
+  renderRail(); renderGrid();
+})();
+</script>
+</body>
+</html>

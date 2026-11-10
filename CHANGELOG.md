@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.35.1 (2026-11-11)
+
+> **方案 C P4 真切换 + P5 团员端（多人同时编辑正式生效）**。零数据 schema 变更。
+
+- **P4 真切换**：`js/data.js` 默认 `DATA_MODE='tables'`——管理端与团员端读写全部走 `aoi_*`
+  规范表（切前最终快照 `aoi-backups/pre-c-cutover-2026-11-11`、重灌 1243 行、形状对拍全绿、
+  sync 烟测通过后执行）；**回退预案**：默认值改回 `'blob'` 重新部署（旧 team_data 行只读
+  保留、数据零损失）；**两通道严禁并存双写**；
+- **P5 团员端适配（迁移 009）**：`aoi_member_get`（组装 + PII 裁剪——语义复刻
+  `get_team_by_member_key`，p_cn 可传 QQ 号经 member_meta 换算 CN，cn 缺省则剔除
+  addresses/memberMeta/cnChanges 三键）/ `aoi_member_sync`（白名单写入新表：本人
+  addresses/memberMeta 条目、本人 orders 行级 upsert、本人 payments 凭证字段 + 状态白名单
+  「仅 待交/待审核」防自批已交、本人 transfers/cnChanges/通知按 id upsert）——
+  **member.js 零改动**（expectedUpdatedAt 兼容签名弃用，行级覆盖无锁）；
+- **aoi_transfers 表 + payments 凭证列**（receipt/receipt_date text；transfers 此前漏表，
+  行结构 = 团员转账申请 id/buyer/batchId/toWarehouseId/reason/status/date）+ aoi_get_all
+  组装主体抽离为 `aoi_assemble(v_team)`（get_all / member_get 共用）+ aoi_sync 补
+  transfers 管理段；
+- **shop RPC 适配留待商城投用前**（七件 RPC 读写旧 blob；当前未投用无数据，切 tables 后
+  shop 停摆但不破坏数据——投用清单必改项已记 PLAN-C）；
+- 测试：v3350 补团员端通道 5 例（member_get 透传/密钥无效/member_sync 传参/错误翻译/debug
+  不受影响）；admin-auth/data-save/enter-app/member-pii/v311-trust 五个 blob 通道守护测试
+  显式钉在 `DATA_MODE='blob'`（回退路径持续有守护）；vitest 821→826 全绿。
+
 ## v3.35.0 (2026-11-11)
 
 > **方案 C 多人并发改造 P3（数据层引擎，用户拍板跳过 B 直接 C）**。零数据 schema 变更

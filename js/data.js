@@ -7,7 +7,9 @@
 //   切换默认值 = P4 真迁移时的唯一发布动作；两通道严禁并存双写。
 window.Aoi = window.Aoi || {};
 
-Aoi.DATA_MODE = Aoi.DATA_MODE || 'blob';
+// v3.35.0 P4 真切换（2026-11-11）：默认 tables（规范表通道，多人行级并发）。
+// 回退：改回 'blob' 并重新部署——旧 team_data 行只读保留，数据零损失。
+Aoi.DATA_MODE = Aoi.DATA_MODE || 'tables';
 
 // 调试模式：团队存 localStorage（aoi_debug_ 前缀）
 Aoi.debugTeam = function () {
@@ -199,6 +201,16 @@ Aoi.getTeamDataByMemberKey = async function (key, cnOrQq) {
       updatedAt: null
     };
   }
+  // v3.35.0（方案 C P5）：tables 通道走 aoi_member_get（同构组装 + 同款 PII 裁剪）
+  if (Aoi.DATA_MODE === 'tables') {
+    var mr = await Aoi.db.rpc('aoi_member_get', { p_member_key: key, p_cn: cnOrQq || null });
+    if (mr.error) {
+      var mHint = Aoi.explainRpcError(mr.error.message, '团员端读取');
+      throw new Error(mHint || ('读取团队数据失败：' + mr.error.message));
+    }
+    if (!mr.data) return null;
+    return mr.data;
+  }
   // v3.4.0 B2：携带输入（圈名或 QQ 号），服务端把 addresses/memberMeta/cnChanges
   // 裁剪到本人条目后返回（含解析出的 cn）；不传则服务端整体剔除这三类 PII。
   var params = { member_key: key };
@@ -217,6 +229,16 @@ Aoi.saveTeamDataByMemberKey = async function (key, data, expectedUpdatedAt, cn) 
   if (debugTeam && (debugTeam.member_key || 'DEMO') === key) {
     localStorage.setItem('aoi_debug_data', JSON.stringify(data));
     return null;
+  }
+  // v3.35.0（方案 C P5）：tables 通道走 aoi_member_sync（服务端白名单合并写入新表，
+  // 行级覆盖无整包乐观锁——expectedUpdatedAt 兼容签名弃用）
+  if (Aoi.DATA_MODE === 'tables') {
+    var ms = await Aoi.db.rpc('aoi_member_sync', { p_member_key: key, p_data: data, p_cn: cn || null });
+    if (ms.error) {
+      var sHint = Aoi.explainRpcError(ms.error.message, '团员端写入');
+      throw new Error(sHint || ('保存失败：' + ms.error.message));
+    }
+    return ms.data;
   }
   var params = { member_key: key, new_data: data };
   if (expectedUpdatedAt) params.expected_updated_at = expectedUpdatedAt;

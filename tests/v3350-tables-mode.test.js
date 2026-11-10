@@ -312,3 +312,56 @@ describe('data.js tables 通道（DATA_MODE=tables）', () => {
     expect(JSON.parse(win.localStorage.getItem('aoi_debug_data')).orders[0].status).toBe('已到货');
   });
 });
+
+describe('data.js 团员端 tables 通道（P5）', () => {
+  beforeEach(() => {
+    aoi.DATA_MODE = 'tables';
+    aoi.state.user = { id: 'm1', username: 'member', isDebug: false };
+    win.localStorage.removeItem('aoi_debug_team');
+  });
+
+  it('getTeamDataByMemberKey：tables 通道调 aoi_member_get 并透传团员形状', async () => {
+    aoi.db = { rpc: vi.fn(async function (fn, params) {
+      expect(fn).toBe('aoi_member_get');
+      expect(params.p_member_key).toBe('KEY-1');
+      expect(params.p_cn).toBe('小樱');
+      return { data: { name: '调试团', data: { orders: [] }, updatedAt: 'X', cn: '小樱' } };
+    }) };
+    const got = await aoi.getTeamDataByMemberKey('KEY-1', '小樱');
+    expect(got.name).toBe('调试团');
+    expect(got.cn).toBe('小樱');
+  });
+
+  it('getTeamDataByMemberKey：密钥无效（null 返回）→ 返回 null', async () => {
+    aoi.db = { rpc: vi.fn(async function () { return { data: null }; }) };
+    expect(await aoi.getTeamDataByMemberKey('BAD', null)).toBeNull();
+  });
+
+  it('saveTeamDataByMemberKey：tables 通道调 aoi_member_sync（整包 + p_cn）', async () => {
+    aoi.db = { rpc: vi.fn(async function (fn, params) {
+      expect(fn).toBe('aoi_member_sync');
+      expect(params.p_member_key).toBe('KEY-1');
+      expect(params.p_cn).toBe('小樱');
+      expect(params.p_data.orders[0].status).toBe('已到货');
+      return { data: { ok: true } };
+    }) };
+    const data = { orders: [{ id: 'o1', buyer: '小樱', status: '已到货' }], payments: [], notifications: [], transfers: [], cnChanges: [], addresses: {}, memberMeta: {} };
+    await aoi.saveTeamDataByMemberKey('KEY-1', data, null, '小樱');
+    expect(aoi.db.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('saveTeamDataByMemberKey：rpc 报错 → 抛错（含服务端消息）', async () => {
+    aoi.db = { rpc: vi.fn(async function () { return { error: { message: '圈名缺失或不合法' } }; }) };
+    await expect(aoi.saveTeamDataByMemberKey('KEY-1', { orders: [] }, null, null)).rejects.toThrow(/本页版本过旧/); // explainRpcError 翻译后文案
+  });
+
+  it('debug 团员不受 DATA_MODE 影响', async () => {
+    aoi.state.user = { id: 'debug-local', username: 'debug', isDebug: true };
+    win.localStorage.setItem('aoi_debug_team', JSON.stringify({ member_key: 'DEMO', name: '调试团' }));
+    aoi.db = { rpc: vi.fn() };
+    const data = { orders: [] };
+    await aoi.saveTeamDataByMemberKey('DEMO', data, null, 'debug');
+    expect(aoi.db.rpc).not.toHaveBeenCalled();
+    expect(JSON.parse(win.localStorage.getItem('aoi_debug_data'))).toEqual(data);
+  });
+});

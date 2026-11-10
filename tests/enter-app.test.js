@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, doc } from './helpers/aoi.js';
 
+// v3.35.0：本文件守护 blob 旧通道（回退路径）——P4 切换后须显式指定 DATA_MODE
+beforeEach(() => { aoi.DATA_MODE = 'blob'; });
+
 // v3.2.0 回归守护：限购计算器曾因 enterApp 漏刷 limits.render 导致活动下拉恒空
 // （CHANGELOG v3.2.0 第 2 条）。本用例保证登录进入应用后 limActivity 必然被填充。
 describe('Aoi.enterApp 登录后刷新（limits 回归守护）', () => {

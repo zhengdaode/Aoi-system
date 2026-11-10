@@ -5,6 +5,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { aoi, win } from './helpers/aoi.js';
 
+// v3.35.0：本文件守护 blob 旧通道（回退路径）——P4 切换后须显式指定 DATA_MODE
+beforeEach(() => { aoi.DATA_MODE = 'blob'; });
+
 const origToast = aoi.toast;
 const origWarn = win.console.warn;
 

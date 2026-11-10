@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, win, doc } from './helpers/aoi.js';
 
+// v3.35.0：本文件守护 blob 旧通道（回退路径）——P4 切换后须显式指定 DATA_MODE
+beforeEach(() => { aoi.DATA_MODE = 'blob'; });
+
 const SESSION = { token: 't'.repeat(64), role: 'super', username: 'boss', expiresAt: '2099-01-01T00:00:00Z' };
 
 function doc_set(id, v) { doc.getElementById(id).value = v; }

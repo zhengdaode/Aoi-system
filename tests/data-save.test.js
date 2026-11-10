@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, win } from './helpers/aoi.js';
 
+// v3.35.0：本文件守护 blob 旧通道（回退路径）——P4 切换后须显式指定 DATA_MODE
+beforeEach(() => { aoi.DATA_MODE = 'blob'; });
+
 describe('Aoi.explainRpcError 错误分类（团员端排障关键）', () => {
   it('RPC 不存在 → 提示重跑 supabase-schema.sql', () => {
     const msg = aoi.explainRpcError('Could not find the function get_team_by_member_key in the schema cache', '团员端读取');

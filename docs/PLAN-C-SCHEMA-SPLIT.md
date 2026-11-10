@@ -90,9 +90,9 @@
 | P1 设计与迁移脚本 | 本文档 + `002-c-schema-split.sql`（DDL）+ `scripts/migrate-blob-to-tables.js`（blob→INSERT 生成器，dry-run 对账） | ✅ 本轮 |
 | P2 建表（真库应用 DDL） | `sb.js migrate` 应用 002（幂等；空表零风险，旧通道不受影响） | ✅ 本轮 |
 | P3 RPC + diff 引擎（v3.35.0） | aoi_get_all / aoi_sync + data.js DATA_MODE 切换 + 测试（含 tables 模式 mock 全量回归） | 待做 |
-| P4 真迁移（v3.36.0，低峰执行） | 重跑备份 → `migrate-blob-to-tables.js --apply`（对账通过才继续）→ 前端 DATA_MODE=tables 发布 → 线上探针验证（登录/录入/保存/排位/导出） | 待做 |
-| P5 团员端与商城切换 | aoi_member_get/sync + shop RPC 重写 + 切换 | 待做 |
-| P6 Realtime（可选） | postgres_changes 订阅 + 前端字段级合并 | 待做 |
+| P4 真迁移（v3.35.1，2026-11-11 执行） | 切前快照 pre-c-cutover → 重灌 1243 行 → 对拍/烟测全绿 → **DATA_MODE 默认值切 tables**（commit 644234b 已推送部署） | ✅ |
+| P5 团员端与商城切换（v3.35.1） | aoi_member_get/sync 已上线（member.js 零改动）+ aoi_transfers 表 + payments 凭证列；shop RPC 适配留待商城投用前（当前未投用无数据） | ✅（shop 部分） |
+| P6 Realtime（可选增强） | postgres_changes 订阅 + 前端字段级合并（他人改动实时可见，当前需刷新） | 待做 |
 
 **P4 回退预案**：DATA_MODE 切回 'blob'（旧 team_data 行未被动过）→ 重发 Pages；
 新表数据保留供排查。两通道并存期间**严禁**双写（blob 通道只读）。

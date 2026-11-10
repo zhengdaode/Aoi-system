@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.34.0 (2026-11-11)
+
+> **侧栏悬浮层 + 全站动效 + 活动详情全屏卡（用户拍板 A4+B3，demo 方案实装）**。
+> 零数据 schema 变更。需求 3（多人并发）按用户指示挂起，方案见 docs/REPORT-CONCURRENCY.md。
+
+- **侧栏悬浮层（需求 1，实装自 demo/sidebar-demo 拍板方案）**：桌面与手机统一「平时收起 +
+  弹出」——`#sidebar` 改 fixed 悬浮层（去 v3.32.1 桌面流内折叠分支），点头部「☰」= 点击模式
+  （保持打开），鼠标贴屏幕左缘 14px 热区（`#sidebarEdge`）= 悬停模式（移出侧栏 350ms 自动收起，
+  悬停中途点 ☰ 转点击模式保持打开）；悬浮不挤压内容区，遮罩默认随开随亮；
+  Esc / 点遮罩 / 点导航项收起（nav 切视图自动收起）；home/workbench 外壳下热区一并隐藏
+  （`setShell` 同步）。`js/core.js` 重写 `toggleSidebar`（open + `opts.by` 记录打开方式）
+  并新增左缘热区绑定 IIFE；
+- **展开动效全站落地（需求 2，拍板 A4+B3）**：styles.css 尾部新增动效层——
+  ①手风琴 **A4**（grid-template-rows 0fr→1fr 高度自适应 + 内容淡入下落微动）应用于工作台
+  「基础功能列表」（`#wbBuilderItems` 重结构为 wb-acc/inner/content 三层，`toggleBuilder` 切
+  `wb-acc-open`）与设置页「关于」卡（`about.toggle` 同步改机制）；②弹层 **B3**（浮现感：
+  scale0.94 + 模糊渐入 + 菜单项逐条错峰入场，菜单项 stagger 封顶第 6 条起）应用于全部模态
+  弹窗（8 处 `aoi-modal` 标记）与画报卡「⋯」操作菜单（`aoi-stagger`）；③时长/曲线收敛为
+  styles.css 四个变量（进场 240ms 减速 / 出场 170ms 加速）；④`prefers-reduced-motion: reduce`
+  时全部动画归零；
+- **活动详情全屏卡（需求 4，实装自 demo/act-detail-demo 拍板方案）**：画报卡改版——
+  ①「订单」按钮移除；②「⋯」= 操作菜单（查订单/打开排谷表/导出宣传图/购买计划/删除活动，
+  B3 动画，外点/Esc 关闭，再点同按钮收起）；③左上 IP 名可点击 = 按该 IP 筛选（与左侧 IP
+  分区栏同语义，再次点击取消）；④点击卡片任意位置（主视图/标题/文字区）= 打开 ≈4/5 屏
+  （86vw×88vh）详情编辑卡：FLIP 面板从原卡片缩放平移长大（420ms 减速）+ **主视图共享元素**
+  从卡片小图放大移动到详情头部大图位（480ms），内容头部/列表错峰浮入；Esc / 右上「× 关闭」/
+  点遮罩空白反向收回；「商品」tab = 原 `actExpandHtml` 展开区全部能力（查订单/排谷表/导出/
+  同步商品/商品卡编辑，与文段模式同一保存链路），「活动信息」tab = 日期/IP/截止/链接/备注/
+  参与人/快递单号；字段即改即存；`openTimer/closeTimer` 防快速关→开竞态、克隆层就地清理
+  （demo 实测教训同款防护）；`Aoi.nav` 离开页面即时关闭；详情打开期间 `renderActivities`
+  同步刷新详情内容；原委托处理器重构为 `actExpandChange/actExpandClick` 双容器（#actCardsWrap
+  与 #actDetail）复用，卡片分支（菜单/IP/整卡点击）仅挂在卡片容器；
+- **修复登录竞态（浏览器实测发现）**：启动自检 IIFE 的 `admin_initialized` RPC 晚于用户完成
+  登录返回时，晚到的 `showScreen('screen-auth')` 会把已进入的应用踢回登录屏——`enterApp`
+  置位 `Aoi._enteredApp`，自检落败分支见到已进入则不再切屏，logout 复位；
+- 测试：新增 `tests/v3340-actdetail.test.js` 10 例（卡片改版/菜单/IP 筛选/详情卡全生命周期/
+  登录竞态标志）；`v3311` 重写为悬浮层语义（汉堡分发 + toggleSidebar/closeDrawers 统一 +
+  悬停模式 fake-timers + Esc）、`v3300`/`v3240` 断言同步手风琴机制；vitest 786→798 全绿。
+
 ## v3.33.0 (2026-11-10)
 
 > **统一返回 + 主视图回显 + 工作台列表合并（用户实测反馈直改三项）**。零数据 schema 变更

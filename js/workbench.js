@@ -139,7 +139,7 @@ Aoi.workbench = (function () {
   // ③ 未归入分类的功能按 业务→基础数据→工具 静态分组；
   // ④ 末尾常驻「⚙ 设置自定义排序」入口（排序/归组/颜色/展示的管理页）。
   function buildNav() {
-    var box = el('wbBuilderItems');
+    var box = el('wbBuilderContent');
     if (!box) return;
     var l = loadLayout();
     var inColl = {};
@@ -327,14 +327,14 @@ Aoi.workbench = (function () {
     Aoi.toast('已新建分类', 'success');
   }
 
-  // 侧栏分组展开/收起（基础功能列表，同小红书案例的展开属性）
+  // 侧栏分组展开/收起（基础功能列表；v3.34.0 起走 A4 手风琴：切 wb-acc-open，styles.css 动画）
   function toggleBuilder() {
     var box = el('wbBuilderItems');
     var chev = el('wbBuilderChevron');
     if (!box) return;
-    var hidden = box.classList.toggle('hidden');
-    if (chev) chev.textContent = hidden ? '▾' : '▴';
-    if (!hidden) buildNav();
+    var open = box.classList.toggle('wb-acc-open');
+    if (chev) chev.textContent = open ? '▴' : '▾';
+    if (open) buildNav();
   }
 
   // 占位页（娱乐活动工具 / 创意工坊）：端口预留，暂不填充内容

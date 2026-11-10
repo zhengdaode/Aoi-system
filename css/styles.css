@@ -741,3 +741,82 @@ textarea:hover:not(:focus) {
     box-shadow: 0 0 18px 2px rgba(20, 20, 19, 0.22);
   }
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   v3.34.0 动效层（需求 2 拍板：手风琴=A4，弹层=B3；需求 1/4 侧栏与活动详情卡共用）
+   约定：进场减速曲线 cubic-bezier(0.22,1,0.36,1) 240ms；出场加速 170ms；
+   prefers-reduced-motion 时全部动画归零。
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* A4 手风琴（工作台基础功能列表 / 设置页关于卡）：grid 0fr→1fr 高度自适应 + 内容微动 */
+.wb-acc {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.wb-acc.wb-acc-open { grid-template-rows: 1fr; }
+.wb-acc:not(.wb-acc-open) {
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  transition-duration: 170ms;
+}
+.wb-acc > .wb-acc-inner { overflow: hidden; min-height: 0; }
+.wb-acc > .wb-acc-inner > .wb-acc-content { opacity: 0; transform: translateY(-5px); }
+.wb-acc.wb-acc-open > .wb-acc-inner > .wb-acc-content {
+  opacity: 1;
+  transform: none;
+  transition: opacity 200ms ease 60ms, transform 240ms cubic-bezier(0.22, 1, 0.36, 1) 40ms;
+}
+.wb-acc:not(.wb-acc-open) > .wb-acc-inner > .wb-acc-content {
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+/* B3 弹层动画：浮现感（模糊→清晰 + 阴影渐入 + 缩放 0.94），display 切换即重播，出场即隐 */
+@keyframes aoiFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aoiPopIn {
+  from { opacity: 0; transform: scale(0.94) translateY(-6px); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes aoiItemIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+.aoi-modal { animation: aoiFadeIn 200ms ease both; }
+.aoi-modal > div { animation: aoiPopIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.aoi-pop { animation: aoiPopIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: top right; }
+.aoi-stagger > * { opacity: 0; animation: aoiItemIn 180ms ease forwards; }
+.aoi-stagger > *:nth-child(1) { animation-delay: 30ms; }
+.aoi-stagger > *:nth-child(2) { animation-delay: 55ms; }
+.aoi-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.aoi-stagger > *:nth-child(4) { animation-delay: 105ms; }
+.aoi-stagger > *:nth-child(5) { animation-delay: 130ms; }
+.aoi-stagger > *:nth-child(n + 6) { animation-delay: 150ms; }
+
+/* 需求 1：经典侧栏悬浮层（flyout）——平时收起，弹出浮于内容之上，不挤压内容区 */
+.sidebar-fly {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 0 34px rgba(47, 46, 43, 0.16);
+}
+#sidebarEdge { background: transparent; border: 0; padding: 0; }
+
+/* 需求 4：活动详情全屏卡（FLIP 由 js/orders.js actDetail 驱动 transform，这里只管内容入场） */
+#actDetail .dt-head, #actDetail #actDetailBody { opacity: 0; transform: translateY(8px); }
+#actDetail.act-detail-ready .dt-head,
+#actDetail.act-detail-ready #actDetailBody {
+  opacity: 1;
+  transform: none;
+  transition: opacity 260ms ease 120ms, transform 320ms cubic-bezier(0.22, 1, 0.36, 1) 200ms;
+}
+#actDetail.act-detail-ready .dt-head { transition-delay: 120ms; }
+#actDetail.act-detail-ready #actDetailBody { transition-delay: 210ms; }
+
+/* 晕动症用户：全部动画归零（直接显隐） */
+@media (prefers-reduced-motion: reduce) {
+  .wb-acc, .wb-acc > .wb-acc-inner > .wb-acc-content,
+  .aoi-modal, .aoi-modal > div, .aoi-pop, .aoi-stagger > *,
+  .sidebar-fly, #sidebarBackdrop,
+  #actDetail .dt-head, #actDetail #actDetailBody, #actDetail, #actDetailBackdrop {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}

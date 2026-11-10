@@ -100,6 +100,7 @@ Aoi.auth.logout = async function () {
   Aoi.state.team = null;
   Aoi.state.role = null;
   Aoi.state.data = {};
+  Aoi._enteredApp = false; // v3.34.0：退出后允许启动自检重新接管切屏
   Aoi.showScreen('screen-auth');
 };
 
@@ -153,12 +154,16 @@ Aoi.enterApp = async function () {
   Aoi.calc.fillForm();
   Aoi.overview.render();
   Aoi.limits.render();
+  Aoi._enteredApp = true; // v3.34.0：已进入应用（启动自检晚到不再踢回登录屏）
   Aoi.showScreen('screen-app');
   // v3.30.0：主页面代替总览成为默认界面；每次启动（页面加载）播一次启动动画
   if (Aoi.home) Aoi.home.enter(true);
 };
 
 // 启动：检查管理员是否已初始化 → 初始化页 / 登录页 / 恢复会话
+// v3.34.0 竞态防护：本 IIFE 的 admin_initialized RPC 若晚于用户完成登录返回，
+// 晚到的 showScreen('screen-auth') 会把已进入的应用踢回登录屏（浏览器实测复现）——
+// enterApp 置位 Aoi._enteredApp，自检落败分支见到已进入则不再切屏。
 (async function () {
   var session = Aoi.adminLoadSession();
   if (session && !session.isDebug) {
@@ -173,8 +178,9 @@ Aoi.enterApp = async function () {
   }
   try {
     var r = await Aoi.db.rpc('admin_initialized');
+    if (Aoi._enteredApp) return; // 用户已登录进入（晚到的自检不覆盖）
     Aoi.showScreen(r.data === false ? 'screen-init' : 'screen-auth');
   } catch (e) {
-    Aoi.showScreen('screen-auth');
+    if (!Aoi._enteredApp) Aoi.showScreen('screen-auth');
   }
 })();

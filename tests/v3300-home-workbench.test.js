@@ -20,8 +20,8 @@ beforeEach(() => {
   boot.classList.add('hidden');
   boot.classList.remove('stage2', 'boot-fade');
   doc.getElementById('view-home').classList.remove('pre-reveal');
-  // 侧栏分组展开态在共享 DOM 中跨用例残留，逐项复位
-  doc.getElementById('wbBuilderItems').classList.add('hidden');
+  // 侧栏分组展开态在共享 DOM 中跨用例残留，逐项复位（v3.34.0 起 wb-acc-open 手风琴机制）
+  doc.getElementById('wbBuilderItems').classList.remove('wb-acc-open');
   doc.getElementById('wbBuilderChevron').textContent = '▾';
 });
 
@@ -265,13 +265,13 @@ describe('工作台', () => {
     expect(items).not.toContain('view-settings');   // 账号与设置独立入口
   });
 
-  it('分组展开/收起切换 chevron 与显隐', () => {
+  it('分组展开/收起切换 chevron 与显隐（v3.34.0 起 wb-acc-open 手风琴机制）', () => {
     aoi.workbench.enter();
-    expect(doc.getElementById('wbBuilderItems').classList.contains('hidden')).toBe(true);
+    expect(doc.getElementById('wbBuilderItems').classList.contains('wb-acc-open')).toBe(false);
     aoi.workbench.toggleBuilder();
-    expect(doc.getElementById('wbBuilderItems').classList.contains('hidden')).toBe(false);
+    expect(doc.getElementById('wbBuilderItems').classList.contains('wb-acc-open')).toBe(true);
     aoi.workbench.toggleBuilder();
-    expect(doc.getElementById('wbBuilderItems').classList.contains('hidden')).toBe(true);
+    expect(doc.getElementById('wbBuilderItems').classList.contains('wb-acc-open')).toBe(false);
   });
 
   it('自定义排序合并（v3.33.0）：自建分类直接渲染在基础功能列表最前，未分类功能留在静态分组', () => {

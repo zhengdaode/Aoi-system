@@ -1,11 +1,11 @@
-// v3.31.1 手机端适配测试
+// v3.31.1 手机端适配测试（v3.34.0 修订：经典侧栏桌面与手机统一「平时收起 + 弹出」悬浮层）
 // ①工作台侧栏（wbSidebar）手机抽屉化：translate 滑入滑出 + 复用遮罩 + 头部汉堡按外壳分发
 //   （workbench 开工作台侧栏、classic 开经典侧栏）+ nav 切视图自动收起 + 离开外壳复位收起位；
 //   桌面端 md:translate-x-0 覆盖位移保持常驻布局（类固定在 HTML 上，此处断言类机制）。
-//   v3.32.0 修订：经典侧栏桌面端改流内折叠（汉堡切 md:hidden，内容让位不再遮罩盖内容），
-//   手机端抽屉行为不变；closeDrawers 桌面端不再收经典侧栏。
-// ②主页 14 格窄屏 2 列网格为 CSS 媒体查询（jsdom 无法断言视口），由样式文件覆盖。
-import { describe, it, expect, beforeEach } from 'vitest';
+// ②经典侧栏 v3.34.0 起全部视口同一套 translate 抽屉语义（汉堡点击模式 / 左缘悬停模式 /
+//   遮罩默认随开随亮 / closeDrawers 两端都收），不再有 md:hidden 流内折叠分支。
+// ③主页 14 格窄屏 2 列网格为 CSS 媒体查询（jsdom 无法断言视口），由样式文件覆盖。
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { aoi, doc, win } from './helpers/aoi.js';
 
 function seedData() {
@@ -20,9 +20,8 @@ beforeEach(() => {
   win.localStorage.clear();
   seedData();
   aoi.navHistory.length = 0;
-  // 复位侧栏到页面初始态：桌面端收起（md:hidden）+ 手机端收起位 + 遮罩隐藏
-  //（v3.32.0 桌面折叠状态随用例残留，须显式复位）
-  doc.getElementById('sidebar').classList.add('md:hidden', '-translate-x-full');
+  // 复位侧栏到页面初始态：收起位 + 遮罩隐藏（v3.34.0 起桌面手机同一套类）
+  doc.getElementById('sidebar').classList.add('-translate-x-full');
   doc.getElementById('sidebarBackdrop').classList.add('hidden');
   aoi.setShell('classic');
   doc.querySelectorAll('[data-view]').forEach((el) => el.classList.add('hidden'));
@@ -49,15 +48,16 @@ describe('工作台侧栏手机抽屉（v3.31.1）', () => {
     expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(true);
   });
 
-  it('汉堡按钮按外壳分发：workbench 开工作台侧栏，classic 开经典侧栏（v3.32.0 起桌面=流内折叠 md:hidden）', () => {
+  it('汉堡按钮按外壳分发：workbench 开工作台侧栏，classic 开经典侧栏（v3.34.0 起同为 translate 抽屉语义）', () => {
     aoi.setShell('workbench');
     aoi.toggleNavDrawer();
     expect(doc.getElementById('wbSidebar').classList.contains('-translate-x-full')).toBe(false);
-    expect(doc.getElementById('sidebar').classList.contains('md:hidden')).toBe(true);
+    expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(true);
     aoi.closeDrawers();
     aoi.setShell('classic');
     aoi.toggleNavDrawer();
-    expect(doc.getElementById('sidebar').classList.contains('md:hidden')).toBe(false);
+    expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(false);
+    expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(false);
     aoi.closeDrawers();
   });
 
@@ -72,27 +72,54 @@ describe('工作台侧栏手机抽屉（v3.31.1）', () => {
     expect(doc.getElementById('wbSidebar').classList.contains('-translate-x-full')).toBe(true);
   });
 
-  it('closeDrawers：桌面端只收工作台抽屉（经典流内侧栏保持开合状态）；手机端两个都收 + 隐藏遮罩', () => {
+  it('toggleSidebar/closeDrawers（v3.34.0）：开=位移+遮罩点亮、关=复位；两端统一无视口分支', () => {
     aoi.setShell('classic');
     aoi.toggleSidebar();
-    aoi.toggleWorkbenchSidebar();
+    expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(false);
+    expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(false);
+    expect(aoi._sbOpenedBy).toBe('click');
     aoi.closeDrawers();
-    // v3.32.0：桌面端经典侧栏是流内折叠面板，nav/遮罩不强制收起（保持用户开合状态）
-    expect(doc.getElementById('sidebar').classList.contains('md:hidden')).toBe(false);
-    expect(doc.getElementById('wbSidebar').classList.contains('-translate-x-full')).toBe(true);
-    // 模拟手机端视口（jsdom matchMedia 恒 false，用 stub 切换抽屉分支）
-    const orig = win.matchMedia;
-    win.matchMedia = () => ({ matches: true });
+    expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(true);
+    expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(true);
+    expect(aoi._sbOpenedBy).toBe('');
+  });
+
+  it('悬停模式（v3.34.0）：左缘热区 mouseenter 打开并标记 hover；移出侧栏 350ms 自动收起；点汉堡转点击模式', () => {
+    vi.useFakeTimers();
     try {
-      aoi.toggleSidebar(false);
-      expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(true);
-      expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(true);
-      aoi.toggleSidebar();
-      expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(false);
+      aoi.setShell('classic');
+      const sb = doc.getElementById('sidebar');
+      // 左缘热区悬停打开
+      doc.getElementById('sidebarEdge').dispatchEvent(new win.Event('mouseenter'));
+      expect(sb.classList.contains('-translate-x-full')).toBe(false);
+      expect(aoi._sbOpenedBy).toBe('hover');
       expect(doc.getElementById('sidebarBackdrop').classList.contains('hidden')).toBe(false);
+      // 悬停中途点汉堡 = 转点击模式（保持打开）
+      aoi.toggleNavDrawer();
+      expect(sb.classList.contains('-translate-x-full')).toBe(false);
+      expect(aoi._sbOpenedBy).toBe('click');
+      aoi.toggleSidebar(false);
+      // 再次悬停打开 → 移出侧栏 → 350ms 后自动收起
+      doc.getElementById('sidebarEdge').dispatchEvent(new win.Event('mouseenter'));
+      sb.dispatchEvent(new win.Event('mouseleave'));
+      vi.advanceTimersByTime(400);
+      expect(sb.classList.contains('-translate-x-full')).toBe(true);
+      // 移出后又回到侧栏（mouseenter）= 取消自动收起
+      doc.getElementById('sidebarEdge').dispatchEvent(new win.Event('mouseenter'));
+      sb.dispatchEvent(new win.Event('mouseleave'));
+      sb.dispatchEvent(new win.Event('mouseenter'));
+      vi.advanceTimersByTime(600);
+      expect(sb.classList.contains('-translate-x-full')).toBe(false);
       aoi.toggleSidebar(false);
     } finally {
-      win.matchMedia = orig;
+      vi.useRealTimers();
     }
+  });
+
+  it('Esc 收起经典侧栏（v3.34.0 悬浮层语义）', () => {
+    aoi.setShell('classic');
+    aoi.toggleSidebar();
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(doc.getElementById('sidebar').classList.contains('-translate-x-full')).toBe(true);
   });
 });

@@ -1712,6 +1712,11 @@ Aoi.orders.renderActivities = function () {
     if (cardsWrap) cardsWrap.classList.remove('hidden');
     Aoi.orders.renderActivityCards(d, list, view);
   }
+  // v3.34.0：详情卡打开时同步刷新其内容（保存商品/字段后 renderActivities 被调用，保持详情一致）
+  if (Aoi.orders.actDetail && Aoi.orders.actDetail.name) {
+    Aoi.orders.renderActDetailChrome(Aoi.orders.actDetail.name);
+    Aoi.orders.renderActDetailBody(Aoi.orders.actDetail.name);
+  }
 };
 
 // 文段模式（原表格，套过滤/排序/IP 筛选；v3.32.0 增「截止日期」列，11→12 列）
@@ -1758,38 +1763,36 @@ Aoi.orders.renderActivityCards = function (d, list, view) {
     + '</div>';
 };
 
+// 画报卡（v3.34.0 需求 4 改版，实装自 demo/act-detail-demo 拍板方案）：
+// 「订单」按钮移除（查订单入口收进详情卡与 ⋯ 菜单）；「⋯」= 操作菜单；左上 IP 名点击 = 按该 IP 筛选；
+// 点击卡片任意位置（图/文字）= 打开全屏详情卡（原内联展开区由详情卡承载，文段模式不受影响）
 Aoi.orders.activityCardHtml = function (d, name, idx) {
   var m = d.activityMeta[name] || {};
   var sum = Aoi.orders.activityProductSummary(name);
-  var expanded = !!Aoi.orders.expandedActivities[name];
   var cover = Aoi.orders.activityCover(d, name);
   var price = Aoi.orders.priceRangeText(d, name);
   var chips = ['周边 ' + ((m.products || []).length) + ' 种'];
   if (sum.buyers) chips.push('参与 ' + sum.buyers + ' 人');
   if (m.deadline) chips.push('预计 ' + Aoi.escapeHtml(m.deadline) + ' 截团');
   var card = '<div class="rounded-xl border border-gray-200 overflow-hidden bg-white hover:shadow-lg transition-shadow">'
-    + '<div class="relative cursor-pointer" data-expand="' + Aoi.escapeHtml(name) + '" title="点击展开/收起商品明细">'
+    + '<div class="relative cursor-pointer" data-openact="' + Aoi.escapeHtml(name) + '" title="点击查看/编辑活动详情">'
     + (cover
       ? '<img src="' + Aoi.escapeHtml(cover) + '" alt="' + Aoi.escapeHtml(name) + '" class="w-full h-44 object-cover" loading="lazy">'
       : '<div class="w-full h-44 bg-gray-100 flex items-center justify-center text-gray-300 text-sm">暂无主视图</div>')
-    + (m.ip ? '<span class="absolute top-2 left-2 px-2 py-0.5 bg-white/90 rounded-full text-xs font-bold text-gray-700">' + Aoi.escapeHtml(m.ip) + '</span>' : '')
-    + '<span class="absolute top-2 right-2 flex gap-1" onclick="event.stopPropagation()">'
-    + '<button data-jump="' + Aoi.escapeHtml(name) + '" class="px-2 py-0.5 bg-white/90 rounded text-xs text-gray-600 hover:bg-white" title="跳转订单管理查看该活动订单">订单</button>'
-    + '<button data-expand="' + Aoi.escapeHtml(name) + '" class="px-2 py-0.5 bg-white/90 rounded text-xs text-gray-600 hover:bg-white" title="展开/收起商品明细">⋯</button>'
+    + (m.ip ? '<button data-actip="' + Aoi.escapeHtml(m.ip) + '" class="absolute top-2 left-2 px-2 py-0.5 bg-white/90 rounded-full text-xs font-bold text-gray-700 hover:bg-white" title="按该 IP 筛选活动">' + Aoi.escapeHtml(m.ip) + '</button>' : '')
+    + '<span class="absolute top-2 right-2">'
+    + '<button data-actmore="' + Aoi.escapeHtml(name) + '" class="px-2 py-0.5 bg-white/90 rounded text-xs text-gray-600 hover:bg-white" title="更多操作">⋯</button>'
     + '</span>'
     + '</div>'
-    + '<div class="p-4">'
+    + '<div class="p-4 cursor-pointer" data-openact="' + Aoi.escapeHtml(name) + '">'
     + '<div class="flex items-start justify-between gap-2">'
-    + '<button data-expand="' + Aoi.escapeHtml(name) + '" class="font-bold text-base text-left leading-snug hover:underline">' + Aoi.escapeHtml(name) + '</button>'
+    + '<span class="font-bold text-base text-left leading-snug">' + Aoi.escapeHtml(name) + '</span>'
     + Aoi.orders.activityStatusBadge(m)
     + '</div>'
     + '<p class="text-xs text-gray-500 mt-2">' + chips.join('<span class="mx-1 text-gray-300">·</span>') + '</p>'
     + (price ? '<p class="text-red-500 font-bold mt-2 text-sm">' + Aoi.escapeHtml(price) + '</p>' : '')
     + '</div>'
     + '</div>';
-  if (expanded) {
-    card += '<div class="p-4 bg-gray-50/60 border border-gray-200 rounded-xl">' + Aoi.orders.actExpandHtml(name, idx) + '</div>';
-  }
   return card;
 };
 
@@ -2095,12 +2098,23 @@ document.getElementById('activityTbody').addEventListener('click', function (e) 
 });
 
 // 画报模式（v3.32.0）展开区与 #activityTbody 同构：字段即时保存 + 操作按钮委托同表
-document.getElementById('actCardsWrap').addEventListener('change', function (e) {
+// v3.34.0：同一组处理器绑定 #actCardsWrap（卡片栅格）与 #actDetail（全屏详情卡）两容器——
+// 详情卡内复用全部展开区按钮与字段保存链路
+Aoi.orders.actExpandChange = function (e) {
   var el = e.target;
   if (!el.hasAttribute || !el.hasAttribute('data-activity')) return;
   Aoi.orders.setActivityField(el.getAttribute('data-activity'), el.getAttribute('data-field'), el.value);
-});
-document.getElementById('actCardsWrap').addEventListener('click', function (e) {
+};
+Aoi.orders.actExpandClick = function (e) {
+  // —— 画报卡专属（仅卡片栅格容器）：⋯ 菜单 / IP 筛选 / 整卡点击开详情（顺序：先具体后整卡）——
+  if (e.currentTarget.id === 'actCardsWrap') {
+    var more = e.target.closest('button[data-actmore]');
+    if (more) { Aoi.orders.actCardMenu(more.getAttribute('data-actmore'), more); return; }
+    var ipb = e.target.closest('button[data-actip]');
+    if (ipb) { Aoi.orders.filterByIpFromCard(ipb.getAttribute('data-actip')); return; }
+    var op = e.target.closest('[data-openact]');
+    if (op) { Aoi.orders.openActDetail(op.getAttribute('data-openact'), op.closest('.rounded-xl')); return; }
+  }
   var btn = e.target.closest('button[data-remove]');
   if (btn) { Aoi.orders.removeActivity(btn.getAttribute('data-remove')); return; }
   var ex = e.target.closest('button[data-expand]');
@@ -2143,7 +2157,294 @@ document.getElementById('actCardsWrap').addEventListener('click', function (e) {
   if (po && window.Aoi.poster) { Aoi.poster.exportFor(po.getAttribute('data-act-poster')); return; }
   var t2 = e.target.closest('button[data-act-track]');
   if (t2) Aoi.orders.openActTrack(t2.getAttribute('data-act-track'));
-});
+};
+document.getElementById('actCardsWrap').addEventListener('change', Aoi.orders.actExpandChange);
+document.getElementById('actCardsWrap').addEventListener('click', Aoi.orders.actExpandClick);
+(function bindActDetailDelegation() {
+  var panel = document.getElementById('actDetail');
+  if (!panel || panel.dataset.adDelegated) return;
+  panel.dataset.adDelegated = '1';
+  panel.addEventListener('change', Aoi.orders.actExpandChange);
+  panel.addEventListener('click', Aoi.orders.actExpandClick);
+})();
+
+// —— 活动详情全屏卡（v3.34.0 需求 4，实装自 demo/act-detail-demo 拍板方案）——
+// 整卡点击 → ≈4/5 屏编辑卡（86vw×88vh，内容可滚轮滑动），FLIP 面板 + 主视图共享元素放大移动；
+// 商品 tab = 展开区能力（actExpandHtml 同源），活动信息 tab = 日期/IP/备注等字段；
+// Esc / 右上 × / 点遮罩空白关闭（反向动画）；openTimer/closeTimer 防快速关→开竞态（demo 实测教训）
+Aoi.orders.actDetail = { name: null, openTimer: null, closeTimer: null, fly: null };
+
+Aoi.orders.actDetailOpen = function () { return !!Aoi.orders.actDetail.name; };
+
+// 详情卡头部（标题/状态/IP/截止 + 主视图 hero 目标图）
+Aoi.orders.renderActDetailChrome = function (name) {
+  var d = Aoi.orders.ensure();
+  var m = d.activityMeta[name] || {};
+  var title = document.getElementById('actDetailTitle');
+  if (title) title.textContent = name;
+  var st = document.getElementById('actDetailStatus');
+  if (st) {
+    st.setAttribute('data-activity', name);
+    st.innerHTML = Aoi.orders.activityStatusOptions(m.status);
+  }
+  var ip = document.getElementById('actDetailIp');
+  if (ip) {
+    ip.setAttribute('data-activity', name);
+    ip.innerHTML = Aoi.orders.ipOptions(m.ip);
+  }
+  var dl = document.getElementById('actDetailDeadline');
+  if (dl) {
+    dl.setAttribute('data-activity', name);
+    dl.value = m.deadline || '';
+  }
+  var hero = document.getElementById('actDetailHero');
+  if (hero) {
+    var cover = Aoi.orders.activityCover(d, name);
+    hero.innerHTML = cover
+      ? '<img src="' + Aoi.escapeHtml(cover) + '" alt="' + Aoi.escapeHtml(name) + '" style="width:100%;height:100%;object-fit:cover;display:block">'
+      : '<div style="width:100%;height:100%;display:grid;place-items:center;color:#c6c1b4;font-size:14px">暂无主视图</div>';
+  }
+};
+
+// 详情卡主体（商品 tab = 展开区同源；活动信息 tab = 日期/链接/备注/参与人）
+Aoi.orders.renderActDetailBody = function (name) {
+  var body = document.getElementById('actDetailBody');
+  if (!body) return;
+  var d = Aoi.orders.ensure();
+  var m = d.activityMeta[name] || {};
+  var fld = function (label, field, type, value, extra) {
+    return '<label class="flex flex-col gap-1 text-xs font-semibold text-gray-500">' + label
+      + '<input type="' + (type || 'text') + '" value="' + Aoi.escapeHtml(value || '') + '" data-activity="' + Aoi.escapeHtml(name) + '" data-field="' + field + '" '
+      + (extra || 'class="border border-gray-300 rounded px-2 py-1.5 text-sm"') + '></label>';
+  };
+  var info = '<div class="grid gap-3 md:grid-cols-3 mb-4">'
+    + fld('购买日期', 'buyDate', 'date', m.buyDate)
+    + fld('出货日期', 'shipDate', 'date', m.shipDate)
+    + fld('出货（模糊，如 9 月中旬）', 'shipDateFuzzy', 'text', m.shipDateFuzzy)
+    + '</div>'
+    + '<div class="grid gap-3 md:grid-cols-2 mb-4">'
+    + fld('平台链接', 'link', 'text', m.link)
+    + fld('备注', 'remark', 'text', m.remark)
+    + '</div>'
+    + '<div class="flex flex-wrap gap-2">'
+    + '<button data-act-buyers="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 border rounded text-xs ' + ((m.buyers || []).length ? 'btn-outline' : 'border-gray-300 text-gray-500 hover:bg-gray-100') + '">购买人' + ((m.buyers || []).length ? ' · ' + m.buyers.length + ' 人' : '（未填写）') + '</button>'
+    + '<button data-act-track="' + Aoi.escapeHtml(name) + '" class="px-3 py-1.5 border rounded text-xs border-gray-300 text-gray-600 hover:bg-gray-100">快递单号</button>'
+    + '</div>';
+  body.innerHTML = '<div id="actDetailPaneProducts">' + Aoi.orders.actExpandHtml(name, 0) + '</div>'
+    + '<div id="actDetailPaneInfo" style="display:none">' + info + '</div>';
+};
+
+// 主视图共享元素：克隆卡片封面 → 从卡位放大移动到 hero 位（480ms 减速）
+Aoi.orders._actDetailFly = function (cardEl) {
+  var st = Aoi.orders.actDetail;
+  var hero = document.getElementById('actDetailHero');
+  if (!hero || !hero.firstChild) return;
+  var coverEl = cardEl ? cardEl.querySelector('.relative img, .relative .w-full.h-44') : null;
+  if (!coverEl) return;
+  var hr = hero.getBoundingClientRect();
+  var fr = coverEl.getBoundingClientRect();
+  if (!hr.width || !fr.width) return;
+  hero.firstChild.style.visibility = 'hidden';
+  var isImg = coverEl.tagName === 'IMG';
+  var fly = isImg ? coverEl.cloneNode(false) : document.createElement('div');
+  fly.style.cssText = 'position:fixed;z-index:96;pointer-events:none;left:' + hr.left + 'px;top:' + hr.top + 'px;width:' + hr.width + 'px;height:' + hr.height + 'px;'
+    + (isImg ? 'object-fit:cover;' : 'background:#efece5;display:grid;place-items:center;color:#c6c1b4;font-size:13px;');
+  if (!isImg) fly.textContent = coverEl.textContent;
+  var fdx = (fr.left + fr.width / 2) - (hr.left + hr.width / 2);
+  var fdy = (fr.top + fr.height / 2) - (hr.top + hr.height / 2);
+  var fsx = fr.width / hr.width, fsy = fr.height / hr.height;
+  fly.style.transform = 'translate(' + fdx + 'px,' + fdy + 'px) scale(' + fsx + ',' + fsy + ')';
+  fly.style.borderRadius = '8px';
+  fly.style.transition = 'none';
+  document.body.appendChild(fly);
+  st.fly = fly;
+  void fly.offsetWidth;
+  fly.style.transition = 'transform 480ms cubic-bezier(0.22,1,0.36,1), border-radius 480ms ease';
+  fly.style.transform = 'none';
+  fly.style.borderRadius = '0px';
+};
+
+Aoi.orders._actDetailFinishFly = function () {
+  var st = Aoi.orders.actDetail;
+  if (st.fly && st.fly.parentNode) st.fly.parentNode.removeChild(st.fly);
+  st.fly = null;
+  var hero = document.getElementById('actDetailHero');
+  if (hero && hero.firstChild) hero.firstChild.style.visibility = '';
+};
+
+Aoi.orders.openActDetail = function (name, cardEl) {
+  var st = Aoi.orders.actDetail;
+  clearTimeout(st.closeTimer);
+  clearTimeout(st.openTimer);
+  if (st.fly && st.fly.parentNode) st.fly.parentNode.removeChild(st.fly); // 清理上一轮残留
+  st.fly = null;
+  st.name = name;
+  Aoi.orders.closeActCardMenu();
+  Aoi.orders.renderActDetailChrome(name);
+  Aoi.orders.renderActDetailBody(name);
+  // 默认落在商品 tab
+  var panes = { products: document.getElementById('actDetailPaneProducts'), info: document.getElementById('actDetailPaneInfo') };
+  if (panes.products) panes.products.style.display = '';
+  if (panes.info) panes.info.style.display = 'none';
+  var panel = document.getElementById('actDetail');
+  var backdrop = document.getElementById('actDetailBackdrop');
+  if (!panel || !backdrop) return;
+  panel.classList.remove('hidden', 'act-detail-ready');
+  panel.style.display = 'flex';
+  backdrop.classList.remove('hidden');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var to = panel.getBoundingClientRect();
+  var from = cardEl ? cardEl.getBoundingClientRect() : null;
+  if (!reduced && from && from.width && to.width) {
+    var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+    var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+    var sx = from.width / to.width, sy = from.height / to.height;
+    panel.style.transition = 'none';
+    panel.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
+    panel.style.opacity = '0';
+    void panel.offsetWidth;
+    panel.style.transition = 'transform 420ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease';
+    panel.style.transform = 'translate(-50%,-50%)';
+    panel.style.opacity = '1';
+    Aoi.orders._actDetailFly(cardEl);
+    st.openTimer = setTimeout(function () {
+      panel.classList.add('act-detail-ready');
+      Aoi.orders._actDetailFinishFly();
+    }, 500);
+  } else {
+    panel.classList.add('act-detail-ready');
+    Aoi.orders._actDetailFinishFly();
+  }
+};
+
+Aoi.orders.closeActDetail = function (instant) {
+  var st = Aoi.orders.actDetail;
+  clearTimeout(st.openTimer);
+  if (st.fly && st.fly.parentNode) st.fly.parentNode.removeChild(st.fly); // 入场定时被取消则 finishFly 不会再跑
+  st.fly = null;
+  var hero = document.getElementById('actDetailHero');
+  if (hero && hero.firstChild) hero.firstChild.style.visibility = '';
+  if (!st.name) return;
+  var closing = st.name; // 收起过程中若又打开了别的活动，定时不得动它
+  var panel = document.getElementById('actDetail');
+  var backdrop = document.getElementById('actDetailBackdrop');
+  Aoi.orders.closeActCardMenu();
+  var finalize = function () {
+    if (st.name !== closing) return; // 已被新的展开接管
+    st.name = null;
+    if (!panel) return;
+    panel.classList.add('hidden');
+    panel.classList.remove('act-detail-ready');
+    panel.style.display = ''; panel.style.transition = ''; panel.style.transform = ''; panel.style.opacity = '';
+    if (backdrop) backdrop.classList.add('hidden');
+  };
+  if (instant || !panel) { finalize(); return; }
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cardEl = null;
+  document.querySelectorAll('#actCardsWrap [data-openact]').forEach(function (el) {
+    if (!cardEl && el.getAttribute('data-openact') === closing) cardEl = el.closest('.rounded-xl');
+  });
+  if (reduced || !cardEl) { finalize(); return; }
+  var from = cardEl.getBoundingClientRect();
+  var to = panel.getBoundingClientRect();
+  if (!from.width || !to.width) { finalize(); return; }
+  var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+  var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+  var sx = from.width / to.width, sy = from.height / to.height;
+  panel.style.transition = 'transform 360ms cubic-bezier(0.4,0,1,1), opacity 240ms ease';
+  panel.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')';
+  panel.style.opacity = '0';
+  if (backdrop) backdrop.classList.remove('hidden');
+  st.closeTimer = setTimeout(finalize, 380);
+};
+
+// 详情卡绑定（× / 遮罩 / tab 切换 / Esc——菜单优先）
+(function bindActDetailChrome() {
+  var panel = document.getElementById('actDetail');
+  if (!panel || panel.dataset.adChrome) return;
+  panel.dataset.adChrome = '1';
+  document.getElementById('actDetailClose').addEventListener('click', function () { Aoi.orders.closeActDetail(); });
+  document.getElementById('actDetailBackdrop').addEventListener('click', function () { Aoi.orders.closeActDetail(); });
+  panel.addEventListener('click', function (e) {
+    var tab = e.target.closest('.act-detail-tab');
+    if (!tab) return;
+    var act = tab.getAttribute('data-tab');
+    panel.querySelectorAll('.act-detail-tab').forEach(function (t) {
+      var on = t === tab;
+      t.classList.toggle('text-gray-800', on);
+      t.classList.toggle('text-gray-500', !on);
+      t.classList.toggle('border-b-[#f97362]', on);
+      t.classList.toggle('border-transparent', !on);
+    });
+    var pp = document.getElementById('actDetailPaneProducts');
+    var pi = document.getElementById('actDetailPaneInfo');
+    if (pp) pp.style.display = act === 'products' ? '' : 'none';
+    if (pi) pi.style.display = act === 'info' ? '' : 'none';
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var menu = document.getElementById('actCardMenu');
+    if (menu && !menu.classList.contains('hidden')) { Aoi.orders.closeActCardMenu(); e.stopImmediatePropagation(); return; }
+    if (Aoi.orders.actDetail.name) { Aoi.orders.closeActDetail(); e.stopImmediatePropagation(); }
+  });
+})();
+
+// 画报卡「⋯」操作菜单（B3 pop + 逐条错峰）
+Aoi.orders.actCardMenu = function (name, anchor) {
+  var menu = document.getElementById('actCardMenu');
+  if (!menu || !anchor) return;
+  if (!menu.classList.contains('hidden') && menu.getAttribute('data-name') === name) { Aoi.orders.closeActCardMenu(); return; }
+  menu.setAttribute('data-name', name);
+  var cls = 'text-left px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 whitespace-nowrap';
+  menu.innerHTML = '<div class="aoi-stagger flex flex-col">'
+    + '<button data-cm="jump" class="' + cls + '">查订单</button>'
+    + '<button data-cm="paigu" class="' + cls + '">打开排谷表</button>'
+    + '<button data-cm="poster" class="' + cls + '">导出宣传图</button>'
+    + '<button data-cm="plan" class="' + cls + '">购买计划</button>'
+    + '<button data-cm="del" class="text-left px-3 py-1.5 rounded-lg text-sm text-red-600 hover:bg-red-50 whitespace-nowrap">删除活动…</button>'
+    + '</div>';
+  menu.classList.remove('hidden');
+  var r = anchor.getBoundingClientRect();
+  var mw = 190, mh = 210;
+  var left = Math.max(8, Math.min(r.right - mw + 24, window.innerWidth - mw - 10));
+  var top = r.bottom + 6;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+};
+Aoi.orders.closeActCardMenu = function () {
+  var menu = document.getElementById('actCardMenu');
+  if (menu) menu.classList.add('hidden');
+};
+(function bindActCardMenu() {
+  var menu = document.getElementById('actCardMenu');
+  if (!menu || menu.dataset.menuBound) return;
+  menu.dataset.menuBound = '1';
+  menu.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-cm]');
+    if (!b) return;
+    var name = menu.getAttribute('data-name');
+    Aoi.orders.closeActCardMenu();
+    var act = b.getAttribute('data-cm');
+    if (act === 'jump') Aoi.orders.jumpToActivity(name);
+    else if (act === 'paigu' && window.Aoi.paigu) { Aoi.paigu.openActivity(name); Aoi.nav('view-paigu'); }
+    else if (act === 'poster' && window.Aoi.poster) Aoi.poster.exportFor(name);
+    else if (act === 'plan') Aoi.limits.openActPlan(name);
+    else if (act === 'del') Aoi.orders.removeActivity(name);
+  });
+  document.addEventListener('click', function (e) {
+    if (menu.classList.contains('hidden')) return;
+    if (e.target.closest('#actCardMenu') || e.target.closest('button[data-actmore]')) return;
+    Aoi.orders.closeActCardMenu();
+  });
+})();
+
+// 卡片左上 IP 名点击 = 按该 IP 筛选（与左侧 IP 分区栏同语义，再次点击取消）
+Aoi.orders.filterByIpFromCard = function (ip) {
+  Aoi.orders.actIpFilter = (Aoi.orders.actIpFilter === ip) ? '' : ip;
+  Aoi.orders.renderActivities();
+  Aoi.toast(Aoi.orders.actIpFilter ? ('已筛选 IP：' + ip) : '已取消 IP 筛选', 'info');
+};
 
 // —— 活动购买人信息 / 快递单号弹窗（v1.9.0）——
 

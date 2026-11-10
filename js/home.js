@@ -57,12 +57,17 @@ Aoi.home = (function () {
     var header = document.querySelector('#screen-app > main > header');
     var main = document.querySelector('#screen-app > main');
     var backdrop = el('sidebarBackdrop');
+    var edge = el('sidebarEdge');
     var home = mode === 'home';
     var wbm = mode === 'workbench';
     if (sb) {
       sb.classList.toggle('hidden', home || wbm);
       if (home || wbm) sb.classList.add('-translate-x-full');
     }
+    // v3.34.0：主页/工作台外壳无经典侧栏，左缘悬停热区一并隐藏；复位打开方式
+    if (edge) edge.classList.toggle('hidden', home || wbm);
+    if (typeof Aoi._sbOpenedBy === 'string') Aoi._sbOpenedBy = '';
+    clearTimeout(Aoi._sbHoverTimer);
     if (wb) {
       wb.classList.toggle('hidden', !wbm);
       // 离开工作台外壳时把手机抽屉复位到收起位（桌面端 md:translate-x-0 覆盖，不影响常驻布局）

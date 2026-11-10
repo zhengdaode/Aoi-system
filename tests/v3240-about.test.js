@@ -4,7 +4,7 @@ import { aoi, doc } from './helpers/aoi.js';
 
 describe('「关于」选项卡（v3.24.0）', () => {
   beforeEach(() => {
-    doc.getElementById('aboutBody').classList.add('hidden'); // 复位折叠态
+    doc.getElementById('aboutBody').classList.remove('wb-acc-open'); // 复位折叠态（v3.34.0 起 A4 手风琴）
   });
 
   it('Aoi.ABOUT 元数据完整：版本号格式 / https 链接 / 作者署名 / 日志非空且首条对应当前版本', () => {
@@ -30,15 +30,15 @@ describe('「关于」选项卡（v3.24.0）', () => {
     expect(doc.getElementById('aboutOrigLink').href).toContain('mossasari');
   });
 
-  it('toggle：点开显示 / 再点收起，aria-expanded 与箭头方向同步', () => {
+  it('toggle：点开显示 / 再点收起，aria-expanded 与箭头方向同步（v3.34.0 起 wb-acc-open 手风琴机制）', () => {
     const body = doc.getElementById('aboutBody');
-    expect(body.classList.contains('hidden')).toBe(true);
+    expect(body.classList.contains('wb-acc-open')).toBe(false);
     aoi.about.toggle();
-    expect(body.classList.contains('hidden')).toBe(false);
+    expect(body.classList.contains('wb-acc-open')).toBe(true);
     expect(doc.getElementById('aboutToggleBtn').getAttribute('aria-expanded')).toBe('true');
     expect(doc.getElementById('aboutChevron').style.transform).toContain('180');
     aoi.about.toggle();
-    expect(body.classList.contains('hidden')).toBe(true);
+    expect(body.classList.contains('wb-acc-open')).toBe(false);
     expect(doc.getElementById('aboutToggleBtn').getAttribute('aria-expanded')).toBe('false');
     expect(doc.getElementById('aboutChevron').style.transform).not.toContain('180');
   });

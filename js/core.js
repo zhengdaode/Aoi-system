@@ -69,7 +69,10 @@ Aoi.nav = function (viewId, opts) {
   document.querySelectorAll('[data-nav]').forEach(function (el) {
     el.classList.toggle('nav-active', el.getAttribute('data-nav') === viewId);
   });
-  Aoi.closeDrawers(); // 移动端切视图后收起全部抽屉（经典侧栏 / 工作台侧栏）
+  Aoi.closeDrawers(); // 切视图后收起全部抽屉（经典侧栏悬浮层 / 工作台侧栏）
+  // v3.34.0：活动详情全屏卡随导航关闭（fixed 覆盖层不跨页滞留）
+  if (Aoi.orders && Aoi.orders.closeActDetail) Aoi.orders.closeActDetail(true);
+  if (Aoi.orders && Aoi.orders.closeActCardMenu) Aoi.orders.closeActCardMenu();
   // v3.30.0：外壳模式挂钩（回主页强制 home 全屏外壳；其余视图沿用当前外壳）
   if (Aoi.applyShellForView) Aoi.applyShellForView(viewId);
   Aoi.renderView(viewId);
@@ -148,8 +151,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.33.0',
-  buildDate: '2026-11-10',
+  version: 'v3.34.0',
+  buildDate: '2026-11-11',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -157,6 +160,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.34.0（2026-11-11）：侧栏悬浮层 + 全站动效 + 活动详情全屏卡（demo 拍板实装）——①侧栏桌面/手机统一「平时收起 + 弹出」：点汉堡（点击模式保持打开）或鼠标贴屏幕左缘热区（悬停模式移出 350ms 自动收起）弹出，悬浮不挤压内容，遮罩默认随开随亮，Esc/点遮罩/点导航项收起；②展开动效全站落地（拍板 A4+B3）：手风琴 grid 0fr→1fr 高度自适应+内容微动（工作台基础功能列表/设置页关于卡），弹层浮现感 scale0.94+模糊渐入+菜单项逐条错峰（全部模态弹窗与画报卡 ⋯ 菜单），时长曲线收敛 styles.css 四变量，prefers-reduced-motion 全部归零；③活动管理画报卡改版：删「订单」按钮、「⋯」= 操作菜单（查订单/排谷表/宣传图/计划/删除）、左上 IP 名点击筛选、点击卡片任意位置弹出 ≈4/5 屏（86vw×88vh）详情编辑卡——FLIP 面板+主视图共享元素放大移动，商品 tab=原展开区全部能力、活动信息 tab=日期/IP/备注，Esc/×/点遮罩关闭，字段即改即存；④修复登录竞态：启动自检 admin_initialized RPC 晚于登录返回时会踢回登录屏（浏览器实测复现），enterApp 置位 _enteredApp 后自检落败不再切屏',
     'v3.33.0（2026-11-10）：统一返回 + 主视图回显 + 工作台列表合并——①全站只保留头部右上角「‹ 返回」：排谷表页内返回按钮移除，新增 Aoi.VIEW_BACK 视图内回退钩子（活动排位矩阵时头部返回先回活动列表、不消费导航历史；功能面板左上返回保留——home 外壳下头部隐藏，它是唯一可见返回）；②活动展开区「主视图 URL」回显封面回落链（未单独设置时显示首商品参考图，此前恒为空）；③工作台「自定义排序」合并进「基础功能列表」：自建分类直接排在列表最前（分类色底色、按设置顺序）、未分类按 业务→基础数据→工具 静态分组、末尾常驻 ⚙ 设置入口，顶部新增模糊搜索（汉字子串/按序简写 + 拼音首字母，如「订管」「dd」均命中「订单管理」；注册表增 py 字段），独立「自定义排序」分组移除',
     'v3.32.5（2026-10-31）：宣传图商品图加边框——暖灰 #e5e7eb 细线（设计系统 border-gray-200 同款）区隔商品图与背景，占位框同款描边；头部封面保持通栏不加框',
     'v3.32.4（2026-10-31）：宣传图 contain 留边颜色改海报背景同色（#faf7f2），替代黑边',
@@ -207,35 +211,42 @@ Aoi.about = {
     set('aboutChangelogLink', a.changelog);
     set('aboutOrigLink', a.originalRepo);
   },
+  // v3.34.0：展开/收起改走 A4 手风琴（wb-acc-open，styles.css），不再 hidden 硬切
   toggle: function () {
     var body = document.getElementById('aboutBody');
     if (!body) return;
-    var hidden = body.classList.toggle('hidden');
+    var open = body.classList.toggle('wb-acc-open');
     var chev = document.getElementById('aboutChevron');
-    if (chev) chev.style.transform = hidden ? '' : 'rotate(180deg)';
+    if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
     var btn = document.getElementById('aboutToggleBtn');
-    if (btn) btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 };
 
-// 侧边栏开关（v3.32.0 按视口分支）：
-// 手机端 = 抽屉滑入 + 遮罩（translate 位移，v3.31.1 行为不变）；
-// 桌面端 = 流内折叠——点击汉堡在原位展开/收起（md:hidden 显隐），内容自适应让位，
-// 不再以全屏遮罩盖住右侧内容。无参切换，true 展开 / false 收起
-Aoi.toggleSidebar = function (open) {
+// 侧边栏开关（v3.34.0 悬浮层统一，实装自 demo/sidebar-demo 拍板方案）：
+// 桌面与手机同一套「平时收起 + 弹出」——侧栏 fixed 悬浮在内容之上（不再流内折叠/挤压内容），
+// 遮罩默认随开随亮。两种弹出方式：
+// ① 头部汉堡点击 = 点击模式（保持打开，直至 ☰/×/Esc/点遮罩或内容空白/点导航项收起）；
+// ② 鼠标贴屏幕左缘热区（#sidebarEdge，14px）= 悬停模式（移出侧栏 350ms 自动收起，
+//    悬停中途点汉堡即转为点击模式语义保持打开）。
+// open 无参切换；true 展开 / false 收起；opts.by = 'click' | 'hover' 记录打开方式
+Aoi._sbOpenedBy = '';
+Aoi._sbHoverTimer = null;
+Aoi.toggleSidebar = function (open, opts) {
   var sb = document.getElementById('sidebar');
   var bd = document.getElementById('sidebarBackdrop');
   if (!sb) return;
-  var mobile = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-  if (mobile) {
-    if (open === undefined) open = sb.classList.contains('-translate-x-full');
-    sb.classList.toggle('-translate-x-full', !open);
-    if (bd) bd.classList.toggle('hidden', !open);
-    return;
+  if (open === undefined) open = sb.classList.contains('-translate-x-full');
+  clearTimeout(Aoi._sbHoverTimer);
+  if (open) {
+    Aoi._sbOpenedBy = (opts && opts.by) || 'click';
+    sb.classList.remove('-translate-x-full');
+    if (bd) bd.classList.remove('hidden');
+  } else {
+    Aoi._sbOpenedBy = '';
+    sb.classList.add('-translate-x-full');
+    if (bd) bd.classList.add('hidden');
   }
-  if (open === undefined) open = sb.classList.contains('md:hidden');
-  sb.classList.toggle('md:hidden', !open);
-  if (bd) bd.classList.add('hidden');
 };
 
 // 工作台侧栏抽屉（v3.31.1）：手机端 wbSidebar 为 fixed 覆盖层，开合与经典侧栏同款
@@ -249,19 +260,46 @@ Aoi.toggleWorkbenchSidebar = function (open) {
   if (bd) bd.classList.toggle('hidden', !open);
 };
 
-// 头部汉堡按钮（v3.31.1）：按当前外壳分发——workbench 外壳开合工作台侧栏，其余开合经典侧栏
+// 头部汉堡按钮（v3.31.1 按外壳分发；v3.34.0 悬停模式点击 = 转点击模式保持打开）：
+// workbench 外壳开合工作台侧栏，其余开合经典侧栏
 Aoi.toggleNavDrawer = function () {
   if (Aoi.shell === 'workbench') Aoi.toggleWorkbenchSidebar();
-  else Aoi.toggleSidebar();
+  else if (!document.getElementById('sidebar').classList.contains('-translate-x-full') && Aoi._sbOpenedBy === 'hover') {
+    Aoi.toggleSidebar(true, { by: 'click' });
+  } else Aoi.toggleSidebar();
 };
 
-// 一次性收起全部抽屉（nav 切视图 / 遮罩点击共用）：
-// 经典侧栏仅手机端收（桌面端是流内折叠面板，nav 切视图保持用户开合状态不强制收起）
+// 一次性收起全部抽屉（nav 切视图 / 遮罩点击 / Esc 共用）：
+// v3.34.0 起经典侧栏是悬浮层，nav 切视图后收起（与手机端抽屉语义一致）；
+// 工作台侧栏桌面端 md:translate-x-0 覆盖位移，收起仅影响手机端。
 Aoi.closeDrawers = function () {
-  var mobile = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
-  if (mobile) Aoi.toggleSidebar(false);
+  Aoi.toggleSidebar(false);
   Aoi.toggleWorkbenchSidebar(false);
 };
+
+// —— 经典侧栏悬浮交互绑定（v3.34.0，实装自 demo/sidebar-demo）——
+(function sidebarFlyBindings() {
+  var edge = document.getElementById('sidebarEdge');
+  var sb = document.getElementById('sidebar');
+  if (!edge || !sb || edge.dataset.flyBound) return;
+  edge.dataset.flyBound = '1';
+  // 左缘热区：侧栏收起时鼠标贴上 = 悬停模式打开
+  edge.addEventListener('mouseenter', function () {
+    if (sb.classList.contains('-translate-x-full')) Aoi.toggleSidebar(true, { by: 'hover' });
+  });
+  // 悬停模式：移出侧栏 350ms 后自动收起（回到侧栏即取消，防手抖）
+  sb.addEventListener('mouseleave', function () {
+    if (!sb.classList.contains('-translate-x-full') && Aoi._sbOpenedBy === 'hover') {
+      clearTimeout(Aoi._sbHoverTimer);
+      Aoi._sbHoverTimer = setTimeout(function () { Aoi.toggleSidebar(false); }, 350);
+    }
+  });
+  sb.addEventListener('mouseenter', function () { clearTimeout(Aoi._sbHoverTimer); });
+  // Esc 收起
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !sb.classList.contains('-translate-x-full')) Aoi.toggleSidebar(false);
+  });
+})();
 
 // XSS 防护：转义后再插入 DOM。引号也转义——value="…"/href="…"/title="…" 等
 // 属性插值点曾可被含 " 的输入突破属性边界注入事件（v3.10.0 修复）

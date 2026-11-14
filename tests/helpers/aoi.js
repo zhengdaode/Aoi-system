@@ -20,7 +20,8 @@ const w = dom.window;
 // Supabase JS 库走 CDN 不会加载，测试中需要时由用例自行 stub Aoi.db。
 
 // 模块加载顺序：与 index.html 底部 <script> 顺序严格一致（config.js 除外，由用例 stub）
-const MODULES = [
+// v3.35.2 起 export：tests/v3352-script-tags.test.js 用它校验 index.html script 标签无漂移
+export const MODULES = [
   'js/core.js',
   'js/data.js',
   'js/blob-diff.js',

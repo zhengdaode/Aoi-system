@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.35.2 (2026-11-14)
+
+> **保存全静默失败修复（用户实测「导入新拼团和修改数据都无法保存，刷新就会丢失」）**。
+> 零数据 schema 变更。
+
+- **根因**：v3.35.0 新增的 `js/blob-diff.js`（diff 引擎）**漏挂 index.html script 标签**
+  （`git log -S blob-diff -- index.html` 全历史零命中）——真实浏览器里 `Aoi.blobDiff`
+  未定义，tables 通道每次保存（导入/登记/编辑/审批/发货……全部 81 处调用点）在
+  `saveTeamDataTables` 第 98 行同步抛 `Aoi.blobDiff is not a function`（位于 try 之外、
+  无 toast），页面在内存中显示已修改、刷新后服务端无改动 = 「丢失」。登录读取
+  （aoi_get_all）不依赖 diff 引擎，故数据能看不能存；团员端走 aoi_member_sync 全量
+  白名单通道不经 diff，不受影响；
+- **为何测试全绿仍翻车**：测试 harness（tests/helpers/aoi.js）显式 eval MODULES 列表
+  （含 blob-diff.js），与 index.html 实际 script 标签脱钩——826 例全绿掩盖了漂移；
+- **修复**：index.html 补挂 `<script src="js/blob-diff.js">`（js/data.js 之后）；
+- **防再犯**：新增 tests/v3352-script-tags.test.js 三断言——①harness MODULES 每个模块
+  必须被 index.html/shop.html 某个 script 标签加载；②js/blob-diff.js 显式钉在
+  index.html；③页面标签不得引用 harness 之外的未知本地模块（防孤儿标签）；
+- 排查过程产出（入库备查）：scripts/probe-rest-sync.js（REST 通道 aoi_get_all/aoi_sync
+  端到端探针，sync-smoke 的浏览器同形版）；
+- 测试：vitest 826→829 全绿（+3 script-tags 回归）。
+
 ## v3.35.1 (2026-11-11)
 
 > **方案 C P4 真切换 + P5 团员端（多人同时编辑正式生效）**。零数据 schema 变更。

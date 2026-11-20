@@ -201,25 +201,32 @@ describe('数据动作（入排防重 / 插排顺延 / 改状态 / 调序 / 撤�
     expect(aoi.state.data.paigu[ACT].slots['毛绒|皮卡丘土王']).toHaveLength(2);
   });
 
-  it('insertSlot 手动排位插第 1 位：后续顺延，无 orderId', async () => {
+  it('insertSlot 手动排位插第 1 位：后续顺延，同步建单挂 orderId（v3.36.0 手动排位即建单）', async () => {
     const n = await P().insertSlot(ACT, '毛绒|皮卡丘土王', '插队侠', 1, []);
     expect(n).toBe(1);
     const arr = aoi.state.data.paigu[ACT].slots['毛绒|皮卡丘土王'];
     expect(arr).toHaveLength(3);
     expect(arr[0].buyer).toBe('插队侠');
-    expect(arr[0].orderId).toBeUndefined();
+    const no = aoi.state.data.orders.find((o) => o.buyer === '插队侠');
+    expect(no).not.toBeNull();
+    expect(no.activity).toBe(ACT);
+    expect(no.type).toBe('毛绒');
+    expect(no.model).toBe('皮卡丘土王');
+    expect(no.src).toBe('paigu');
+    expect(arr[0].orderId).toBe(no.id);
     expect(arr[1].slot ?? arr[1].buyer).toBe('一枚小混子');
     expect(arr[2].buyer).toBe('草莓头那个莹');
     expect(aoi.state.data.paigu[ACT].log[0].text).toContain('第 1 位');
   });
 
-  it('insertSlot 带未入排订单 + 手动名：一并插入且订单防重（v3.29.1 按件数拆位）', async () => {
+  it('insertSlot 带未入排订单 + 手动名：一并插入且订单防重（v3.29.1 按件数拆位；手动名同步建单）', async () => {
     const n = await P().insertSlot(ACT, '毛绒|圣诞节植绒', '手动甲', 1, ['o3', 'o1']);
     expect(n).toBe(3); // o3 count=2 → 2 位；o1 已在排被跳过；手动甲 1 位
     const arr = aoi.state.data.paigu[ACT].slots['毛绒|圣诞节植绒'];
     expect(arr[0].orderId).toBe('o3');
     expect(arr[1].orderId).toBe('o3');
     expect(arr[2].buyer).toBe('手动甲');
+    expect(arr[2].orderId).toBeTruthy(); // v3.36.0：手动名同步建单
   });
 
   it('setStatus：状态写入 + 日志含方向；非法状态与未知排位被拒', async () => {

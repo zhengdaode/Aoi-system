@@ -151,8 +151,8 @@ Aoi.navRefresh = function () {
 
 // —— 关于本项目（v3.24.0）：账户与设置「关于」选项卡的数据源，发版时随 CHANGELOG 同步更新 ——
 Aoi.ABOUT = {
-  version: 'v3.35.2',
-  buildDate: '2026-11-14',
+  version: 'v3.36.0',
+  buildDate: '2026-11-20',
   repo: 'https://github.com/zhengdaode/Aoi-system',
   site: 'https://zhengdaode.github.io/Aoi-system/',
   changelog: 'https://github.com/zhengdaode/Aoi-system/blob/main/CHANGELOG.md',
@@ -160,6 +160,7 @@ Aoi.ABOUT = {
   originalRepo: 'https://github.com/mossasari/Group-Buy-Management-System',
   maintainer: '郑 (zhengdaode)',
   log: [
+    'v3.36.0（2026-11-20）：排谷表 ↔ 订单管理同步闭环（用户实测「排谷表中新建的订单无法同步到订单管理界面」）——根因是 v3.27.0「手动排位仅虚拟不建订单」的设计缺口而非丢数据；现手动插排同步创建真实订单（列头参考价建单、src=paigu 标记、商品主档骨架补登、活动自动入列，订单管理即时可见），自建订单撤掉最后一个排位确认后联动删单（他源订单维持不动），并修复删除活动不清理排谷表残留僵尸活动卡；同步链路审计结论：订单编辑/删单/商品改键→排位与蓄水池均为既有设计联动，无需改动',
     'v3.35.2（2026-11-14）：保存全静默失败修复——v3.35.0 新增的 js/blob-diff.js（diff 引擎）漏挂 index.html script 标签，真实浏览器里 Aoi.blobDiff 未定义，管理端每次保存（含导入/登记/编辑）在 saveTeamDataTables 同步抛 "Aoi.blobDiff is not a function"（位于 try 之外无 toast）——页面看起来已保存、刷新即丢失；测试 harness 因显式 eval 模块列表而全绿掩盖了漂移。修复 = index.html 补挂标签（js/data.js 之后）+ 新增 tests/v3352-script-tags.test.js 三断言（MODULES 全覆盖 / blob-diff 显式钉 / 无孤儿标签）防再犯',
     'v3.35.1（2026-11-11）：方案 C P4 真切换 + P5 团员端——①DATA_MODE 默认值切 tables（规范表通道正式上线：管理端/团员端读写全部走 aoi_* 表，行级并发多人同时编辑生效；旧 blob 通道保留为回退路径，旧 team_data 行只读不删）；②团员端适配：aoi_member_get（组装 + PII 裁剪，语义复刻 get_team_by_member_key，支持 QQ 号换算 CN）/ aoi_member_sync（白名单写入新表：本人地址/元数据/订单/交费凭证+状态白名单/转账/改圈名/通知）——member.js 零改动；③新增 aoi_transfers 表与 transfers 全通道（此前漏表，行结构 = 团员转账申请）；切前快照 aoi-backups/pre-c-cutover + 形状对拍/sync 烟测全绿；shop RPC 适配留待商城投用前（当前未投用无数据）',    'v3.35.0（2026-11-11）：方案 C 多人并发改造 P3（数据层引擎，docs/PLAN-C-SCHEMA-SPLIT.md）——新通道 DATA_MODE=tables（默认仍 blob，P4 真迁移时切换）：读 = aoi_get_all 把 24 张 aoi_* 规范表组装成与旧 blob 完全同构的 JSON（业务模块零改动）；写 = saveTeamData 内部 blobDiff 深比较基线 → 最小变更集 → aoi_sync 行级应用（同字段并发后写覆盖，乐观锁退役）——迁移脚本已把线上全部业务数据（1243 行/23 键）灌入真表并经形状对拍「组装输出 vs 备份 blob 语义等价」全绿 + aoi_sync 写路径烟测通过；真库 DDL/RPC 迁移 002-008 幂等入库',
     'v3.34.1（2026-11-11）：活动详情卡动画两连修——①展开主视图「先缩小下移再跳变成 banner」根因：共享元素终点几何在面板设缩小起点变换之后读取，读到的是缩小态 hero（几何全错）；改为先读全尺寸终点再设起点、面板与共享元素过渡统一回流后同帧启动（demo 同款顺序），实测 fly 起点精确覆盖卡片图、终点落在真实 banner 位；②关闭补全反向对称动画：内容淡出（act-detail-closing）→ 主视图自 banner 位飞回卡片图位（与面板缩小同帧 360ms）→ 遮罩淡出，400ms 后干净复位（fly/hero/类/透明度全清）',

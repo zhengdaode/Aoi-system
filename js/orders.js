@@ -1835,7 +1835,9 @@ Aoi.orders.addActivity = async function (nameArg, ipArg) {
 Aoi.orders.removeActivity = async function (name) {
   var d = Aoi.orders.ensure();
   var targets = d.orders.filter(function (o) { return o.activity === name; });
-  if (!(await Aoi.confirm('确定删除活动「' + name + '」？将同时删除其 ' + targets.length + ' 笔订单（30 秒内可撤销）'))) return;
+  var hasPaigu = !!(d.paigu && d.paigu[name]);
+  if (!(await Aoi.confirm('确定删除活动「' + name + '」？将同时删除其 ' + targets.length + ' 笔订单'
+    + (hasPaigu ? '与排谷表' : '') + '（30 秒内可撤销）'))) return;
   Aoi.undo.arm('删除活动', d);
   var affected = {};
   targets.forEach(function (o) { if (o.buyer) affected[o.buyer] = 1; });
@@ -1843,6 +1845,8 @@ Aoi.orders.removeActivity = async function (name) {
   delete d.activityMeta[name];
   delete Aoi.orders.expandedActivities[name];
   if (d.limitPlans) delete d.limitPlans[name];
+  // v3.36.0：级联清理排谷表——否则排谷表活动列表（activities ∪ paigu 键）残留僵尸活动卡
+  if (hasPaigu) delete d.paigu[name];
   var removed = {};
   targets.forEach(function (o) { removed[o.id] = 1; });
   d.orders = d.orders.filter(function (o) { return !removed[o.id]; });

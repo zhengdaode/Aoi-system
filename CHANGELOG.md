@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.36.1 (2026-11-20)
+
+> **Tailwind CDN 自托管（用户实测打开站点整页无样式堆叠）**。
+> 零数据 schema 变更、零业务逻辑变更，纯前端资源加载通道替换。
+
+- **现象**：打开站点整页「裸奔」——登录/初始化超管/团员自助等全部 screen 同时可见、
+  纵向堆叠、无布局无间距，仅剩 `css/styles.css` 的自定义按钮配色还在生效。
+- **根因**：`index.html` 一直从 `cdn.tailwindcss.com` 加载 **Play CDN**——它不是一份静态
+  CSS，而是一个运行时 JS，负责在浏览器里现场生成页面用到的**全部** Tailwind 工具类
+  （含 `hidden`，正是各 screen 默认隐藏所依赖的类）。该脚本一旦加载失败（大陆网络对其
+  间歇性不可达，与 v3.9.3 实测 jsDelivr 返回伪造证书同类问题），所有工具类失效：
+  `hidden` 失效 → 全部 screen 同时显示，`flex`/`grid`/`md:*` 失效 → 布局坍塌。
+  代码本身无任何改动，属于**第三方 CDN 单点可用性故障**；且 v3.9.3 时 vendor README
+  曾记「Tailwind 仍走 CDN（大陆可达性尚可，运行时 JIT 无法简单自托管）」——前半句本次
+  被实测证伪，后半句本就不成立（它就是单个自包含 bundle）。
+- **修复**：下载官方固定版 `https://cdn.tailwindcss.com/3.4.17`（407KB，重定向即锁版本）
+  入 `js/vendor/tailwindcss.js`，`index.html` 改同源加载；内联 `tailwind.config`
+  （自定义珊瑚色板）不变，自托管副本同样在运行时读取该全局，行为与 CDN 版完全等价。
+  `shop.html` 用自有 `css/shop.css` 从不依赖 Tailwind，不受影响。
+- **防回潮**：新增 `tests/v3361-no-cdn.test.js`——钉死 index.html/shop.html **零外部
+  `src="http…"` script 标签** + `js/vendor/tailwindcss.js` 必须存在且被 index.html 引用，
+  第三方 CDN 依赖今后一律先自托管再引入。
+- 影响：全站从此不再依赖任何第三方 CDN 脚本，GitHub Pages 单源即可完整渲染；
+  Play CDN 的「生产环境警告」控制台提示随自托管同样存在，无功能影响。
+
 ## v3.36.0 (2026-11-20)
 
 > **排谷表 ↔ 订单管理同步闭环（用户实测「排谷表中新建的订单无法同步到订单管理界面」）+ 同步链路审计**。

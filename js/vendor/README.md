@@ -11,6 +11,7 @@
 | `xlsx.full.min.js` | xlsx@0.18.5 | npm tarball `dist/xlsx.full.min.js` | Apache-2.0 |
 | `exceljs.min.js` | exceljs@4.4.0 | npm tarball `dist/exceljs.min.js` | MIT |
 | `html2canvas.min.js` | html2canvas@1.4.1 | npm tarball `dist/html2canvas.min.js` | MIT |
+| `tailwindcss.js` | tailwindcss Play CDN@3.4.17 | `https://cdn.tailwindcss.com/3.4.17`（官方域，重定向即固定版） | MIT |
 
 ## 升级方法
 
@@ -21,8 +22,12 @@ cp package/dist/umd/supabase.js <repo>/js/vendor/
 cp package/dist/xlsx.full.min.js <repo>/js/vendor/
 cp package/dist/exceljs.min.js <repo>/js/vendor/
 cp package/dist/html2canvas.min.js <repo>/js/vendor/
+# tailwindcss（v3.36.1 起，固定版号 URL）
+curl -L -o <repo>/js/vendor/tailwindcss.js https://cdn.tailwindcss.com/3.4.17
 ```
 
 （不走 jsdelivr 下载，避免被污染的解析结果混入非官方文件。）
 
-Tailwind 仍走 `cdn.tailwindcss.com`（Cloudflare 网络，大陆可达性尚可，且为运行时 JIT 无法简单自托管）。
+Tailwind 自 v3.36.1 起同样自托管（2026-11-20 用户实测 cdn.tailwindcss.com 间歇不可达致整页无样式堆叠；
+Play CDN 是单个自包含运行时 bundle，浏览器内 JIT 生成工具类，自托管副本与 CDN 版行为等价，
+内联 `tailwind.config` 全局配置不受影响）。

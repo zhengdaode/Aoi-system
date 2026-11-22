@@ -436,9 +436,10 @@
     var W = 750;
     var pad = 26;
     var COL = {
-      bg: '#faf7f2', card: '#ffffff', coral: '#cc785c', ink: '#33302e', sub: '#8a837c',
-      ok: '#2e9e6b', warn: '#d97706', amberBg: 'rgba(217, 119, 6, 0.12)', amberInk: '#8a5a10'
+      bg: '#f8f8f0', card: 'rgb(247, 243, 223)', teal: '#19c8b9', ink: '#794f27', sub: '#9f927d',
+      ok: '#4e8f1c', warn: '#8a6a10', border: '#c4b89e', amberBg: 'rgba(245, 195, 28, 0.28)', amberInk: '#8a6a10'
     };
+    var FONT = 'Nunito, "PingFang SC", "Microsoft YaHei", sans-serif';
 
     var mg = document.createElement('canvas');
     mg.width = W;
@@ -464,16 +465,16 @@
     var sumText = summaryText(bundle);
     var nameText = ctx.name ? '「' + ctx.name + '」' : '';
     ops.push({ h: 132, fn: function (g) {
-      g.fillStyle = COL.coral;
+      g.fillStyle = COL.teal;
       g.fillRect(0, 0, W, 132);
       g.fillStyle = '#ffffff';
-      g.font = 'bold 36px sans-serif';
+      g.font = 'bold 36px ' + FONT;
       g.fillText('谷圈限购计算器', pad, 56);
       var ty = 56;
-      if (nameText) { g.font = '18px sans-serif'; g.globalAlpha = 0.9; g.fillText(nameText, pad, 86); ty = 86; g.globalAlpha = 1; }
-      g.font = '17px sans-serif';
+      if (nameText) { g.font = '18px ' + FONT; g.globalAlpha = 0.9; g.fillText(nameText, pad, 86); ty = 86; g.globalAlpha = 1; }
+      g.font = '17px ' + FONT;
       g.globalAlpha = 0.95;
-      wrapLines(mg, sumText, '17px sans-serif', W - 2 * pad).slice(0, 2).forEach(function (line, i) {
+      wrapLines(mg, sumText, '17px ' + FONT, W - 2 * pad).slice(0, 2).forEach(function (line, i) {
         g.fillText(line, pad, ty + 26 + i * 22);
       });
       g.globalAlpha = 1;
@@ -505,41 +506,44 @@
         rrPath(g, pad, y, W - 2 * pad, cardH, 18);
         g.fillStyle = COL.card;
         g.fill();
+        g.strokeStyle = COL.border;
+        g.lineWidth = 3;
+        g.stroke();
         var hy = y + 18 + 26;
         g.fillStyle = COL.ink;
-        g.font = 'bold 26px sans-serif';
+        g.font = 'bold 26px ' + FONT;
         g.fillText('账号 ' + a.index, innerX, hy);
         var xr = W - pad - 20;
         var shipText = a.reached ? '已达包邮' : (ctx.free > 0 ? '差 ' + fmtMoney(a.diff) : '');
         if (shipText) {
           g.fillStyle = a.reached ? COL.ok : COL.warn;
-          g.font = 'bold 19px sans-serif';
+          g.font = 'bold 19px ' + FONT;
           var sw = g.measureText(shipText).width;
           g.fillText(shipText, xr - sw, hy);
           xr -= sw + 16;
         }
         g.fillStyle = COL.ink;
-        g.font = 'bold 24px sans-serif';
+        g.font = 'bold 24px ' + FONT;
         var tw = g.measureText(fmtMoney(a.total)).width;
         g.fillText(fmtMoney(a.total), xr - tw, hy);
         var iy = y + 18 + 36 + 6;
         rows.forEach(function (r) {
           g.fillStyle = COL.ink;
-          g.font = '20px sans-serif';
+          g.font = '20px ' + FONT;
           g.fillText(r.name, innerX, iy + 20);
           var aw = g.measureText(r.amt).width;
           g.fillText(r.amt, W - pad - 20 - aw, iy + 20);
           iy += 30;
           if (r.orig != null) {
             g.fillStyle = COL.sub;
-            g.font = '15px sans-serif';
+            g.font = '15px ' + FONT;
             var ow = g.measureText(r.origText).width;
             g.fillText(r.origText, W - pad - 20 - ow, iy + 2);
             iy += 20;
           }
         });
         g.fillStyle = COL.sub;
-        g.font = '15px sans-serif';
+        g.font = '15px ' + FONT;
         g.fillText(footText, innerX, y + cardH - 14);
       } });
     });
@@ -548,14 +552,14 @@
     if (result.remaining && result.remaining.length) {
       var remainText = '⚠️ 剩余未分配（受限购 / 种类上限装不下，需加账号或放宽限购）：'
         + result.remaining.map(function (r) { return r.type + ' ×' + r.qty; }).join('，');
-      var lines = wrapLines(mg, remainText, '17px sans-serif', innerW);
+      var lines = wrapLines(mg, remainText, '17px ' + FONT, innerW);
       var boxH = 16 + lines.length * 24 + 16;
       ops.push({ h: boxH + 14, fn: function (g, y) {
         rrPath(g, pad, y, W - 2 * pad, boxH, 14);
         g.fillStyle = COL.amberBg;
         g.fill();
         g.fillStyle = COL.amberInk;
-        g.font = '17px sans-serif';
+        g.font = '17px ' + FONT;
         lines.forEach(function (line, i) { g.fillText(line, innerX, y + 16 + 18 + i * 24); });
       } });
     }
@@ -563,7 +567,7 @@
     // 落款
     ops.push({ h: 56, fn: function (g, y) {
       g.fillStyle = COL.sub;
-      g.font = '14px sans-serif';
+      g.font = '14px ' + FONT;
       g.textAlign = 'center';
       g.fillText('谷圈限购计算器 · ' + dateStr(), W / 2, y + 28);
       g.textAlign = 'left';

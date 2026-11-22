@@ -150,31 +150,31 @@ function downsample(src, factor) {
   return out;
 }
 
-// —— 调色板（与 Aoi-system 珊瑚 #cc785c 同源）——
-const CORAL = [204, 120, 92];
-const CORAL_DEEP = [169, 92, 64];
-const CORAL_LIGHT_TOP = [214, 135, 103];
-const CORAL_LIGHT_BOTTOM = [192, 106, 78];
-const CORAL_SOFT = [246, 231, 224];
-const CREAM = [250, 247, 242];
+// —— 调色板（animal-island-ui 岛屿配色（薄荷青 #19c8b9 + 奶油羊皮纸））——
+const TEAL = [25, 200, 185];
+const TEAL_DEEP = [17, 168, 155];
+const TEAL_TOP = [61, 212, 198];
+const TEAL_BOTTOM = [17, 168, 155];
+const TEAL_SOFT = [230, 249, 246];
+const CREAM = [248, 248, 240];
 const WHITE = [255, 255, 255];
-const BAR = [233, 225, 217];
-const AMBER = [224, 160, 60];
+const BAR = [212, 201, 180];
+const YELLOW = [247, 205, 103];
 
-// —— 图标 512×512：珊瑚渐变底 + 白色计算器（显示屏 + 按键阵）——
+// —— 图标 512×512：薄荷青渐变底 + 白色计算器（显示屏 + 按键阵）——
 // 所有设计坐标均在最终输出空间（512），绘制时乘以超采样系数 F
 function drawIcon() {
   const F = 2;
   const c = new Raster(512 * F, 512 * F);
-  c.vGradient(CORAL_LIGHT_TOP, CORAL_LIGHT_BOTTOM);
+  c.vGradient(TEAL_TOP, TEAL_BOTTOM);
   const s = F;
 
   // 计算器机身（白）
   c.fillRoundRect(146 * s, 126 * s, 366 * s, 396 * s, 36 * s, WHITE);
-  // 显示屏（浅珊瑚底）
-  c.fillRoundRect(168 * s, 154 * s, 344 * s, 204 * s, 12 * s, CORAL_SOFT);
-  // 屏上数字条（珊瑚，右对齐）
-  c.fillRoundRect(250 * s, 170 * s, 328 * s, 188 * s, 9 * s, CORAL);
+  // 显示屏（浅青底）
+  c.fillRoundRect(168 * s, 154 * s, 344 * s, 204 * s, 12 * s, TEAL_SOFT);
+  // 屏上数字条（薄荷青，右对齐）
+  c.fillRoundRect(250 * s, 170 * s, 328 * s, 188 * s, 9 * s, TEAL);
   // 按键阵 3×3（末位深色点缀）
   const cell = 44, gap = 12, x0 = 178;
   const rows = [224, 280, 336];
@@ -182,14 +182,14 @@ function drawIcon() {
     for (let rx = 0; rx < 3; rx++) {
       const x = x0 + rx * (cell + gap);
       const y = rows[ry];
-      const color = (ry === 2 && rx === 2) ? CORAL_DEEP : CORAL;
+      const color = (ry === 2 && rx === 2) ? TEAL_DEEP : TEAL;
       c.fillRoundRect(x * s, y * s, (x + cell) * s, (y + cell) * s, 11 * s, color);
     }
   }
   return downsample(c, F);
 }
 
-// —— 封面 750×1000（3:4）：奶油底 + 珊瑚渐变圆角主卡（计算器）+ 三行账号卡 ——
+// —— 封面 750×1000（3:4）：奶油羊皮纸底 + 薄荷青渐变圆角主卡（计算器）+ 三行账号卡 ——
 // 渐变圆角卡实现：先铺矩形渐变，再用 SDF 判定把圆角外四角涂回背景色
 function drawCover() {
   const F = 2;
@@ -198,8 +198,8 @@ function drawCover() {
   const s = F;
 
   // 主卡区域渐变（矩形铺色）+ 擦掉圆角外四角
-  const top = [214, 135, 103];
-  const bottom = [192, 106, 78];
+  const top = [61, 212, 198];
+  const bottom = [17, 168, 155];
   const y0 = 80, y1 = 440, x0 = 75, x1 = 675, r = 40;
   for (let y = y0 * s; y < y1 * s; y++) {
     const t = (y - y0 * s) / ((y1 - y0) * s);
@@ -227,9 +227,9 @@ function drawCover() {
   // 计算器机身（白）
   c.fillRoundRect(175 * s, 125 * s, 575 * s, 395 * s, 32 * s, WHITE);
   // 显示屏
-  c.fillRoundRect(200 * s, 150 * s, 550 * s, 205 * s, 12 * s, CORAL_SOFT);
+  c.fillRoundRect(200 * s, 150 * s, 550 * s, 205 * s, 12 * s, TEAL_SOFT);
   // 数字条
-  c.fillRoundRect(350 * s, 167 * s, 520 * s, 187 * s, 10 * s, CORAL);
+  c.fillRoundRect(350 * s, 167 * s, 520 * s, 187 * s, 10 * s, TEAL);
   // 按键 3×2
   const cell = 60, gap = 16, bx = 269;
   const btnRows = [230, 306];
@@ -237,7 +237,7 @@ function drawCover() {
     for (let rx = 0; rx < 3; rx++) {
       const x = bx + rx * (cell + gap);
       const y = btnRows[ry];
-      const color = (ry === 1 && rx === 2) ? CORAL_DEEP : CORAL;
+      const color = (ry === 1 && rx === 2) ? TEAL_DEEP : TEAL;
       c.fillRoundRect(x * s, y * s, (x + cell) * s, (y + cell) * s, 13 * s, color);
     }
   }
@@ -250,17 +250,17 @@ function drawCover() {
     c.fillRoundRect(73 * s, (ry - 2) * s, 677 * s, (ry + rowH + 2) * s, 27 * s, BAR);
     c.fillRoundRect(75 * s, ry * s, 675 * s, (ry + rowH) * s, 25 * s, WHITE);
     // 账号圆点
-    c.fillCircle(120 * s, (ry + rowH / 2) * s, 15 * s, CORAL);
+    c.fillCircle(120 * s, (ry + rowH / 2) * s, 15 * s, TEAL);
     // 信息条
     const barW = i === 2 ? 240 : 280;
     c.fillRoundRect(155 * s, (ry + 19) * s, (155 + barW) * s, (ry + 31) * s, 6 * s, BAR);
     // 金额胶囊：前两行珊瑚（达标），末行琥珀（差额）
-    const pillColor = i === 2 ? AMBER : CORAL;
+    const pillColor = i === 2 ? YELLOW : TEAL;
     c.fillRoundRect(575 * s, (ry + 14) * s, 645 * s, (ry + 36) * s, 11 * s, pillColor);
   });
 
   // 底部装饰胶囊（暗示主按钮）
-  c.fillRoundRect(280 * s, 720 * s, 470 * s, 760 * s, 20 * s, CORAL);
+  c.fillRoundRect(280 * s, 720 * s, 470 * s, 760 * s, 20 * s, TEAL);
 
   return downsample(c, F);
 }

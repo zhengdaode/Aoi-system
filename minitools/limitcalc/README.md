@@ -3,6 +3,12 @@
 从 Aoi-system 主系统「工具 → 限购计算器」（`js/limits.js`）单独拆出的离线小工具，
 发布到小红书小工具（创服平台）供谷圈团长在手机上直接分单。
 
+**UI 设计**：采用 [animal-island-ui](https://github.com/guokaigdg/animal-island-ui)
+（MIT）的岛屿设计语言——薄荷青 `#19c8b9` 主色 + 暖棕文字 + 奶油羊皮纸底 +
+药丸形输入/按钮 + 主按钮 3D 底影（`0 5px 0 0 #bdaea0`）+ 缎带标题 + 波点壁纸，
+token 取自其 `docs/design-system/css-variables.md`；字体 Nunito + Noto Sans SC
+简中子集（500/700）取自该包随包分发的 woff2（共 ~2.3MB 离线打包）。
+
 ## 功能
 
 - 方案设置：方案名称 / 每单包邮线（¥/JP¥/₩ 三种币种）/ 可用账号数 / 每账号最多买几种

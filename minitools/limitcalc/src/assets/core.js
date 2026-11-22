@@ -203,7 +203,29 @@
     return result;
   }
 
-  var LimitCalcCore = { planCore: planCore };
+  // —— 币种换算（与主系统 Aoi.calc 同口径移植，rates 由界面层传入）——
+  // rates: { jpy: { rate, markup }, krw: { rate, markup } }
+
+  // 0.5 圆整：小数部分 ≤0.3 → 0；0.4~0.6 → 0.5；≥0.7 → 1
+  function roundHalf(n) {
+    // 先归一到两位小数，避免浮点误差（如 1.3 - 1 === 0.30000000000000004）
+    var cents = Math.round(n * 100) / 100;
+    var whole = Math.floor(cents);
+    var frac = Math.round((cents - whole) * 100) / 100;
+    if (frac <= 0.3) return whole;
+    if (frac >= 0.7) return whole + 1;
+    return whole + 0.5;
+  }
+
+  // 外币 → 人民币：外币 × (汇率 + 加价) 后 0.5 圆整；人民币原样返回
+  function toRmb(price, currency, rates) {
+    if (!currency || currency === 'cny') return price;
+    var c = rates && rates[currency];
+    if (!c) return price;
+    return roundHalf(price * (c.rate + c.markup));
+  }
+
+  var LimitCalcCore = { planCore: planCore, roundHalf: roundHalf, toRmb: toRmb };
 
   // 浏览器（经典脚本挂 window）与 Node 测试（vitest 直接 require）双通道
   if (typeof window !== 'undefined') window.LimitCalcCore = LimitCalcCore;

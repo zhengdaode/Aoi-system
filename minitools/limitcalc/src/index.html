@@ -40,8 +40,15 @@
       </div>
       <div class="field-row">
         <div class="field">
-          <label class="flabel" for="inFree">每单包邮线（¥）</label>
-          <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
+          <label class="flabel" for="inFree">每单包邮线</label>
+          <div class="field-inline">
+            <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
+            <select id="freeCur" class="sel sel-field">
+              <option value="cny" selected>¥ 人民币</option>
+              <option value="jpy">JP¥ 日元</option>
+              <option value="krw">₩ 韩元</option>
+            </select>
+          </div>
         </div>
         <div class="field">
           <label class="flabel" for="inAccounts">可用账号数</label>
@@ -52,6 +59,22 @@
           <input id="inMaxTypes" type="number" inputmode="numeric" min="0" step="1" class="input" placeholder="不限" />
         </div>
       </div>
+    </section>
+
+    <!-- 汇率设置（外币 → 人民币，与主系统计算器同口径） -->
+    <section class="card">
+      <h2 class="card-title">汇率设置</h2>
+      <div class="rate-row">
+        <span class="rate-cur">JP¥ 日元</span>
+        <label class="pnum"><span class="pnum-label">汇率</span><input id="jpyRate" type="number" inputmode="decimal" min="0" step="0.0001" class="input" value="0.048" /></label>
+        <label class="pnum"><span class="pnum-label">加价</span><input id="jpyMarkup" type="number" inputmode="decimal" min="0" step="0.0001" class="input" value="0.005" /></label>
+      </div>
+      <div class="rate-row">
+        <span class="rate-cur">₩ 韩元</span>
+        <label class="pnum"><span class="pnum-label">汇率</span><input id="krwRate" type="number" inputmode="decimal" min="0" step="0.0001" class="input" value="0.0052" /></label>
+        <label class="pnum"><span class="pnum-label">加价</span><input id="krwMarkup" type="number" inputmode="decimal" min="0" step="0.0001" class="input" value="0.0001" /></label>
+      </div>
+      <p class="tiny-tip">外币单价 ×（汇率 + 加价）折成人民币参与计算，结果 0.5 圆整。</p>
     </section>
 
     <!-- 商品清单 -->
@@ -75,6 +98,7 @@
       <div id="resultSummary" class="r-summary"></div>
       <div id="resultCards" class="r-cards"></div>
       <div id="resultRemain" class="r-remain" hidden></div>
+      <button id="btnExport" type="button" class="btn-ghost btn-export">保存结果图片到相册</button>
       <p class="tiny-tip">结果文字可长按选中复制。</p>
     </section>
 

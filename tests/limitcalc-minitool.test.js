@@ -98,6 +98,19 @@ describe('LimitCalcCore.planCore 算法移植（与 Aoi.limits.planCore 同源�
     expect(r.accounts[0].reached).toBe(true);
   });
 
+  it('roundHalf 0.5 圆整与 toRmb 汇率换算（与 Aoi.calc 同口径移植）', () => {
+    expect(CORE.roundHalf(10.3)).toBe(10);
+    expect(CORE.roundHalf(10.4)).toBe(10.5);
+    expect(CORE.roundHalf(10.6)).toBe(10.5);
+    expect(CORE.roundHalf(10.7)).toBe(11);
+    const rates = { jpy: { rate: 0.048, markup: 0.005 }, krw: { rate: 0.0052, markup: 0.0001 } };
+    expect(CORE.toRmb(100, 'cny', rates)).toBe(100);       // 人民币原样
+    expect(CORE.toRmb(500, 'jpy', rates)).toBe(26.5);      // 500 × 0.053 = 26.5
+    expect(CORE.toRmb(100, 'jpy', rates)).toBe(5);         // 5.3 → 0.5 圆整 → 5
+    expect(CORE.toRmb(1000, 'krw', rates)).toBe(5);        // 5.3 → 5
+    expect(CORE.toRmb(800, 'jpy', rates)).toBe(42.5);      // 42.4 → 42.5
+  });
+
   it('core.js 带浏览器 + CommonJS 双通道导出', () => {
     expect(typeof win.LimitCalcCore.planCore).toBe('function');
     expect(coreSrc).toContain('module.exports');
@@ -244,6 +257,48 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     expect(doc.getElementById('resultRemain').hidden).toBe(false);
     expect(doc.getElementById('resultRemain').textContent).toContain('剩余未分配');
     expect(doc.getElementById('resultRemain').textContent).toContain('色纸');
+  });
+
+  it('外币单价商品：折算人民币参与计算并保留原币展示', () => {
+    win.confirm = function () { return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '吧唧';
+    row.querySelector('.p-qty').value = '2';
+    row.querySelector('.p-price').value = '500';
+    row.querySelector('.p-cur').value = 'jpy';
+    doc.getElementById('inFree').value = '0';
+    doc.getElementById('inAccounts').value = '1';
+    doc.getElementById('btnCompute').click();
+    const card = doc.querySelector('#resultCards .acard');
+    expect(card.textContent).toContain('¥53.00');      // 500×0.053=26.5/件 → ×2 = 53
+    expect(card.textContent).toContain('JP¥1,000');    // 原币 500×2，千分位
+    expect(card.textContent).toContain('外币合计');
+    expect(doc.getElementById('resultSummary').textContent).toContain('分配 1 个账号');
+  });
+
+  it('包邮线外币：按汇率折算人民币判断包邮状态', () => {
+    win.confirm = function () { return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '立牌';
+    row.querySelector('.p-qty').value = '1';
+    row.querySelector('.p-price').value = '10000';
+    row.querySelector('.p-cur').value = 'jpy';
+    doc.getElementById('inFree').value = '800';
+    doc.getElementById('freeCur').value = 'jpy';
+    doc.getElementById('inAccounts').value = '1';
+    doc.getElementById('btnCompute').click();
+    // 包邮线 JP¥800 × 0.053 = 42.4 → 0.5 圆整 42.5；商品 10000×0.053=530 → 达标
+    const card = doc.querySelector('#resultCards .acard');
+    expect(card.textContent).toContain('已达包邮');
+    expect(doc.getElementById('resultSummary').textContent).toContain('JP¥800');
+    expect(doc.getElementById('resultSummary').textContent).toContain('¥42.50');
+  });
+
+  it('导出：无 Canvas / 容器桥的环境给出可读提示', () => {
+    doc.getElementById('btnExport').click();   // jsdom 无 2D context → 生成图片提示
+    expect(doc.getElementById('toast').textContent).toContain('不支持');
   });
 
   it('计算引擎未加载时启动给出可读失败提示并禁用计算按钮', async () => {

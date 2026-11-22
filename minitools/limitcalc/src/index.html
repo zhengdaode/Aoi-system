@@ -25,7 +25,6 @@
   <div class="wrap">
     <header class="hero">
       <h1>谷圈限购计算器</h1>
-      <p class="hero-sub">按限购把排单数量分给多个账号，自动调剂凑包邮</p>
     </header>
 
     <noscript>
@@ -37,7 +36,7 @@
       <h2 class="card-title">方案设置</h2>
       <div class="field">
         <label class="flabel" for="inName">方案名称（选填）</label>
-        <input id="inName" type="text" class="input" placeholder="如：8.23 涩谷痛包团" maxlength="30" />
+        <input id="inName" type="text" class="input" maxlength="30" />
       </div>
       <div class="field-row">
         <div class="field">
@@ -63,7 +62,6 @@
       </div>
       <div id="productList"></div>
       <div class="row-actions">
-        <button id="btnExample" type="button" class="btn-ghost btn-sm">填入示例</button>
         <button id="btnClear" type="button" class="btn-ghost btn-sm btn-danger-ghost">清空</button>
       </div>
       <p class="tiny-tip">限购留空 = 该商品单账号不限购；账号金额 = 单价 × 件数。</p>

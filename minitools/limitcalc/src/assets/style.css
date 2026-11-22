@@ -28,7 +28,6 @@ html { touch-action: manipulation; }
 /* —— 首屏头部 —— */
 .hero { padding: 20px 4px 4px; }
 .hero h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
-.hero-sub { margin-top: 6px; font-size: 13px; color: var(--sub); }
 
 .noscript-tip {
   margin-top: 12px;

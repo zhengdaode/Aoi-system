@@ -133,7 +133,6 @@
     var top = el('div', 'prow-top');
     var name = el('input', 'input p-name');
     name.type = 'text';
-    name.placeholder = '商品名（如 吧唧·小夜灯）';
     name.maxLength = 30;
     name.value = (data && data.name) || '';
     var del = el('button', 'p-del', '×');
@@ -164,7 +163,6 @@
       scheduleSave();
     });
 
-    $('btnExample').addEventListener('click', fillExample);
     $('btnClear').addEventListener('click', onClear);
     $('btnCompute').addEventListener('click', onCompute);
 
@@ -184,23 +182,6 @@
       $(id).addEventListener('input', scheduleSave);
       $(id).addEventListener('change', scheduleSave);
     });
-  }
-
-  var EXAMPLE = {
-    settings: { name: '示例：8.23 涩谷痛包团', free: '168', accounts: '4', maxTypes: '' },
-    products: [
-      { name: '痛包·单肩', qty: '4', price: '128', limit: '1' },
-      { name: '吧唧·角色A', qty: '8', price: '25', limit: '2' },
-      { name: '立牌·亚克力', qty: '6', price: '58', limit: '2' },
-      { name: '色纸·收藏卡', qty: '10', price: '12', limit: '3' }
-    ]
-  };
-
-  function fillExample() {
-    applySettings(EXAMPLE.settings);
-    renderProducts(EXAMPLE.products);
-    toast('已填入示例数据，可直接计算');
-    saveNow();
   }
 
   function onClear() {

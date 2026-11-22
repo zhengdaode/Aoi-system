@@ -177,23 +177,41 @@ describe('小工具容器合规（zip-artifact-spec / device-capabilities / js-c
     // 安全区必须用 var(--safe-area-inset-*, env(...)) 组合而非裸 env
     expect(cssCode).toMatch(/var\(--safe-area-inset-bottom,\s*env\(safe-area-inset-bottom/);
   });
+
+  it('预览反馈修订已落实：示例功能与首屏说明占位文案全部移除', () => {
+    expect(htmlSrc).not.toContain('填入示例');
+    expect(htmlSrc).not.toContain('按限购把排单数量分给多个账号');
+    expect(htmlSrc).not.toContain('如：8.23');
+    expect(htmlSrc).not.toContain('如 吧唧');
+    expect(htmlSrc).not.toContain('hero-sub');
+    expect(appSrc).not.toMatch(/fillExample|EXAMPLE/);
+    expect(cssSrc).not.toContain('hero-sub');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
-describe('jsdom 冒烟：示例数据 → 计算 → 结果渲染', () => {
-  it('示例数据按钮填充 4 个商品与设置，账号数为空时计算给出提示', () => {
-    doc.getElementById('btnExample').click();
-    expect(doc.getElementById('inAccounts').value).toBe('4');
-    expect(doc.querySelectorAll('#productList .prow')).toHaveLength(4);
-    // 账号数已由示例填充 → 直接计算
+describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
+  it('手动填写商品与设置后计算渲染结果（算法用例同源数据：35/35/30 全员包邮）', () => {
+    // 两行商品：徽章×5 ¥10、色纸×10 ¥5，包邮 30、账号 3
+    const row0 = doc.querySelector('#productList .prow');
+    row0.querySelector('.p-name').value = '徽章';
+    row0.querySelector('.p-qty').value = '5';
+    row0.querySelector('.p-price').value = '10';
+    doc.getElementById('btnAdd').click();
+    const row1 = doc.querySelector('#productList .prow:last-child');
+    row1.querySelector('.p-name').value = '色纸';
+    row1.querySelector('.p-qty').value = '10';
+    row1.querySelector('.p-price').value = '5';
+    doc.getElementById('inFree').value = '30';
+    doc.getElementById('inAccounts').value = '3';
     doc.getElementById('btnCompute').click();
     const box = doc.getElementById('resultBox');
     expect(box.hidden).toBe(false);
     expect(box.textContent).toContain('账号 1');
     expect(box.textContent).toContain('已达包邮');
-    expect(doc.getElementById('resultSummary').textContent).toContain('4/4 达标包邮');
-    // 4 个账号卡 + 无剩余未分配
-    expect(doc.querySelectorAll('#resultCards .acard')).toHaveLength(4);
+    expect(doc.getElementById('resultSummary').textContent).toContain('3/3 达标包邮');
+    // 3 个账号卡 + 无剩余未分配
+    expect(doc.querySelectorAll('#resultCards .acard')).toHaveLength(3);
     expect(doc.getElementById('resultRemain').hidden).toBe(true);
     // 存储不可用（无 window.xhs）→ 保存状态给出说明
     expect(doc.getElementById('saveStatus').textContent).toContain('不支持本地保存');

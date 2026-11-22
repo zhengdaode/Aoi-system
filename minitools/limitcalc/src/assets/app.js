@@ -255,7 +255,11 @@
     var del = el('button', 'p-del', '×');
     del.type = 'button';
     del.setAttribute('aria-label', '删除该商品');
+    var copyBtn = el('button', 'p-copy', '复制');
+    copyBtn.type = 'button';
+    copyBtn.setAttribute('aria-label', '复制该商品：新增一行相同信息，方便添加类似商品');
     top.appendChild(name);
+    top.appendChild(copyBtn);
     top.appendChild(del);
     var nums = el('div', 'prow-nums');
     nums.appendChild(numCell('数量', 'p-qty', '1', data ? data.qty : '', '1', 'numeric', null));
@@ -304,6 +308,16 @@
           picker.value = '';
           picker.click();
         }
+        return;
+      }
+      var copyBtn = e.target.closest ? e.target.closest('.p-copy') : null;
+      if (copyBtn) {
+        var crow = e.target.closest('.prow');
+        if (!crow) return;
+        var newRow = makeRow(readRow(crow));
+        if (crow.nextSibling) crow.parentNode.insertBefore(newRow, crow.nextSibling);
+        else list.appendChild(newRow);
+        scheduleSave();
         return;
       }
       var btn = e.target.closest ? e.target.closest('.p-del') : null;
@@ -372,10 +386,43 @@
         price: CORE.toRmb(price, cur, rates),   // 折算人民币参与分配与包邮判断
         limit: isNaN(limit) || limit <= 0 ? null : limit
       });
-      meta[type + '|'] = { currency: cur, unit: price, img: r.img || '' };   // 原币单价 + 商品图（展示用）
+      if (!meta[type + '|']) meta[type + '|'] = { currency: cur, unit: price, img: r.img || '' };   // 原币单价 + 商品图（首行为准，展示用）
     }
     if (!products.length) { toast('请先添加商品并填写数量'); return null; }
-    return { products: products, meta: meta };
+
+    // 完全一致检测（名称/数量/折算单价/限购全同）：提醒防重复录入
+    var seen = {};
+    var dupCount = 0;
+    var dupExample = '';
+    products.forEach(function (p) {
+      var sig = p.type + '|' + p.qty + '|' + p.price + '|' + (p.limit == null ? '' : p.limit);
+      if (seen[sig]) {
+        dupCount++;
+        if (!dupExample) dupExample = p.type + ' ×' + p.qty + ' · ' + fmtMoney(p.price);
+      }
+      seen[sig] = true;
+    });
+
+    // 同名合并：数量累加、单价按金额加权平均、限购取最严 —— 结果条目与账号总额才能对上
+    var merged = {};
+    var order = [];
+    products.forEach(function (p) {
+      if (!merged[p.type]) {
+        merged[p.type] = { type: p.type, model: '', qty: p.qty, price: p.price, limit: p.limit };
+        order.push(p.type);
+      } else {
+        var m = merged[p.type];
+        m.price = Math.round((m.price * m.qty + p.price * p.qty) / (m.qty + p.qty) * 100) / 100;
+        m.qty += p.qty;
+        if (p.limit != null) m.limit = (m.limit == null) ? p.limit : Math.min(m.limit, p.limit);
+      }
+    });
+    return {
+      products: order.map(function (t) { return merged[t]; }),
+      meta: meta,
+      dupCount: dupCount,
+      dupExample: dupExample
+    };
   }
 
   var lastResult = null;
@@ -478,6 +525,11 @@
     var rates = readRates();
     var collected = collectProductsForCompute(rates);
     if (!collected) return;
+    if (collected.dupCount > 0 && typeof window.confirm === 'function') {
+      var ok = window.confirm('检测到 ' + collected.dupCount + ' 个与前面完全一致的商品（如「'
+        + collected.dupExample + '」），计算时会合并为同一条。确认没有重复录入？');
+      if (!ok) return;
+    }
     var accounts = parseInt($('inAccounts').value, 10);
     if (!(accounts >= 1)) { toast('请填写可用账号数（≥1）'); $('inAccounts').focus(); return; }
     var free = parseFloat($('inFree').value);

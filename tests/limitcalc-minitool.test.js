@@ -21,6 +21,7 @@ const appSrc = readFileSync(resolve(SRC, 'assets/app.js'), 'utf8');
 const dom = new JSDOM(htmlSrc, { runScripts: 'outside-only', url: 'https://minitool.local/' });
 const win = dom.window;
 const doc = win.document;
+let lastConfirmMsg = '';
 await new Promise((r) => {
   if (doc.readyState !== 'loading') r();
   else win.addEventListener('DOMContentLoaded', r);
@@ -317,6 +318,75 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     const img = doc.querySelector('#resultCards .acard-item-img');
     expect(img).toBeTruthy();
     expect(img.getAttribute('src')).toContain('data:image/gif');
+  });
+
+  it('复制商品：整行复用（含图片）并插入其后', () => {
+    win.confirm = function (msg) { lastConfirmMsg = msg; return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '吧唧';
+    row.querySelector('.p-qty').value = '2';
+    row.querySelector('.p-price').value = '10';
+    row.querySelector('.p-cur').value = 'jpy';
+    row._imgData = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    row.querySelector('.p-copy').click();
+    const rows = doc.querySelectorAll('#productList .prow');
+    expect(rows).toHaveLength(2);
+    expect(rows[1].querySelector('.p-name').value).toBe('吧唧');
+    expect(rows[1].querySelector('.p-qty').value).toBe('2');
+    expect(rows[1].querySelector('.p-price').value).toBe('10');
+    expect(rows[1].querySelector('.p-cur').value).toBe('jpy');
+    expect(rows[1]._imgData).toContain('data:image/gif');
+    expect(rows[1].querySelector('.p-thumb-img')).toBeTruthy();
+  });
+
+  it('完全一致商品：计算前确认，取消不计算，确认后合并为一条', () => {
+    win.confirm = function (msg) { lastConfirmMsg = msg; return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '吧唧';
+    row.querySelector('.p-qty').value = '2';
+    row.querySelector('.p-price').value = '10';
+    doc.getElementById('btnAdd').click();
+    const row2 = doc.querySelector('#productList .prow:last-child');
+    row2.querySelector('.p-name').value = '吧唧';
+    row2.querySelector('.p-qty').value = '2';
+    row2.querySelector('.p-price').value = '10';
+    doc.getElementById('inFree').value = '0';
+    doc.getElementById('inAccounts').value = '1';
+    // 取消确认 → 不出结果
+    win.confirm = function (msg) { lastConfirmMsg = msg; return false; };
+    doc.getElementById('btnCompute').click();
+    expect(doc.getElementById('resultBox').hidden).toBe(true);
+    // 确认 → 合并为同一条 ×4
+    win.confirm = function (msg) { lastConfirmMsg = msg; return true; };
+    doc.getElementById('btnCompute').click();
+    expect(lastConfirmMsg).toContain('完全一致');
+    expect(doc.querySelectorAll('#resultCards .acard')).toHaveLength(1);
+    const card = doc.querySelector('#resultCards .acard');
+    expect(card.textContent).toContain('吧唧 ×4');
+    expect(card.textContent).toContain('¥40.00');
+  });
+
+  it('同名不同价商品：自动加权合并为一条（无需确认）', () => {
+    win.confirm = function (msg) { lastConfirmMsg = msg; return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '徽章';
+    row.querySelector('.p-qty').value = '1';
+    row.querySelector('.p-price').value = '10';
+    doc.getElementById('btnAdd').click();
+    const row2 = doc.querySelector('#productList .prow:last-child');
+    row2.querySelector('.p-name').value = '徽章';
+    row2.querySelector('.p-qty').value = '1';
+    row2.querySelector('.p-price').value = '20';
+    doc.getElementById('inAccounts').value = '1';
+    doc.getElementById('btnCompute').click();
+    // 单价不同 → 非完全一致，不触发确认弹窗
+    expect(lastConfirmMsg).not.toContain('完全一致');
+    const card = doc.querySelector('#resultCards .acard');
+    expect(card.textContent).toContain('徽章 ×2');
+    expect(card.textContent).toContain('¥30.00');   // 加权均价 15 × 2
   });
 
   it('计算引擎未加载时启动给出可读失败提示并禁用计算按钮', async () => {

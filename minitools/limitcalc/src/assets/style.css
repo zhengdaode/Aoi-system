@@ -139,9 +139,9 @@ body {
 .card-head .card-title { flex: 1 1 auto; min-width: 0; }
 
 /* —— 表单（药丸输入：奶油黄底 + 2.5px 边框 + 3D 底影，焦点黄圈）—— */
-.field { margin-top: 12px; min-width: 0; }
-.field-row { display: flex; flex-wrap: wrap; }
-.field-row .field { flex: 1 1 30%; }
+.field { margin-top: 14px; min-width: 0; }
+.field-row { display: flex; }
+.field-row .field { flex: 1 1 0; }
 .field-row .field + .field { margin-left: 10px; }
 
 .flabel {
@@ -177,6 +177,11 @@ body {
 .input::placeholder { color: var(--ink-disabled); font-weight: 400; }
 
 .sel { padding: 0 8px; }
+
+/* 金额 + 币种并排（币种固定宽，金额吃剩余；flex-basis 0 防堆叠） */
+.field-inline { display: flex; }
+.field-inline .input { flex: 1 1 0; min-width: 0; }
+.sel-field { flex: 0 0 auto; width: 118px; margin-left: 8px; }
 
 /* —— 商品行（副底色小卡；缩略图 + 名称 + 删除）—— */
 .prow {
@@ -225,6 +230,20 @@ body {
   transition: all 0.15s;
 }
 .p-del:active { background: rgba(224, 90, 90, 0.12); }
+.p-copy {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 10px;
+  margin-left: 8px;
+  border: 2px solid var(--border);
+  border-radius: 50px;
+  background: #fffdf4;
+  color: var(--ink-body);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.15s;
+}
+.p-copy:active { background: var(--teal-bg); }
 
 /* 数字三联：flex-basis 0 均分（单价列含币种下拉，占 1.7 份），杜绝窄屏挤压重叠 */
 .prow-nums { display: flex; margin-top: 8px; }

@@ -38,18 +38,18 @@
         <label class="flabel" for="inName">方案名称（选填）</label>
         <input id="inName" type="text" class="input" maxlength="30" />
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label class="flabel" for="inFree">每单包邮线</label>
-          <div class="field-inline">
-            <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
-            <select id="freeCur" class="sel sel-field">
-              <option value="cny" selected>¥ 人民币</option>
-              <option value="jpy">JP¥ 日元</option>
-              <option value="krw">₩ 韩元</option>
-            </select>
-          </div>
+      <div class="field">
+        <label class="flabel" for="inFree">每单包邮线</label>
+        <div class="field-inline">
+          <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
+          <select id="freeCur" class="sel sel-field">
+            <option value="cny" selected>¥ 人民币</option>
+            <option value="jpy">JP¥ 日元</option>
+            <option value="krw">₩ 韩元</option>
+          </select>
         </div>
+      </div>
+      <div class="field-row">
         <div class="field">
           <label class="flabel" for="inAccounts">可用账号数</label>
           <input id="inAccounts" type="number" inputmode="numeric" min="1" step="1" class="input" placeholder="如：4" />

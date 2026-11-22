@@ -75,6 +75,31 @@
 
   var miniTool = getMiniTool();
   var saveTimer = null;
+  var pickTarget = null;
+
+  // 选图压缩：最长边 240、JPEG q0.75 —— 平台存储单 key 上限 1MB，必须缩略后才能持久化
+  function shrinkImage(file, cb) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var max = 240;
+      var iw = img.width || 1;
+      var ih = img.height || 1;
+      var scale = Math.min(1, max / Math.max(iw, ih));
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(iw * scale));
+      c.height = Math.max(1, Math.round(ih * scale));
+      var g = c.getContext && c.getContext('2d');
+      if (!g) { URL.revokeObjectURL(url); cb(null); return; }
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      var out = null;
+      try { out = c.toDataURL('image/jpeg', 0.75); } catch (e) { out = null; }
+      cb(out);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
 
   function setSaveStatus(text) {
     var s = $('saveStatus');
@@ -157,7 +182,8 @@
       qty: row.querySelector('.p-qty').value,
       price: row.querySelector('.p-price').value,
       cur: row.querySelector('.p-cur').value,
-      limit: row.querySelector('.p-limit').value
+      limit: row.querySelector('.p-limit').value,
+      img: row._imgData || ''
     };
   }
 
@@ -198,9 +224,30 @@
     return wrap;
   }
 
+  function setThumb(row, imgData) {
+    var thumb = row.querySelector('.p-thumb');
+    if (!thumb) return;
+    thumb.textContent = '';
+    if (imgData) {
+      var im = el('img', 'p-thumb-img');
+      im.src = imgData;
+      im.alt = '';
+      thumb.appendChild(im);
+      thumb.classList.add('has-img');
+    } else {
+      thumb.appendChild(el('span', null, '＋'));
+      thumb.classList.remove('has-img');
+    }
+  }
+
   function makeRow(data) {
     var row = el('div', 'prow');
+    row._imgData = (data && data.img) || '';
     var top = el('div', 'prow-top');
+    var thumb = el('button', 'p-thumb');
+    thumb.type = 'button';
+    thumb.setAttribute('aria-label', '商品图片：点按选图，已设置则点按移除');
+    top.appendChild(thumb);
     var name = el('input', 'input p-name');
     name.type = 'text';
     name.maxLength = 30;
@@ -212,10 +259,13 @@
     top.appendChild(del);
     var nums = el('div', 'prow-nums');
     nums.appendChild(numCell('数量', 'p-qty', '1', data ? data.qty : '', '1', 'numeric', null));
-    nums.appendChild(numCell('单价', 'p-price', '0.01', data ? data.price : '', '0', 'decimal', currencySelect('p-cur', data ? data.cur : 'cny')));
+    var priceCell = numCell('单价', 'p-price', '0.01', data ? data.price : '', '0', 'decimal', currencySelect('p-cur', data ? data.cur : 'cny'));
+    priceCell.className += ' pnum-price';
+    nums.appendChild(priceCell);
     nums.appendChild(numCell('单账号限购', 'p-limit', '1', data ? data.limit : '', '不限', 'numeric', null));
     row.appendChild(top);
     row.appendChild(nums);
+    setThumb(row, row._imgData);
     return row;
   }
 
@@ -239,12 +289,43 @@
 
     var list = $('productList');
     list.addEventListener('click', function (e) {
+      var thumb = e.target.closest ? e.target.closest('.p-thumb') : null;
+      if (thumb) {
+        var trow = e.target.closest('.prow');
+        if (!trow) return;
+        if (trow._imgData) {
+          if (typeof window.confirm === 'function' && !window.confirm('移除该商品的图片？')) return;
+          trow._imgData = '';
+          setThumb(trow, '');
+          scheduleSave();
+        } else {
+          pickTarget = trow;
+          var picker = $('imgPicker');
+          picker.value = '';
+          picker.click();
+        }
+        return;
+      }
       var btn = e.target.closest ? e.target.closest('.p-del') : null;
       if (!btn) return;
       var row = e.target.closest('.prow');
       if (row && row.parentNode === list) list.removeChild(row);
       if (!list.querySelector('.prow')) list.appendChild(makeRow(null));
       scheduleSave();
+    });
+    $('imgPicker').addEventListener('change', function (e) {
+      var row = pickTarget;
+      pickTarget = null;
+      var input = e.target;
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!row || !file) return;
+      shrinkImage(file, function (dataUrl) {
+        if (!dataUrl) { toast('图片读取失败，请换一张试试'); return; }
+        row._imgData = dataUrl;
+        setThumb(row, dataUrl);
+        scheduleSave();
+      });
     });
     list.addEventListener('input', scheduleSave);
     list.addEventListener('change', scheduleSave);
@@ -291,7 +372,7 @@
         price: CORE.toRmb(price, cur, rates),   // 折算人民币参与分配与包邮判断
         limit: isNaN(limit) || limit <= 0 ? null : limit
       });
-      meta[type + '|'] = { currency: cur, unit: price };   // 原币单价（展示用）
+      meta[type + '|'] = { currency: cur, unit: price, img: r.img || '' };   // 原币单价 + 商品图（展示用）
     }
     if (!products.length) { toast('请先添加商品并填写数量'); return null; }
     return { products: products, meta: meta };
@@ -347,6 +428,12 @@
         var cur = m ? m.currency : 'cny';
         var li = el('li', 'acard-item');
         var row = el('div', 'acard-item-row');
+        if (m && m.img) {
+          var im = el('img', 'acard-item-img');
+          im.src = m.img;
+          im.alt = '';
+          row.appendChild(im);
+        }
         row.appendChild(el('span', 'acard-item-name', it.type + (it.model ? '·' + it.model : '') + ' ×' + it.qty));
         row.appendChild(el('span', 'acard-item-amt', fmtMoney(it.amount)));
         li.appendChild(row);
@@ -457,6 +544,19 @@
       g.closePath();
     }
 
+    // 圆角方图（cover 裁切）
+    function drawThumb(g, img, x, y, size) {
+      var iw = img.width || 0;
+      var ih = img.height || 0;
+      if (!iw || !ih) return;
+      var side = Math.min(iw, ih);
+      g.save();
+      rrPath(g, x, y, size, size, 10);
+      g.clip();
+      g.drawImage(img, (iw - side) / 2, (ih - side) / 2, side, side, x, y, size, size);
+      g.restore();
+    }
+
     var ops = [];
     var innerX = pad + 20;
     var innerW = W - 2 * pad - 40;
@@ -494,10 +594,12 @@
           name: it.type + ' ×' + it.qty,
           amt: fmtMoney(it.amount),
           orig: orig,
-          origText: orig != null ? currencySymbol(cur) + fmtNum(orig) : ''
+          origText: orig != null ? currencySymbol(cur) + fmtNum(orig) : '',
+          hasImg: !!(m && m.img),
+          imgEl: (m && m.imgEl) || null
         });
       });
-      var itemsH = rows.reduce(function (s, r) { return s + 30 + (r.orig != null ? 20 : 0); }, 0);
+      var itemsH = rows.reduce(function (s, r) { return s + (r.hasImg ? 44 : 30) + (r.orig != null ? 20 : 0); }, 0);
       var fKeys = Object.keys(foreign);
       var footText = '共 ' + a.items.reduce(function (t, it) { return t + it.qty; }, 0) + ' 件'
         + (fKeys.length ? ' · 外币合计 ' + fKeys.map(function (c) { return currencySymbol(c) + fmtNum(foreign[c]); }).join(' + ') : '');
@@ -528,12 +630,18 @@
         g.fillText(fmtMoney(a.total), xr - tw, hy);
         var iy = y + 18 + 36 + 6;
         rows.forEach(function (r) {
+          var textX = innerX;
+          if (r.imgEl) {
+            drawThumb(g, r.imgEl, innerX, iy + 2, 36);
+            textX = innerX + 46;
+          }
+          var base = iy + (r.hasImg ? 25 : 20);
           g.fillStyle = COL.ink;
           g.font = '20px ' + FONT;
-          g.fillText(r.name, innerX, iy + 20);
+          g.fillText(r.name, textX, base);
           var aw = g.measureText(r.amt).width;
-          g.fillText(r.amt, W - pad - 20 - aw, iy + 20);
-          iy += 30;
+          g.fillText(r.amt, W - pad - 20 - aw, base);
+          iy += r.hasImg ? 44 : 30;
           if (r.orig != null) {
             g.fillStyle = COL.sub;
             g.font = '15px ' + FONT;
@@ -587,35 +695,54 @@
     return canvas;
   }
 
+  // 预加载商品图（data: URI 的 Image 加载是异步的，绘图前必须就绪）
+  function preloadMetaImages(meta) {
+    var jobs = [];
+    Object.keys(meta).forEach(function (k) {
+      var m = meta[k];
+      if (m && m.img && !m.imgEl) {
+        jobs.push(new Promise(function (resolve) {
+          var im = new Image();
+          im.onload = function () { m.imgEl = im; resolve(); };
+          im.onerror = function () { resolve(); };
+          im.src = m.img;
+        }));
+      }
+    });
+    return Promise.all(jobs);
+  }
+
   function onExport() {
     if (!lastResult) { toast('请先计算购买计划'); return; }
-    var canvas = drawResultCanvas(lastResult);
-    if (!canvas) { toast('当前环境不支持生成图片'); return; }
-    var dataUrl;
-    try { dataUrl = canvas.toDataURL('image/png'); } catch (e) { toast('生成图片失败，请重试'); return; }
-    var mt = window.xhs && window.xhs.miniTool;
-    if (!mt || typeof mt.saveImageToPhotosAlbum !== 'function') { toast('当前环境不支持保存图片'); return; }
-    function save(filePath) {
-      Promise.resolve(mt.saveImageToPhotosAlbum({ filePath: filePath }))
-        .then(function (r) {
-          if (r === false || (r && r.errMsg && r.errMsg.indexOf(':fail') >= 0)) {
-            toast('保存失败' + (r && r.errMsg ? '：' + r.errMsg : '，请重试'));
-          } else {
-            toast('已保存到系统相册');
-          }
-        })
-        .catch(function (e) {
-          toast('保存失败：' + ((e && e.errMsg) || '请重试'));
-        });
-    }
-    if (typeof mt.writeTempFile === 'function') {
-      // 大图先落临时文件（官方建议），失败回落直接传 dataUrl
-      Promise.resolve(mt.writeTempFile({ data: dataUrl }))
-        .then(function (r) { save(r && r.filePath ? r.filePath : dataUrl); })
-        .catch(function () { save(dataUrl); });
-    } else {
-      save(dataUrl);
-    }
+    preloadMetaImages(lastResult.meta).then(function () {
+      var canvas = drawResultCanvas(lastResult);
+      if (!canvas) { toast('当前环境不支持生成图片'); return; }
+      var dataUrl;
+      try { dataUrl = canvas.toDataURL('image/png'); } catch (e) { toast('生成图片失败，请重试'); return; }
+      var mt = window.xhs && window.xhs.miniTool;
+      if (!mt || typeof mt.saveImageToPhotosAlbum !== 'function') { toast('当前环境不支持保存图片'); return; }
+      function save(filePath) {
+        Promise.resolve(mt.saveImageToPhotosAlbum({ filePath: filePath }))
+          .then(function (r) {
+            if (r === false || (r && r.errMsg && r.errMsg.indexOf(':fail') >= 0)) {
+              toast('保存失败' + (r && r.errMsg ? '：' + r.errMsg : '，请重试'));
+            } else {
+              toast('已保存到系统相册');
+            }
+          })
+          .catch(function (e) {
+            toast('保存失败：' + ((e && e.errMsg) || '请重试'));
+          });
+      }
+      if (typeof mt.writeTempFile === 'function') {
+        // 大图先落临时文件（官方建议），失败回落直接传 dataUrl
+        Promise.resolve(mt.writeTempFile({ data: dataUrl }))
+          .then(function (r) { save(r && r.filePath ? r.filePath : dataUrl); })
+          .catch(function () { save(dataUrl); });
+      } else {
+        save(dataUrl);
+      }
+    });
   }
 
   // —— 启动 ——

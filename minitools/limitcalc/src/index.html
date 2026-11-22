@@ -9,14 +9,14 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                   "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-family: 'Nunito', 'Noto Sans SC', -apple-system, "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none;
       user-select: none;
-      background: #faf7f2;
-      color: #33302e;
+      background: #f8f8f0;
+      color: #725d42;
     }
   </style>
   <link rel="stylesheet" href="./assets/style.css" />
@@ -104,6 +104,7 @@
 
     <p id="saveStatus" class="save-status" role="status"></p>
     <div id="toast" class="toast" role="status" hidden></div>
+    <input id="imgPicker" type="file" accept="image/*" hidden />
   </div>
 
   <script defer src="./assets/core.js"></script>

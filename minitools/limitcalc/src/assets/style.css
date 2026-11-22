@@ -178,7 +178,7 @@ body {
 
 .sel { padding: 0 8px; }
 
-/* —— 商品行（副底色小卡）—— */
+/* —— 商品行（副底色小卡；缩略图 + 名称 + 删除）—— */
 .prow {
   margin-top: 10px;
   padding: 10px;
@@ -190,7 +190,26 @@ body {
   display: flex;
   align-items: center;
 }
-.prow-top .p-name { flex: 1 1 auto; min-width: 0; height: 42px; font-size: 15px; }
+.p-thumb {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  margin-right: 8px;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  background: #fffdf4;
+  color: var(--ink-sub);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  padding: 0;
+  transition: all 0.15s;
+}
+.p-thumb.has-img { border-style: solid; }
+.p-thumb:active { background: var(--teal-bg); }
+.p-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prow-top .p-name { flex: 1 1 auto; min-width: 0; height: 44px; font-size: 15px; }
 .p-del {
   flex: 0 0 auto;
   width: 36px;
@@ -206,9 +225,12 @@ body {
   transition: all 0.15s;
 }
 .p-del:active { background: rgba(224, 90, 90, 0.12); }
-.prow-nums { display: flex; flex-wrap: wrap; margin-top: 8px; }
-.pnum { flex: 1 1 30%; min-width: 0; }
-.pnum + .pnum { margin-left: 8px; }
+
+/* 数字三联：flex-basis 0 均分（单价列含币种下拉，占 1.7 份），杜绝窄屏挤压重叠 */
+.prow-nums { display: flex; margin-top: 8px; }
+.prow-nums .pnum { flex: 1 1 0; min-width: 0; }
+.prow-nums .pnum + .pnum { margin-left: 8px; }
+.prow-nums .pnum-price { flex: 1.7 1 0; }
 .pnum-label {
   display: block;
   font-size: 11px;
@@ -219,8 +241,8 @@ body {
 .pnum .input,
 .pnum .sel { height: 40px; padding: 0 12px; font-size: 15px; }
 .pnum-inline { display: flex; }
-.pnum-inline .input { flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 12px; font-size: 15px; }
-.p-cur { flex: 0 0 auto; width: 78px; margin-left: 6px; height: 40px; padding: 0 6px; font-size: 13px; }
+.pnum-inline .input { flex: 1 1 0; width: 100%; min-width: 0; }
+.pnum-inline .p-cur { flex: 0 0 auto; width: 64px; margin-left: 5px; height: 40px; padding: 0 4px; font-size: 12px; }
 
 /* —— 按钮 —— */
 button { font-family: inherit; cursor: pointer; }
@@ -315,9 +337,20 @@ button { font-family: inherit; cursor: pointer; }
 .acard-items { margin-top: 8px; list-style: none; }
 .acard-item-row {
   display: flex;
+  align-items: center;
   font-size: 13px;
   line-height: 1.7;
   color: var(--ink-body);
+}
+.acard-item-img {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid rgba(196, 184, 158, 0.7);
+  background: #fff;
 }
 .acard-item-name { flex: 1 1 auto; min-width: 0; }
 .acard-item-amt { flex: 0 0 auto; margin-left: 8px; color: var(--ink); font-weight: 700; }

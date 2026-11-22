@@ -296,9 +296,27 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     expect(doc.getElementById('resultSummary').textContent).toContain('¥42.50');
   });
 
-  it('导出：无 Canvas / 容器桥的环境给出可读提示', () => {
+  it('导出：无 Canvas / 容器桥的环境给出可读提示', async () => {
     doc.getElementById('btnExport').click();   // jsdom 无 2D context → 生成图片提示
+    await Promise.resolve();                    // onExport 经 preload().then 微任务后弹 toast
+    await Promise.resolve();
     expect(doc.getElementById('toast').textContent).toContain('不支持');
+  });
+
+  it('商品图片：行内缩略位可设置，结果条目带图', () => {
+    win.confirm = function () { return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    expect(row.querySelector('.p-thumb')).toBeTruthy();
+    row._imgData = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    row.querySelector('.p-name').value = '吧唧';
+    row.querySelector('.p-qty').value = '2';
+    row.querySelector('.p-price').value = '10';
+    doc.getElementById('inAccounts').value = '1';
+    doc.getElementById('btnCompute').click();
+    const img = doc.querySelector('#resultCards .acard-item-img');
+    expect(img).toBeTruthy();
+    expect(img.getAttribute('src')).toContain('data:image/gif');
   });
 
   it('计算引擎未加载时启动给出可读失败提示并禁用计算按钮', async () => {

@@ -15,3 +15,6 @@ demo/*.zip
 
 # PCO 已存目录下线时的本地数据快照（v3.15.0，业务数据不入库）
 /archives/
+
+# 小红书小工具构建产物（minitools/limitcalc，dist 由 build.mjs 生成不入库）
+minitools/limitcalc/dist/

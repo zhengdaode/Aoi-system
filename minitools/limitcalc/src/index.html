@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>谷圈限购计算器</title>
+  <style>
+    /* 关键首屏样式（少量内联；完整样式在 assets/style.css） */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      background: #faf7f2;
+      color: #33302e;
+    }
+  </style>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <h1>谷圈限购计算器</h1>
+      <p class="hero-sub">按限购把排单数量分给多个账号，自动调剂凑包邮</p>
+    </header>
+
+    <noscript>
+      <div class="noscript-tip">需要启用 JavaScript 才能计算，请退出后重新打开小工具。</div>
+    </noscript>
+
+    <!-- 方案设置 -->
+    <section class="card">
+      <h2 class="card-title">方案设置</h2>
+      <div class="field">
+        <label class="flabel" for="inName">方案名称（选填）</label>
+        <input id="inName" type="text" class="input" placeholder="如：8.23 涩谷痛包团" maxlength="30" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label class="flabel" for="inFree">每单包邮线（¥）</label>
+          <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
+        </div>
+        <div class="field">
+          <label class="flabel" for="inAccounts">可用账号数</label>
+          <input id="inAccounts" type="number" inputmode="numeric" min="1" step="1" class="input" placeholder="如：4" />
+        </div>
+        <div class="field">
+          <label class="flabel" for="inMaxTypes">每账号最多几种</label>
+          <input id="inMaxTypes" type="number" inputmode="numeric" min="0" step="1" class="input" placeholder="不限" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 商品清单 -->
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">商品清单</h2>
+        <button id="btnAdd" type="button" class="btn-ghost btn-sm">＋ 添加商品</button>
+      </div>
+      <div id="productList"></div>
+      <div class="row-actions">
+        <button id="btnExample" type="button" class="btn-ghost btn-sm">填入示例</button>
+        <button id="btnClear" type="button" class="btn-ghost btn-sm btn-danger-ghost">清空</button>
+      </div>
+      <p class="tiny-tip">限购留空 = 该商品单账号不限购；账号金额 = 单价 × 件数。</p>
+    </section>
+
+    <button id="btnCompute" type="button" class="btn-primary">计算购买计划</button>
+
+    <!-- 结果 -->
+    <section class="card result-card" id="resultBox" hidden>
+      <h2 class="card-title">购买计划结果</h2>
+      <div id="resultSummary" class="r-summary"></div>
+      <div id="resultCards" class="r-cards"></div>
+      <div id="resultRemain" class="r-remain" hidden></div>
+      <p class="tiny-tip">结果文字可长按选中复制。</p>
+    </section>
+
+    <p id="saveStatus" class="save-status" role="status"></p>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </div>
+
+  <script defer src="./assets/core.js"></script>
+  <script defer src="./assets/app.js"></script>
+</body>
+</html>

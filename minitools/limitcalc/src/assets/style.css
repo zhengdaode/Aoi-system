@@ -1,0 +1,257 @@
+/* 谷圈限购计算器 — 暖奶油画布 + 珊瑚主色（与 Aoi-system 设计系统同源）
+ * 兼容基线：Chrome/WebView 61 —— 不用 Flex gap / aspect-ratio / clamp / :has / dvh；
+ * 间距一律用子项单边 margin；安全区用 var(--safe-area-inset-*, env(...)) 组合。 */
+
+:root {
+  --coral: #cc785c;
+  --coral-deep: #b96a50;
+  --coral-soft: #f6e7e0;
+  --ink: #33302e;
+  --sub: #8a837c;
+  --line: #ece4dc;
+  --bg: #faf7f2;
+  --card: #ffffff;
+  --ok: #2e9e6b;
+  --warn: #d97706;
+}
+
+[hidden] { display: none !important; }
+
+html { touch-action: manipulation; }
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(28px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+
+/* —— 首屏头部 —— */
+.hero { padding: 20px 4px 4px; }
+.hero h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+.hero-sub { margin-top: 6px; font-size: 13px; color: var(--sub); }
+
+.noscript-tip {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--coral-soft);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--coral-deep);
+}
+
+/* —— 卡片 —— */
+.card {
+  margin-top: 14px;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(70, 45, 30, 0.06);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title { font-size: 15px; font-weight: 700; }
+.card-head .card-title { flex: 1 1 auto; min-width: 0; }
+
+/* —— 表单 —— */
+.field { margin-top: 12px; min-width: 0; }
+.field-row { display: flex; flex-wrap: wrap; }
+.field-row .field { flex: 1 1 30%; }
+.field-row .field + .field { margin-left: 10px; }
+
+.flabel {
+  display: block;
+  font-size: 11px;
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 10px;
+  font-size: 16px;
+  color: var(--ink);
+  font-family: inherit;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.input:focus {
+  border-color: var(--coral);
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15);
+}
+.input::placeholder { color: #b9b1a9; }
+
+/* —— 商品行 —— */
+.prow {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fdfbf8;
+}
+.prow-top {
+  display: flex;
+  align-items: center;
+}
+.prow-top .p-name { flex: 1 1 auto; min-width: 0; height: 40px; font-size: 15px; }
+.p-del {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin-left: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--sub);
+  font-size: 18px;
+  line-height: 1;
+}
+.prow-nums { display: flex; flex-wrap: wrap; margin-top: 8px; }
+.pnum { flex: 1 1 30%; min-width: 0; }
+.pnum + .pnum { margin-left: 8px; }
+.pnum-label {
+  display: block;
+  font-size: 10px;
+  color: var(--sub);
+  margin-bottom: 3px;
+}
+.pnum .input { height: 38px; padding: 0 8px; font-size: 15px; }
+
+/* —— 按钮 —— */
+button { font-family: inherit; cursor: pointer; }
+.btn-primary {
+  display: block;
+  width: 100%;
+  height: 50px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 14px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  box-shadow: 0 4px 12px rgba(204, 120, 92, 0.35);
+}
+.btn-primary:active { background: var(--coral-deep); }
+.btn-primary[disabled] { background: #d8c9c0; box-shadow: none; }
+
+.btn-ghost {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 600;
+}
+.btn-ghost:active { background: var(--coral-soft); }
+.btn-sm { height: 34px; padding: 0 12px; font-size: 13px; }
+.btn-danger-ghost { color: #c04c3e; }
+
+.row-actions {
+  display: flex;
+  margin-top: 10px;
+}
+.row-actions .btn-sm + .btn-sm { margin-left: 10px; }
+
+.tiny-tip {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--sub);
+  line-height: 1.5;
+}
+
+/* —— 结果区（文字可选中，供长按复制） —— */
+.result-card { user-select: text; -webkit-user-select: text; }
+.r-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.6;
+}
+.r-cards { margin-top: 10px; }
+.acard {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 0;
+}
+.acard + .acard { margin-top: 8px; }
+.acard-ok { border-color: rgba(46, 158, 107, 0.45); }
+.acard-head {
+  display: flex;
+  align-items: center;
+}
+.acard-idx { font-weight: 700; font-size: 14px; }
+.acard-total { margin-left: 10px; font-weight: 700; font-size: 14px; color: var(--ink); }
+.acard-ship {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.ship-ok { color: var(--ok); background: rgba(46, 158, 107, 0.12); }
+.ship-warn { color: var(--warn); background: rgba(217, 119, 6, 0.12); }
+
+.acard-items { margin-top: 8px; list-style: none; }
+.acard-item {
+  display: flex;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.acard-item + .acard-item { margin-top: 2px; }
+.acard-item-name { flex: 1 1 auto; min-width: 0; }
+.acard-item-amt { flex: 0 0 auto; margin-left: 8px; color: var(--sub); }
+.acard-foot {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--sub);
+}
+
+.r-remain {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(217, 119, 6, 0.1);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a5a10;
+}
+
+.save-status {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #b0a89f;
+  min-height: 14px;
+}
+
+/* —— Toast —— */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 10px 18px;
+  background: rgba(45, 40, 36, 0.92);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 13px;
+  text-align: center;
+  z-index: 99;
+}
+
+/* 指针设备上的悬停增强（触摸端不影响） */
+@media (hover: hover) {
+  .btn-primary:hover { background: var(--coral-deep); }
+  .btn-ghost:hover { border-color: var(--coral); color: var(--coral-deep); }
+  .input:hover { border-color: #d8cfc6; }
+}

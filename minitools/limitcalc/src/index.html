@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>谷圈限购计算器</title>
+  <title>拼好邮 · 满赠/包邮计算器</title>
   <style>
     /* 关键首屏样式（少量内联；完整样式在 assets/style.css） */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,7 +24,7 @@
 <body>
   <div class="wrap">
     <header class="hero">
-      <h1>谷圈限购计算器</h1>
+      <h1>满赠/包邮计算器</h1>
     </header>
 
     <noscript>
@@ -39,7 +39,7 @@
         <input id="inName" type="text" class="input" maxlength="30" />
       </div>
       <div class="field">
-        <label class="flabel" for="inFree">每单包邮线</label>
+        <label class="flabel" for="inFree">每个订单满赠/包邮线</label>
         <div class="field-inline">
           <input id="inFree" type="number" inputmode="decimal" min="0" step="0.01" class="input" placeholder="0 = 不限" />
           <select id="freeCur" class="sel sel-field">
@@ -51,11 +51,11 @@
       </div>
       <div class="field-row">
         <div class="field">
-          <label class="flabel" for="inAccounts">可用账号数</label>
+          <label class="flabel" for="inAccounts">订单数</label>
           <input id="inAccounts" type="number" inputmode="numeric" min="1" step="1" class="input" placeholder="如：4" />
         </div>
         <div class="field">
-          <label class="flabel" for="inMaxTypes">每账号最多几种</label>
+          <label class="flabel" for="inMaxTypes">每单最多几种</label>
           <input id="inMaxTypes" type="number" inputmode="numeric" min="0" step="1" class="input" placeholder="不限" />
         </div>
       </div>
@@ -87,7 +87,7 @@
       <div class="row-actions">
         <button id="btnClear" type="button" class="btn-ghost btn-sm btn-danger-ghost">清空</button>
       </div>
-      <p class="tiny-tip">限购留空 = 该商品单账号不限购；账号金额 = 单价 × 件数。</p>
+      <p class="tiny-tip">限购留空 = 该商品每单不限购；订单金额 = 单价 × 件数。</p>
     </section>
 
     <button id="btnCompute" type="button" class="btn-primary">计算购买计划</button>

@@ -1,4 +1,4 @@
-/* 谷圈限购计算器 — animal-island-ui 设计语言复刻
+/* 拼好邮（满赠/包邮计算器）— animal-island-ui 设计语言复刻
  * 设计来源：https://github.com/guokaigdg/animal-island-ui（MIT，docs/design-system 为单一事实源）
  * 要点：暖棕文字 + 薄荷青主色 + 奶油羊皮纸底 + 大圆角药丸形 + 游戏按钮 3D 阴影 + 波点壁纸
  * 字体：Nunito（拉丁/数字）+ Noto Sans SC 简中子集（随包分发 woff2，离线打进 zip）
@@ -94,6 +94,7 @@ body {
   font-weight: 900;
   letter-spacing: 0.02em;
   color: var(--ink);
+  text-align: center;
 }
 
 .noscript-tip {
@@ -263,6 +264,13 @@ body {
 .pnum-inline .input { flex: 1 1 0; width: 100%; min-width: 0; }
 .pnum-inline .p-cur { flex: 0 0 auto; width: 64px; margin-left: 5px; height: 40px; padding: 0 4px; font-size: 12px; }
 
+/* 窄屏（≤400px）：单价列加宽、币种下拉收窄 —— 否则 4 位价格只剩 1~2 位可视 */
+@media (max-width: 400px) {
+  .prow-nums .pnum + .pnum { margin-left: 6px; }
+  .prow-nums .pnum-price { flex: 2.2 1 0; }
+  .pnum-inline .p-cur { width: 54px; margin-left: 4px; }
+}
+
 /* —— 按钮 —— */
 button { font-family: inherit; cursor: pointer; }
 .btn-primary {
@@ -340,11 +348,14 @@ button { font-family: inherit; cursor: pointer; }
 .acard-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;   /* 极窄屏放不下时徽标整行降到第二行，不拆字 */
 }
 .acard-idx { font-weight: 700; font-size: 14px; color: var(--ink); }
 .acard-total { margin-left: 10px; font-weight: 900; font-size: 15px; color: var(--ink); }
+.acard-idx, .acard-total, .acard-ship { white-space: nowrap; }
 .acard-ship {
   margin-left: auto;
+  margin-top: 2px;
   font-size: 11px;
   font-weight: 700;
   padding: 3px 10px;

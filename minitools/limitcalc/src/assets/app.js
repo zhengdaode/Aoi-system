@@ -1,4 +1,6 @@
-// 谷圈限购计算器 — 界面逻辑（经典脚本，ES2017）
+// 拼好邮（满赠/包邮计算器）— 界面逻辑（经典脚本，ES2017）
+// 界面口径：一个「订单」= 算法里的一个账号槽位（core.js 的 accounts，与主系统 planCore
+// 同源，标识符保持不动）；用户可见文案一律写「订单」，「包邮线」写作「满赠/包邮线」。
 // 容器 CSP 禁止内联脚本与行内事件：全部逻辑在此文件，事件用 addEventListener 绑定。
 // 存储：容器注入的 window.xhs.miniTool 本地缓存（小工具在线文档 §3.1，客户端 ≥9.46）；
 // 按容器规范不回退 localStorage / IndexedDB —— 存储不可用时工具照常运行、仅不保存。
@@ -11,6 +13,7 @@
   var CORE = window.LimitCalcCore;
   var SAVE_KEY = 'limitcalc_state_v1';
   var SAVE_DELAY = 400;
+  var TITLE = '满赠/包邮计算器';   // 页面标题与导出图抬头/落款共用
 
   // —— 币种（与主系统一致：人民币 / 日元 / 韩元）——
   var CURRENCIES = [
@@ -266,7 +269,7 @@
     var priceCell = numCell('单价', 'p-price', '0.01', data ? data.price : '', '0', 'decimal', currencySelect('p-cur', data ? data.cur : 'cny'));
     priceCell.className += ' pnum-price';
     nums.appendChild(priceCell);
-    nums.appendChild(numCell('单账号限购', 'p-limit', '1', data ? data.limit : '', '不限', 'numeric', null));
+    nums.appendChild(numCell('每单限购', 'p-limit', '1', data ? data.limit : '', '不限', 'numeric', null));
     row.appendChild(top);
     row.appendChild(nums);
     setThumb(row, row._imgData);
@@ -383,7 +386,7 @@
         type: type,
         model: '',
         qty: qty,
-        price: CORE.toRmb(price, cur, rates),   // 折算人民币参与分配与包邮判断
+        price: CORE.toRmb(price, cur, rates),   // 折算人民币参与分配与满赠/包邮判断
         limit: isNaN(limit) || limit <= 0 ? null : limit
       });
       if (!meta[type + '|']) meta[type + '|'] = { currency: cur, unit: price, img: r.img || '' };   // 原币单价 + 商品图（首行为准，展示用）
@@ -403,7 +406,7 @@
       seen[sig] = true;
     });
 
-    // 同名合并：数量累加、单价按金额加权平均、限购取最严 —— 结果条目与账号总额才能对上
+    // 同名合并：数量累加、单价按金额加权平均、限购取最严 —— 结果条目与订单总额才能对上
     var merged = {};
     var order = [];
     products.forEach(function (p) {
@@ -429,6 +432,19 @@
 
   function hideResult() { $('resultBox').hidden = true; }
 
+  // —— 结果文案（页面渲染与导出图共用同一份，避免两处口径不一致）——
+  // 单个订单的达标状态：达标 = 已达满赠/包邮；未达标且设了线 = 差额；未设线 = 不显示
+  function reachText(reached, diff, ctx) {
+    if (reached) return '已达满赠/包邮';
+    return ctx.free > 0 ? '差 ' + fmtMoney(diff) : '';
+  }
+
+  function remainText(result) {
+    if (!result.remaining || !result.remaining.length) return '';
+    return '⚠️ 剩余未分配（受限购 / 种类上限装不下，需加订单或放宽限购）：'
+      + result.remaining.map(function (r) { return r.type + ' ×' + r.qty; }).join('，');
+  }
+
   function summaryText(bundle) {
     var result = bundle.result;
     var ctx = bundle.ctx;
@@ -444,8 +460,8 @@
         : '（线 ' + currencySymbol(ctx.freeCur) + fmtNum(ctx.free) + ' ≈ ' + fmtMoney(ctx.freeRmb) + '）';
     }
     return (ctx.name ? '「' + ctx.name + '」' : '')
-      + '分配 ' + accounts.length + ' 个账号 · 共 ' + pieces + ' 件'
-      + (ctx.free > 0 ? ' · ' + reachedCnt + '/' + accounts.length + ' 达标包邮' + lineText : '');
+      + '分配 ' + accounts.length + ' 个订单 · 共 ' + pieces + ' 件'
+      + (ctx.free > 0 ? ' · ' + reachedCnt + '/' + accounts.length + ' 达标满赠/包邮' + lineText : '');
   }
 
   function renderResult(bundle) {
@@ -462,9 +478,9 @@
     accounts.forEach(function (a) {
       var card = el('div', 'acard' + (a.reached ? ' acard-ok' : ''));
       var head = el('div', 'acard-head');
-      head.appendChild(el('span', 'acard-idx', '账号 ' + a.index));
+      head.appendChild(el('span', 'acard-idx', '订单 ' + a.index));
       head.appendChild(el('span', 'acard-total', fmtMoney(a.total)));
-      var shipText = a.reached ? '已达包邮' : (ctx.free > 0 ? '差 ' + fmtMoney(a.diff) : '');
+      var shipText = reachText(a.reached, a.diff, ctx);
       if (shipText) head.appendChild(el('span', 'acard-ship ' + (a.reached ? 'ship-ok' : 'ship-warn'), shipText));
       card.appendChild(head);
 
@@ -503,13 +519,9 @@
     });
 
     var remain = $('resultRemain');
-    if (result.remaining && result.remaining.length) {
-      remain.textContent = '⚠️ 剩余未分配（受限购 / 种类上限装不下，需加账号或放宽限购）：'
-        + result.remaining.map(function (r) { return r.type + ' ×' + r.qty; }).join('，');
-      remain.hidden = false;
-    } else {
-      remain.hidden = true;
-    }
+    var remainMsg = remainText(result);
+    remain.textContent = remainMsg;
+    remain.hidden = remainMsg === '';
 
     box.hidden = false;
     if (typeof box.scrollIntoView === 'function') {
@@ -531,7 +543,7 @@
       if (!ok) return;
     }
     var accounts = parseInt($('inAccounts').value, 10);
-    if (!(accounts >= 1)) { toast('请填写可用账号数（≥1）'); $('inAccounts').focus(); return; }
+    if (!(accounts >= 1)) { toast('请填写订单数（≥1）'); $('inAccounts').focus(); return; }
     var free = parseFloat($('inFree').value);
     if (isNaN(free) || free < 0) free = 0;
     var freeCur = $('freeCur').value;
@@ -621,7 +633,7 @@
       g.fillRect(0, 0, W, 132);
       g.fillStyle = '#ffffff';
       g.font = 'bold 36px ' + FONT;
-      g.fillText('谷圈限购计算器', pad, 56);
+      g.fillText(TITLE, pad, 56);
       var ty = 56;
       if (nameText) { g.font = '18px ' + FONT; g.globalAlpha = 0.9; g.fillText(nameText, pad, 86); ty = 86; g.globalAlpha = 1; }
       g.font = '17px ' + FONT;
@@ -633,7 +645,7 @@
     } });
     ops.push({ h: 18, fn: function () {} });
 
-    // 账号卡
+    // 订单卡
     result.accounts.forEach(function (a) {
       var rows = [];
       var foreign = {};
@@ -666,9 +678,9 @@
         var hy = y + 18 + 26;
         g.fillStyle = COL.ink;
         g.font = 'bold 26px ' + FONT;
-        g.fillText('账号 ' + a.index, innerX, hy);
+        g.fillText('订单 ' + a.index, innerX, hy);
         var xr = W - pad - 20;
-        var shipText = a.reached ? '已达包邮' : (ctx.free > 0 ? '差 ' + fmtMoney(a.diff) : '');
+        var shipText = reachText(a.reached, a.diff, ctx);
         if (shipText) {
           g.fillStyle = a.reached ? COL.ok : COL.warn;
           g.font = 'bold 19px ' + FONT;
@@ -709,10 +721,9 @@
     });
 
     // 剩余未分配
-    if (result.remaining && result.remaining.length) {
-      var remainText = '⚠️ 剩余未分配（受限购 / 种类上限装不下，需加账号或放宽限购）：'
-        + result.remaining.map(function (r) { return r.type + ' ×' + r.qty; }).join('，');
-      var lines = wrapLines(mg, remainText, '17px ' + FONT, innerW);
+    var remainMsg = remainText(result);
+    if (remainMsg) {
+      var lines = wrapLines(mg, remainMsg, '17px ' + FONT, innerW);
       var boxH = 16 + lines.length * 24 + 16;
       ops.push({ h: boxH + 14, fn: function (g, y) {
         rrPath(g, pad, y, W - 2 * pad, boxH, 14);
@@ -729,7 +740,7 @@
       g.fillStyle = COL.sub;
       g.font = '14px ' + FONT;
       g.textAlign = 'center';
-      g.fillText('谷圈限购计算器 · ' + dateStr(), W / 2, y + 28);
+      g.fillText(TITLE + ' · ' + dateStr(), W / 2, y + 28);
       g.textAlign = 'left';
     } });
 

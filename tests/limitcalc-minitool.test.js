@@ -1,4 +1,4 @@
-// 谷圈限购计算器（小红书小工具，minitools/limitcalc）三合一测试：
+// 拼好邮（满赠/包邮计算器，小红书小工具，minitools/limitcalc）三合一测试：
 //   1) core.js 算法用例 —— 从 tests/limits.test.js 移植，钉死与主系统 Aoi.limits.planCore 同源
 //   2) 小工具容器合规静态扫描 —— zip-artifact-spec / device-capabilities / js-compatibility 关键红线
 //   3) jsdom 冒烟 —— index.html + core.js + app.js 真实装配：示例数据 → 计算 → 结果渲染
@@ -201,6 +201,37 @@ describe('小工具容器合规（zip-artifact-spec / device-capabilities / js-c
     expect(appSrc).not.toMatch(/fillExample|EXAMPLE/);
     expect(cssSrc).not.toContain('hero-sub');
   });
+
+  it('文案口径（2026-11-24 改名「拼好邮」）：标题居中改「满赠/包邮计算器」，账号→订单，包邮→满赠/包邮', () => {
+    // 页面：标题与方案设置项
+    expect(htmlSrc).toContain('<title>拼好邮 · 满赠/包邮计算器</title>');
+    expect(htmlSrc).toContain('<h1>满赠/包邮计算器</h1>');
+    expect(htmlSrc).toContain('每个订单满赠/包邮线');
+    expect(htmlSrc).toContain('>订单数</label>');
+    expect(htmlSrc).toContain('>每单最多几种</label>');
+    expect(htmlSrc).toContain('该商品每单不限购；订单金额 = 单价 × 件数');
+    // 标题居中：.hero h1 规则块内声明 text-align: center
+    expect(cssSrc).toMatch(/\.hero h1\s*\{[^}]*text-align:\s*center;/);
+    // 商品行的限购标签由 app.js 渲染
+    const appCode = appSrc.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, '');
+    expect(appCode).toContain("'每单限购'");
+    expect(appCode).toContain("toast('请填写订单数（≥1）')");
+    // 用户可见文案：零「账号」、零旧名；「包邮」一律带「满赠/」前缀（页面 + app.js 非注释代码）
+    [htmlSrc, appCode].forEach((src) => {
+      expect(src).not.toMatch(/账号/);
+      expect(src).not.toMatch(/谷圈限购/);
+      expect(src.match(/(?<!满赠\/)包邮/g) || []).toEqual([]);
+    });
+  });
+
+  it('窄屏适配（≤400px）：单价列加宽/币种收窄；结果卡头徽标不拆字', () => {
+    const mq = cssCode.match(/@media\s*\(max-width:\s*400px\)\s*\{[\s\S]*?\n\}/);
+    expect(mq).toBeTruthy();
+    expect(mq[0]).toContain('.prow-nums .pnum-price');
+    expect(mq[0]).toContain('.pnum-inline .p-cur');
+    expect(cssCode).toMatch(/\.acard-head\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(cssCode).toMatch(/\.acard-idx,\s*\.acard-total,\s*\.acard-ship\s*\{[^}]*white-space:\s*nowrap/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -221,9 +252,10 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     doc.getElementById('btnCompute').click();
     const box = doc.getElementById('resultBox');
     expect(box.hidden).toBe(false);
-    expect(box.textContent).toContain('账号 1');
-    expect(box.textContent).toContain('已达包邮');
-    expect(doc.getElementById('resultSummary').textContent).toContain('3/3 达标包邮');
+    expect(box.textContent).toContain('订单 1');
+    expect(box.textContent).toContain('已达满赠/包邮');
+    expect(doc.getElementById('resultSummary').textContent).toContain('3/3 达标满赠/包邮');
+    expect(doc.getElementById('resultSummary').textContent).toContain('分配 3 个订单');
     // 3 个账号卡 + 无剩余未分配
     expect(doc.querySelectorAll('#resultCards .acard')).toHaveLength(3);
     expect(doc.getElementById('resultRemain').hidden).toBe(true);
@@ -254,9 +286,10 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     const acards = doc.querySelectorAll('#resultCards .acard');
     expect(acards).toHaveLength(1);
     expect(acards[0].textContent).toContain('徽章 ×3');
-    expect(acards[0].textContent).toContain('已达包邮');
+    expect(acards[0].textContent).toContain('已达满赠/包邮');
     expect(doc.getElementById('resultRemain').hidden).toBe(false);
     expect(doc.getElementById('resultRemain').textContent).toContain('剩余未分配');
+    expect(doc.getElementById('resultRemain').textContent).toContain('需加订单或放宽限购');
     expect(doc.getElementById('resultRemain').textContent).toContain('色纸');
   });
 
@@ -275,7 +308,7 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     expect(card.textContent).toContain('¥53.00');      // 500×0.053=26.5/件 → ×2 = 53
     expect(card.textContent).toContain('JP¥1,000');    // 原币 500×2，千分位
     expect(card.textContent).toContain('外币合计');
-    expect(doc.getElementById('resultSummary').textContent).toContain('分配 1 个账号');
+    expect(doc.getElementById('resultSummary').textContent).toContain('分配 1 个订单');
   });
 
   it('包邮线外币：按汇率折算人民币判断包邮状态', () => {
@@ -292,7 +325,7 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     doc.getElementById('btnCompute').click();
     // 包邮线 JP¥800 × 0.053 = 42.4 → 0.5 圆整 42.5；商品 10000×0.053=530 → 达标
     const card = doc.querySelector('#resultCards .acard');
-    expect(card.textContent).toContain('已达包邮');
+    expect(card.textContent).toContain('已达满赠/包邮');
     expect(doc.getElementById('resultSummary').textContent).toContain('JP¥800');
     expect(doc.getElementById('resultSummary').textContent).toContain('¥42.50');
   });
@@ -302,6 +335,56 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
     await Promise.resolve();                    // onExport 经 preload().then 微任务后弹 toast
     await Promise.resolve();
     expect(doc.getElementById('toast').textContent).toContain('不支持');
+  });
+
+  it('导出图文字：抬头/落款用新标题，订单卡与达标状态和页面同口径', async () => {
+    win.confirm = function () { return true; };
+    doc.getElementById('btnClear').click();
+    const row = doc.querySelector('#productList .prow');
+    row.querySelector('.p-name').value = '吧唧';
+    row.querySelector('.p-qty').value = '1';
+    row.querySelector('.p-price').value = '128';
+    doc.getElementById('inName').value = '8.23涩谷';
+    doc.getElementById('inFree').value = '100';
+    doc.getElementById('inAccounts').value = '2';
+    doc.getElementById('btnCompute').click();
+    expect(doc.querySelectorAll('#resultCards .acard')).toHaveLength(1);   // 1 件货只占 1 个订单
+
+    // 桩：2D 上下文只记录 fillText 文字（其余方法空操作）；toDataURL 给占位 dataUrl；容器桥给保存成功
+    const texts = [];
+    const ctxStub = new Proxy({
+      fillText: (t) => texts.push(String(t)),
+      measureText: (t) => ({ width: String(t).length * 10 })
+    }, { get: (target, prop) => (prop in target ? target[prop] : () => {}) });
+    const saved = [];
+    const proto = win.HTMLCanvasElement.prototype;
+    const origGetContext = proto.getContext;
+    const origToDataURL = proto.toDataURL;
+    proto.getContext = function () { return ctxStub; };
+    proto.toDataURL = function () { return 'data:image/png;base64,AAAA'; };
+    win.xhs = { miniTool: {
+      writeTempFile: () => Promise.resolve({ filePath: 'tmp://plan.png' }),
+      saveImageToPhotosAlbum: (o) => { saved.push(o.filePath); return Promise.resolve({ errMsg: 'saveImageToPhotosAlbum:ok' }); }
+    } };
+    try {
+      doc.getElementById('btnExport').click();
+      await new Promise((r) => setTimeout(r, 0));   // 预加载图片 → 绘图 → 落临时文件 → 保存，全在微任务链上
+      const all = texts.join('\n');
+      expect(texts[0]).toBe('满赠/包邮计算器');                                  // 抬头
+      expect(all).toContain('「8.23涩谷」');
+      expect(all).toContain('分配 1 个订单 · 共 1 件 · 1/1 达标满赠/包邮（线 ¥100.00）');
+      expect(all).toContain('订单 1');
+      expect(all).toContain('已达满赠/包邮');
+      expect(all).toContain('¥128.00');
+      expect(all).toMatch(/^满赠\/包邮计算器 · \d{4}-\d{2}-\d{2}$/m);           // 落款
+      expect(all).not.toMatch(/账号|谷圈限购|已达包邮/);
+      expect(saved).toEqual(['tmp://plan.png']);
+      expect(doc.getElementById('toast').textContent).toBe('已保存到系统相册');
+    } finally {
+      proto.getContext = origGetContext;
+      proto.toDataURL = origToDataURL;
+      delete win.xhs;
+    }
   });
 
   it('商品图片：行内缩略位可设置，结果条目带图', () => {
@@ -404,9 +487,27 @@ describe('jsdom 冒烟：手动填写 → 计算 → 结果渲染', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-describe('构建与素材脚本', () => {
-  it('build.mjs / brand.mjs 语法可执行（node --check）', () => {
+describe('构建与上传素材', () => {
+  // PNG IHDR：宽 / 高各 4 字节大端（偏移 16 / 20），文件签名 8 字节
+  function pngSize(file) {
+    const buf = readFileSync(resolve(TOOL, 'brand', file));
+    expect(buf.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), bytes: buf.length };
+  }
+
+  it('build.mjs 语法可执行（node --check）', () => {
     execFileSync(process.execPath, ['--check', resolve(TOOL, 'build.mjs')]);
-    execFileSync(process.execPath, ['--check', resolve(TOOL, 'brand.mjs')]);
+  });
+
+  it('素材合规：图标 512×512（1:1、≤5MiB）、封面 3:4（≤10MiB）；图标原图随仓', () => {
+    const icon = pngSize('icon.png');
+    expect(icon.w).toBe(512);
+    expect(icon.h).toBe(512);
+    expect(icon.bytes).toBeLessThanOrEqual(5 * 1024 * 1024);
+    const cover = pngSize('cover.png');
+    expect(cover.w * 4).toBe(cover.h * 3);
+    expect(cover.bytes).toBeLessThanOrEqual(10 * 1024 * 1024);
+    expect(pngSize('icon-src.png').w).toBe(pngSize('icon-src.png').h);   // 原图 1:1
+    expect(existsSync(resolve(TOOL, 'brand.py'))).toBe(true);
   });
 });

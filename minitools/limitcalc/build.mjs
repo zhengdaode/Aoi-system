@@ -1,4 +1,4 @@
-// 谷圈限购计算器 — 打包脚本：src → dist/ → dist/limitcalc.zip
+// 拼好邮（满赠/包邮计算器）— 打包脚本：src → dist/ → dist/limitcalc.zip
 // 用法：node build.mjs
 // 产出 ZIP 满足小红书小工具规范：index.html 在根目录、仅允许的文件类型、无多余目录层。
 import { rmSync, mkdirSync, cpSync, readdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
